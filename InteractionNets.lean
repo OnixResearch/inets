@@ -1111,9 +1111,9 @@ Two threads.  A second thread can make the program slower.
                                 `m + 1` and `n` in at most
                                 `116 * m + 33 * n + 267` actions that are
                                 not rests and `48 * m + 15 * n + 85` for
-                                each of the `k` others, for
-                                `18 * k ≤ m + 14` and every `n`, however
-                                they are scheduled after the first
+                                each of the `k` others, for `4 ≤ m`,
+                                `20 * k ≤ 3 * m + 16` and every `n`,
+                                however they are scheduled after the first
                                 `(k + 1) * (17 * m - 1)` actions
 * `INet.Arith.threads_round_robin`, `INet.Arith.threads_rest`
                                 and when `3 * n + 16 ≤ 13 * m` in the work
@@ -1126,14 +1126,16 @@ Two threads.  A second thread can make the program slower.
   `INet.Arith.three_threads_round_robin`,
   `INet.Arith.three_threads_any_second`
                                 the cases of two threads, `m` from four
-                                on, and of three, `m` from twenty-two on
+                                on, and of three, `m` from eight on
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
 * `INet.Arith.solo_alive`       on an addition, through the first rounds
                                 of one thread, every agent of the start
                                 that those rounds do not take is in memory
-                                after every action
+                                after every action, so a thread that reads
+                                makes exactly three actions on each
+                                successor of its chain
 
 Closed loops.  `Net.Dead` marks the components of the wiring that reach no
 end, `Net.DeadCount` counts them, and `Loops` counts the loops closed by a
@@ -1904,7 +1906,7 @@ holds up to equality rather than up to renaming.
   threads act in turn, the first thread first, the work is linear,
   whatever the second argument and for any number of threads that the
   first argument is long enough for: on the net for `(m + 1) + n`, with
-  `k + 1` threads and `18 * k ≤ m + 14`, at most
+  `k + 1` threads, `4 ≤ m` and `20 * k ≤ 3 * m + 16`, at most
   `116 * m + 33 * n + 267` actions and `48 * m + 15 * n + 85` for each of
   the `k` other threads are not rests (`Arith.threads_any_second`), and
   the schedule is free after the first `(k + 1) * (17 * m - 1)` actions.
@@ -1922,16 +1924,16 @@ holds up to equality rather than up to renaming.
   those runs stay far under the bound proved, which is not tight.  The
   condition on the number of threads is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
-  to each after the round that takes it; the proof knows only that the
-  thread has made an action for each agent before, which gives
-  `18 * t ≤ m + 14`.  For two threads that is `m` from four on, for three
-  from twenty-two on; in the runs computed the other threads never claim
-  at smaller sizes either.  That the agents the first thread has not
-  taken are in memory after each of its actions is proved
-  (`Arith.solo_alive`), but not yet used to time the other threads
-  exactly.  Nothing is proved for more threads than that, or for
-  schedules that leave round robin earlier.  The alternating run is
-  followed while successors are left on
+  to each after the round that takes it.  The agents the first thread has
+  not taken are in memory after each of its actions
+  (`Arith.solo_alive`), so the thread makes exactly three actions on each
+  successor of its chain, and that count gives the condition; the actions
+  it makes on the second argument are not counted yet, and would allow
+  more threads when the second argument is long.  For two threads the
+  condition is `m` from four on, for three from eight on; in the runs
+  computed the other threads never claim at smaller sizes either.
+  Nothing is proved for more threads than that, or for schedules that
+  leave round robin earlier.  The alternating run is followed while successors are left on
   the first argument only, so the count is a lower bound on the work of
   the whole run, not its work.
 * An executable system (`XSys`) carries proofs: that its rules are the rules
@@ -42991,6 +42993,120 @@ theorem solo_gone_succ (m n : Nat) {d : Nat} (h1 : 1 ≤ d) (h2 : d ≤ m) {u : 
   rw [show n + 3 + m + 1 - d = h + 1 by omega]
   exact k
 
+/-- What the first round needs of the memory at the start: the top
+successor is first in the list and faces the adder. -/
+theorem Start.pair {n : Nat} {X : XNet Arith} {hi : Nat} (st : Start n X hi) :
+    ∃ rest, X.agents = ([hi + 1], .succ) :: rest ∧ assoc [hi + 1] X.agents = some .succ ∧
+      assoc (([hi + 1], 0) : Port) X.wires = some ([1], 0) ∧ ([hi + 1] : Id) ≠ [1] ∧
+      assoc [1] (X.takeAgent [hi + 1]).agents = some .add := by
+  obtain ⟨rest, hA⟩ := st.head
+  have hne : ([hi + 1] : Id) ≠ [1] := fun e => by
+    have ht := st.top
+    injection e with e1
+    omega
+  have h₁ : assoc [hi + 1] X.agents = some .succ := by
+    rw [hA]
+    show (if ([hi + 1] : Id) = [hi + 1] then some Arith.succ else assoc _ rest) = _
+    rw [ite_pos' rfl]
+  have h₂ : assoc (([hi + 1], 0) : Port) X.wires = some ([1], 0) :=
+    assoc_eq_of_unique ((st.first _).2 rfl) (fun q' hq => (st.first q').1 hq)
+  have h₄ : assoc [1] (X.takeAgent [hi + 1]).agents = some .add := by
+    show assoc [1] (X.agents.filter fun e => decide (e.1 ≠ [hi + 1])) = _
+    rw [assoc_filter_ne, ite_neg' hne]
+    exact st.adder
+  exact ⟨rest, hA, h₁, h₂, hne, h₄⟩
+
+/-- What a later round needs of the memory before it: the adder is first
+in the list, and one point away from the next successor of the chain. -/
+theorem Steady.pair {n : Nat} {X : XNet Arith} {h : Nat} (st : Steady n X (h + 1))
+    (hn : n + 4 ≤ h + 1) :
+    ∃ rest, X.agents = ([0, h + 1 + 1], .add) :: rest ∧
+      assoc [0, h + 1 + 1] X.agents = some .add ∧
+      assoc (([0, h + 1 + 1], 0) : Port) X.wires = some ([h + 1 + 1], 1) ∧
+      nextSeg X.wires ([h + 1 + 1], 1) ([0, h + 1 + 1], 0) = some ([h + 1], 0) ∧
+      assoc [h + 1] X.agents = some .succ ∧ ([0, h + 1 + 1] : Id) ≠ [h + 1] ∧
+      assoc [h + 1] (X.takeAgent [0, h + 1 + 1]).agents = some .succ := by
+  obtain ⟨rest, hA⟩ := st.head
+  have hb : below n (h + 1) = [h + 1] := below_pos hn
+  have hne : ([0, h + 1 + 1] : Id) ≠ [h + 1] := fun e => by
+    injection e with _ e2
+    cases e2
+  have h₁ : assoc [0, h + 1 + 1] X.agents = some .add := by
+    rw [hA]
+    show (if ([0, h + 1 + 1] : Id) = [0, h + 1 + 1] then some Arith.add
+      else assoc _ rest) = _
+    rw [ite_pos' rfl]
+  have h₂ : assoc (([0, h + 1 + 1], 0) : Port) X.wires = some ([h + 1 + 1], 1) :=
+    assoc_eq_of_unique ((st.first _).2 rfl) (fun q' hq => (st.first q').1 hq)
+  have h₂' : nextSeg X.wires ([h + 1 + 1], 1) ([0, h + 1 + 1], 0) = some ([h + 1], 0) := by
+    refine nextSeg_some ((st.mid _).2 (.inr (by rw [hb]))) (fun e => ?_) (fun q hq hqp => ?_)
+    · injection e with e1 _
+      injection e1 with _ e2
+      cases e2
+    · rcases (st.mid q).1 hq with e | e
+      · exact absurd e hqp
+      · rw [e, hb]
+  have h₃ : assoc [h + 1] X.agents = some .succ := st.chain.live (h + 1) hn (Nat.le_refl _)
+  have h₄ : assoc [h + 1] (X.takeAgent [0, h + 1 + 1]).agents = some .succ := by
+    show assoc [h + 1] (X.agents.filter fun e => decide (e.1 ≠ [0, h + 1 + 1])) = _
+    rw [assoc_filter_ne, ite_neg' hne]
+    exact h₃
+  exact ⟨rest, hA, h₁, h₂, h₂', h₃, hne, h₄⟩
+
+/-- **What the first thread has not taken is still there.**  On the net for
+`(m + 1) + n`, through the first `ρ + 1` rounds of one thread, that is its
+first `16 + 17 * ρ` actions, every agent of the start numbered from `2` up
+to the successor `ρ + 1` below the top one is in memory with its symbol,
+after every action: the rounds have taken the first adder and the `ρ + 1`
+top successors, and nothing else. -/
+theorem solo_alive (m n : Nat) : ∀ ρ, ρ ≤ m → ∀ (j : Nat) (γ : Arith) (u : Nat), 2 ≤ j →
+    j + ρ ≤ n + 3 + m → u ≤ 16 + 17 * ρ →
+    assoc [j] (sum (m + 1) n).agents = some γ →
+    assoc [j]
+      (XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ u).1.agents = some γ
+  | 0, _, j, γ, u, hj2, hj, hu, hx => by
+    have st := start_sum m n
+    obtain ⟨rest, hA, h₁, h₂, hne, h₄⟩ := st.pair
+    have hR : xsys.rule .succ .add = some addSucc.swap.toX := rfl
+    have k := XMach.solo_direct_keeps (xs := xsys) rest h₁ h₂ st.adder hne h₄ hR
+      (x := [j]) (γ := γ) hx (by ports_differ) (by ports_differ)
+      (fun e he => single_ne_new (by omega) (new_head hR he)) u (by
+        rw [newAgents_swap (a := [1]) (s := [m + n + 3 + 1]) (fun e => hne e.symm)]
+        show u ≤ 5 + (2 + 8 + 1)
+        omega)
+    rw [← hA] at k
+    exact k
+  | ρ + 1, hρ, j, γ, u, hj2, hj, hu, hx => by
+    by_cases hu' : u ≤ 16 + 17 * ρ
+    · exact solo_alive m n ρ (by omega) j γ u hj2 (by omega) hu' hx
+    · obtain ⟨X1, w1, st⟩ := solo_steady m n ρ (m + n + 3 - ρ) (by omega) (by omega)
+      have ih := solo_alive m n ρ (by omega) j γ (16 + 17 * ρ) hj2 (by omega)
+        (Nat.le_refl _) hx
+      rw [w1.solo.1] at ih
+      obtain ⟨h, eh⟩ : ∃ h, m + n + 3 - ρ = h + 1 := ⟨m + n + 2 - ρ, by omega⟩
+      rw [eh] at st
+      obtain ⟨rest, hA, h₁, h₂, h₂', h₃, hne, h₄⟩ := st.pair (by omega)
+      have hR : xsys.rule .add .succ = some addSucc.toX := rfl
+      obtain ⟨u', rfl⟩ : ∃ u', u = 16 + 17 * ρ + u' := ⟨u - (16 + 17 * ρ), by omega⟩
+      have k := XMach.solo_via_keeps (xs := xsys) (c := ([h + 1 + 1], 1)) rest h₁ h₂ rfl h₂'
+        h₃ hne h₄ hR (x := [j]) (γ := γ) ih (by ports_differ) (by ports_differ)
+        (fun e he => single_ne_new (by omega) (new_head hR he)) u' (by
+          rw [newAgents_add hne]
+          show u' ≤ 6 + (2 + 8 + 1)
+          omega)
+      rw [← hA] at k
+      rw [XMach.solo_add, w1.solo.1]
+      exact k
+
+/-- In particular the second argument and the zero of the first are there
+through all the rounds on the successors of the first argument. -/
+theorem solo_alive_snd (m n : Nat) {j : Nat} {γ : Arith} {u : Nat} (hj2 : 2 ≤ j)
+    (hj : j ≤ n + 3) (hu : u ≤ 16 + 17 * m)
+    (hx : assoc [j] (sum (m + 1) n).agents = some γ) :
+    assoc [j]
+      (XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ u).1.agents = some γ :=
+  solo_alive m n m (Nat.le_refl m) j γ u hj2 (by omega) hu hx
+
 /-- What every thread has in its list after the chain of the first
 argument: the second argument, the first adder, and the two zeros. -/
 def sndBase (n : Nat) : List (Id × Arith) :=
@@ -43081,11 +43197,12 @@ theorem passSum_sndBase (m n : Nat) : passSum m n (sndBase n) = m + 3 * n + 12 :
 
 /-- The names a list of a thread that reads may hold after the chain: the
 second argument, the first adder and the zeros, and a successor `d` below
-the top one for a thread that has made `17 * d + 4` actions before it
-comes to them, so that the round on that successor has taken it. -/
+the top one when the three actions on each of the `r0` successors of the
+chain before come to `17 * d + 4` at least, so that the round on that
+successor has taken it. -/
 def SndNames (m n r0 : Nat) (l : List (Id × Arith)) : Prop :=
   ∀ e ∈ l, ∃ j, 1 ≤ j ∧
-    (j ≤ n + 3 ∨ (j ≤ n + 3 + m + 1 ∧ 17 * (n + 3 + m + 1 - j) + 4 ≤ r0)) ∧ e.1 = [j]
+    (j ≤ n + 3 ∨ (j ≤ n + 3 + m + 1 ∧ 17 * (n + 3 + m + 1 - j) + 4 ≤ 3 * r0)) ∧ e.1 = [j]
 
 /-- **A list that a thread can read while the first thread works**: `r0`
 successors of the chain, the lowest last, then a list `tl` of the names
@@ -43102,45 +43219,45 @@ structure ReadList (m n r0 : Nat) (tl : List (Id × Arith)) (W : Nat) : Prop whe
 /-- **What a thread that reads can be while the first works**, with the
 actions it has left at most, and the least number it has made: in the
 chain it pops a successor, reads its segment, and finds the point above
-without a second segment; after the chain it does the same with the
+without a second segment, three actions for each; after the chain it does the same with the
 second argument and the zeros, walks along the adders from the top of the
 second argument, and finds the first adder and the successors that the
 first rounds took gone. -/
 inductive Reads (m n r0 : Nat) (tl : List (Id × Arith)) (W : Nat) :
     XThread Arith → Nat → Nat → Prop
   | cIdle (r : Nat) (hr : r ≤ m) :
-      Reads m n r0 tl W ⟨chainL n r ++ tl, .idle⟩ (3 * r + W) (r0 - r)
+      Reads m n r0 tl W ⟨chainL n r ++ tl, .idle⟩ (3 * r + W) (3 * (r0 - r))
   | cLook (r : Nat) (hr : r < m) :
       Reads m n r0 tl W ⟨chainL n r ++ tl, .look [n + 3 + r + 1] .succ⟩
-        (3 * r + W + 2) (r0 - r)
+        (3 * r + W + 2) (3 * (r0 - (r + 1)) + 1)
   | cSeek (r : Nat) (hr : r < m) :
       Reads m n r0 tl W ⟨chainL n r ++ tl,
         .seek [n + 3 + r + 1] .succ ([n + 3 + r + 1], 0) ([n + 3 + r + 1 + 1], 1)⟩
-        (3 * r + W + 1) (r0 - r)
+        (3 * r + W + 1) (3 * (r0 - (r + 1)) + 2)
   | tIdle (l : List (Id × Arith)) (hl : SndNames m n r0 l) :
-      Reads m n r0 tl W ⟨l, .idle⟩ (passSum m n l) r0
+      Reads m n r0 tl W ⟨l, .idle⟩ (passSum m n l) (3 * r0)
   | tLook (l : List (Id × Arith)) (hl : SndNames m n r0 l) (j : Nat) (α : Arith)
       (h1 : 2 ≤ j) (h2 : j ≤ n + 3) :
-      Reads m n r0 tl W ⟨l, .look [j] α⟩ (passCost m n ([j], α) - 1 + passSum m n l) r0
+      Reads m n r0 tl W ⟨l, .look [j] α⟩ (passCost m n ([j], α) - 1 + passSum m n l) (3 * r0)
   | tSeek (l : List (Id × Arith)) (hl : SndNames m n r0 l) (j : Nat) (α : Arith)
       (h1 : 3 ≤ j) (h2 : j ≤ n + 2) :
-      Reads m n r0 tl W ⟨l, .seek [j] α ([j], 0) ([j + 1], 1)⟩ (1 + passSum m n l) r0
+      Reads m n r0 tl W ⟨l, .seek [j] α ([j], 0) ([j + 1], 1)⟩ (1 + passSum m n l) (3 * r0)
   | tTwo (l : List (Id × Arith)) (hl : SndNames m n r0 l) (α : Arith) :
-      Reads m n r0 tl W ⟨l, .seek [2] α ([2], 0) ([n + 4], 1)⟩ (1 + passSum m n l) r0
+      Reads m n r0 tl W ⟨l, .seek [2] α ([2], 0) ([n + 4], 1)⟩ (1 + passSum m n l) (3 * r0)
   | w0 (l : List (Id × Arith)) (hl : SndNames m n r0 l) (α : Arith) :
       Reads m n r0 tl W ⟨l, .seek [n + 3] α ([n + 3], 0) ([1], 1)⟩
-        (m + 4 + passSum m n l) r0
+        (m + 4 + passSum m n l) (3 * r0)
   | wx (l : List (Id × Arith)) (hl : SndNames m n r0 l) (α : Arith) (x : Nat)
       (h1 : n + 3 + 1 ≤ x) (h2 : x ≤ n + 3 + m + 1) :
       Reads m n r0 tl W ⟨l, .seek [n + 3] α
           (if x = n + 3 + m + 1 then ([1], 1) else ([0, x + 1], 1)) ([0, x], 1)⟩
-        (x - (n + 4) + 3 + passSum m n l) r0
+        (x - (n + 4) + 3 + passSum m n l) (3 * r0)
   | w2 (l : List (Id × Arith)) (hl : SndNames m n r0 l) (α : Arith) :
       Reads m n r0 tl W ⟨l, .seek [n + 3] α ([0, n + 3 + 1], 1) ([0, n + 3 + 1], 2)⟩
-        (2 + passSum m n l) r0
+        (2 + passSum m n l) (3 * r0)
   | w1 (l : List (Id × Arith)) (hl : SndNames m n r0 l) (α : Arith) :
       Reads m n r0 tl W ⟨l, .seek [n + 3] α ([0, n + 3 + 1], 2) ([0, 0, n + 3 + 1 + 1], 1)⟩
-        (1 + passSum m n l) r0
+        (1 + passSum m n l) (3 * r0)
 
 /-- In each of these states the thread reads. -/
 theorem Reads.reading {m n r0 : Nat} {tl : List (Id × Arith)} {W : Nat} {T : XThread Arith}
@@ -43167,6 +43284,9 @@ theorem Reads.step {m n r0 : Nat} {tl : List (Id × Arith)} {W : Nat}
     (hgone : 5 ≤ a + 1 → assoc [n + 3 + m + 1] X.agents = none ∧ assoc [1] X.agents = none)
     (hgone' : ∀ j, n + 4 ≤ j → j ≤ n + 3 + m → 17 * (n + 3 + m + 1 - j) + 5 ≤ a + 1 →
       assoc [j] X.agents = none)
+    (halive : ∀ t, n + 4 ≤ t → t ≤ n + 3 + m → a + 2 ≤ 17 * (n + 3 + m + 1 - t) →
+      assoc [t] X.agents = some .succ)
+    (hstart : ∀ e ∈ (sum (m + 1) n).wires, e ∈ X.wires)
     {T1 : XThread Arith} {b lo : Nat} (h : Reads m n r0 tl W T1 b lo)
     (hb : a + b ≤ 4 * m + 3 * n + 15) (hlo : lo ≤ a) :
     T1 = ⟨[], .idle⟩ ∨ ∃ T1' b' lo', XMach.act xsys X T1 = (X, T1', 0) ∧
@@ -43176,10 +43296,10 @@ theorem Reads.step {m n r0 : Nat} {tl : List (Id × Arith)} {W : Nat}
   have h4 := RL.four
   have hle := RL.le
   have hlow := RL.low
-  have tailIdle : ∀ l, SndNames m n r0 l → r0 ≤ a →
+  have tailIdle : ∀ l, SndNames m n r0 l → 3 * r0 ≤ a →
       (⟨l, .idle⟩ : XThread Arith) = ⟨[], .idle⟩ ∨ ∃ T1' b' lo',
         XMach.act xsys X ⟨l, .idle⟩ = (X, T1', 0) ∧ Reads m n r0 tl W T1' b' lo' ∧
-          b' + 1 ≤ passSum m n l ∧ lo' ≤ r0 + 1 := by
+          b' + 1 ≤ passSum m n l ∧ lo' ≤ 3 * r0 + 1 := by
     intro l hl hma
     cases l with
     | nil => exact .inl rfl
@@ -43221,19 +43341,21 @@ theorem Reads.step {m n r0 : Nat} {tl : List (Id × Arith)} {W : Nat}
       · exact .inr ⟨T1', b', lo', k1, k2, by omega, by omega⟩
     | succ r =>
       right
-      by_cases hal : assoc [n + 3 + r + 1] X.agents = some Arith.succ
-      · exact ⟨⟨chainL n r ++ tl, .look [n + 3 + r + 1] .succ⟩, _, _,
-          XMach.act_idle_pos (e := ([n + 3 + r + 1], Arith.succ)) hal, .cLook r (by omega),
-          by omega, by omega⟩
-      · exact ⟨⟨chainL n r ++ tl, .idle⟩, _, _,
-          XMach.act_idle_neg (e := ([n + 3 + r + 1], Arith.succ)) hal, .cIdle r (by omega),
-          by omega, by omega⟩
+      have hal : assoc [n + 3 + r + 1] X.agents = some Arith.succ :=
+        halive (n + 3 + r + 1) (by omega) (by omega) (by omega)
+      exact ⟨⟨chainL n r ++ tl, .look [n + 3 + r + 1] .succ⟩, _, _,
+        XMach.act_idle_pos (e := ([n + 3 + r + 1], Arith.succ)) hal, .cLook r (by omega),
+        by omega, by omega⟩
   | cLook r hr =>
     right
     cases hq : assoc (([n + 3 + r + 1], 0) : Port) X.wires with
     | none =>
-      exact ⟨⟨_, .idle⟩, _, _, XMach.act_look_none hq, .cIdle r (by omega), by omega,
-        by omega⟩
+      exfalso
+      obtain ⟨q', e'⟩ := assoc_of_mem (hstart _
+        ((sum_princ (m + 1) n (n + 3 + r + 1) (by omega) (by omega)
+          ([n + 3 + r + 1 + 1], 1)).2 rfl))
+      rw [hq] at e'
+      cases e'
     | some q =>
       have hq0 := (F.old (.inl rfl) q).1 (hfin _ (assoc_mem hq))
       have eq := (sum_princ (m + 1) n (n + 3 + r + 1) (by omega) (by omega) q).1 hq0
@@ -43411,8 +43533,10 @@ theorem chain_turn (n r s : Nat) (B : List (Id × Arith)) :
 thread works, when the first argument is long enough for the thread to
 come to the top successors after their rounds: the chain without its
 `t + 1` top successors, then the second argument, the adder, the zeros,
-and those successors. -/
-theorem readList_turn (m n t : Nat) (ht : 18 * (t + 1) ≤ m + 14) :
+and those successors.  The thread makes three actions on each of the
+`m - t` successors of its chain, and the round on the last of the top
+successors has taken it after `17 * t + 5` actions of the first thread. -/
+theorem readList_turn (m n t : Nat) (hm : t + 4 ≤ m) (ht : 20 * t + 4 ≤ 3 * m) :
     ReadList m n (m - t) (sndBase n ++ (chainL n (m - t + (t + 1))).take (t + 1))
       (m + 3 * n + 12 + 3 * (t + 1)) := by
   have hlen : ((chainL n (m - t + (t + 1))).take (t + 1)).length = t + 1 := by
@@ -43464,7 +43588,7 @@ theorem rr_reads {m n r0 : Nat} {tl : List (Id × Arith)} {W : Nat}
         a + 1 + b ≤ 4 * m + 3 * n + 15 ∧ lo ≤ a + 1)
     rcases hc with hrest | ⟨hb, hlo⟩
     · rw [hrest]
-      exact ⟨_, r0, .tIdle [] (fun e he => nomatch he), .inl rfl⟩
+      exact ⟨_, _, .tIdle [] (fun e he => nomatch he), .inl rfl⟩
     · rcases Reads.step RL F (a := a) ht
           (X := (XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ (a + 1)).1)
           (fun e he => hfin (a + 1) (by omega) e he)
@@ -43475,10 +43599,17 @@ theorem rr_reads {m n r0 : Nat} {tl : List (Id × Arith)} {W : Nat}
               (u := a + 1) hu
             rw [show n + 3 + m + 1 - (n + 3 + m + 1 - j) = j by omega] at hg
             exact hg)
+          (fun t t1 t2 hu => solo_alive m n (n + 3 + m - t) (by omega) t .succ (a + 1)
+            (by omega) (by omega) (by omega) ((start_sum m n).chain.live t t1 (by omega)))
+          (fun e he => by
+            have hw := XMach.solo_wires_mono xsys (sum (m + 1) n)
+              ⟨(sum (m + 1) n).agents, .idle⟩ 0 (a + 1) e he
+            rw [Nat.zero_add] at hw
+            exact hw)
           hR hb hlo with
         h0 | ⟨T1', b', lo', hact, hR', hb', hlo'⟩
       · rw [h0]
-        exact ⟨_, r0, .tIdle [] (fun e he => nomatch he), .inl rfl⟩
+        exact ⟨_, _, .tIdle [] (fun e he => nomatch he), .inl rfl⟩
       · rw [hact]
         exact ⟨b', lo', hR', .inr ⟨by omega, by omega⟩⟩
 
@@ -43514,6 +43645,13 @@ theorem rr_quiet {m n r0 : Nat} {tl : List (Id × Arith)} {W : Nat}
             (u := a + 1) hu
           rw [show n + 3 + m + 1 - (n + 3 + m + 1 - j) = j by omega] at hg
           exact hg)
+        (fun t t1 t2 hu => solo_alive m n (n + 3 + m - t) (by omega) t .succ (a + 1)
+          (by omega) (by omega) (by omega) ((start_sum m n).chain.live t t1 (by omega)))
+        (fun e he => by
+          have hw := XMach.solo_wires_mono xsys (sum (m + 1) n)
+            ⟨(sum (m + 1) n).agents, .idle⟩ 0 (a + 1) e he
+          rw [Nat.zero_add] at hw
+          exact hw)
         hR hb hlo with
       h0 | ⟨T1', b', lo', hact, hR', hb', hlo'⟩
     · rw [h0]
@@ -43558,7 +43696,8 @@ theorem turn_list (m n t : Nat) (ht : t ≤ m) :
 
 /-- Each of the `k` threads after the first has a list that can be
 read. -/
-theorem turn_readList (m n k : Nat) (hk : 18 * k ≤ m + 14) {T : XThread Arith}
+theorem turn_readList (m n k : Nat) (hm : 4 ≤ m) (hk : 20 * k ≤ 3 * m + 16)
+    {T : XThread Arith}
     (hT : T ∈ (List.range k).map fun t => (⟨(sum (m + 1) n).agents.drop (t + 1) ++
       (sum (m + 1) n).agents.take (t + 1), .idle⟩ : XThread Arith)) :
     ∃ t, t < k ∧
@@ -43571,15 +43710,15 @@ theorem turn_readList (m n k : Nat) (hk : 18 * k ≤ m + 14) {T : XThread Arith}
   obtain ⟨t, ht, rfl⟩ := List.mem_map.1 hT
   have ht' := List.mem_range.1 ht
   have el := turn_list m n t (by omega)
-  exact ⟨t, ht', by rw [el], readList_turn m n t (by omega), el⟩
+  exact ⟨t, ht', by rw [el], readList_turn m n t (by omega) (by omega), el⟩
 
 /-- **Threads in turn add in linear work.**  On the net for `(m + 1) + n`
-take `k + 1` threads that act in turn, with `18 * k ≤ m + 14` and
-`3 * n + 16 ≤ 13 * m`.  They never do more than the work of one thread
+take `k + 1` threads that act in turn, with `4 ≤ m`,
+`20 * k ≤ 3 * m + 16` and `3 * n + 16 ≤ 13 * m`.  They never do more than the work of one thread
 alone and `4 * m + 3 * n + 15` more for each of the `k` others: those make
 no claim and change nothing; each reads the agents of its list once and
 comes to rest.  And they do no less than one thread alone. -/
-theorem threads_round_robin (m n k : Nat) (hk : 18 * k ≤ m + 14)
+theorem threads_round_robin (m n k : Nat) (hm : 4 ≤ m) (hk : 20 * k ≤ 3 * m + 16)
     (hn : 3 * n + 16 ≤ 13 * m) :
     (∀ i, (XMach.init (sum (m + 1) n) (k + 1)).work xsys (fun i => i % (k + 1)) i ≤
       soloWork (m + 1) n + k * (4 * m + 3 * n + 15)) ∧
@@ -43602,7 +43741,7 @@ theorem threads_round_robin (m n k : Nat) (hk : 18 * k ≤ m + 14)
       (XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T a ≠
         ⟨[], .idle⟩ → a < 4 * m + 3 * n + 15) := by
     intro T hT a
-    obtain ⟨t, ht, rfl, RL, -⟩ := turn_readList m n k hk hT
+    obtain ⟨t, ht, rfl, RL, -⟩ := turn_readList m n k hm hk hT
     exact rr_quiet RL a (.inr hn)
   constructor
   · intro i
@@ -43634,7 +43773,8 @@ theorem threads_round_robin (m n k : Nat) (hk : 18 * k ≤ m + 14)
 /-- **And they come to rest**: when each thread has had the number of
 actions that one thread needs alone, the first has finished the addition
 and the others have read their lists. -/
-theorem threads_rest (m n k : Nat) (hk : 18 * k ≤ m + 14) (hn : 3 * n + 16 ≤ 13 * m) :
+theorem threads_rest (m n k : Nat) (hm : 4 ≤ m) (hk : 20 * k ≤ 3 * m + 16)
+    (hn : 3 * n + 16 ≤ 13 * m) :
     ((XMach.init (sum (m + 1) n) (k + 1)).trace xsys (fun i => i % (k + 1))
       ((k + 1) * soloWork (m + 1) n)).1.resting = true := by
   rw [XMach.init_succ]
@@ -43647,7 +43787,7 @@ theorem threads_rest (m n k : Nat) (hk : 18 * k ≤ m + 14) (hn : 3 * n + 16 ≤
       (sum (m + 1) n).agents.take (t + 1), .idle⟩ : XThread Arith))
     (A := soloWork (m + 1) n)
     (fun T hT a _ => by
-      obtain ⟨t, ht, rfl, RL, -⟩ := turn_readList m n k hk hT
+      obtain ⟨t, ht, rfl, RL, -⟩ := turn_readList m n k hm hk hT
       have h := rr_quiet RL a (.inr hn)
       exact ⟨h.1, h.2.1⟩) (soloWork (m + 1) n) (Nat.le_refl _)
   rw [hl] at tr
@@ -43666,7 +43806,7 @@ theorem threads_rest (m n k : Nat) (hk : 18 * k ≤ m + 14) (hn : 3 * n + 16 ≤
   · rw [e1]
     rfl
   · obtain ⟨T, hT, rfl⟩ := List.mem_map.1 hx
-    obtain ⟨t, ht, rfl, RL, -⟩ := turn_readList m n k hk hT
+    obtain ⟨t, ht, rfl, RL, -⟩ := turn_readList m n k hm hk hT
     have e2 : XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩
         ⟨chainL n (m - t) ++ (sndBase n ++ (chainL n (m - t + (t + 1))).take (t + 1)), .idle⟩
         (soloWork (m + 1) n) = ⟨[], .idle⟩ := by
@@ -43681,15 +43821,15 @@ theorem threads_rest (m n k : Nat) (hk : 18 * k ≤ m + 14) (hn : 3 * n + 16 ≤
     rfl
 
 /-- **Threads in turn add in linear work, whatever the second argument.**
-On the net for `(m + 1) + n` take `k + 1` threads, `k` at least one, with
-`18 * k ≤ m + 14`.  Let them act in turn for the first
+On the net for `(m + 1) + n` take `k + 1` threads, with `4 ≤ m` and
+`20 * k ≤ 3 * m + 16`.  Let them act in turn for the first
 `(k + 1) * (17 * m - 1)` actions, and in any order after that.  Then at
 most `116 * m + 33 * n + 267` and `48 * m + 15 * n + 85` for each of the
 `k` others of their actions are not rests.  Until then the others have
 only read, and the first has made all its claims but two; from then on the
 measure of the general bound pays for a pass of the first thread, two for
 each other, and two claims. -/
-theorem threads_any_second (m n k : Nat) (hk1 : 1 ≤ k) (hk : 18 * k ≤ m + 14)
+theorem threads_any_second (m n k : Nat) (hm : 4 ≤ m) (hk : 20 * k ≤ 3 * m + 16)
     (σ : Nat → Nat) (hσ : ∀ j, j < (k + 1) * (17 * m - 1) → σ j = j % (k + 1)) (i : Nat) :
     (XMach.init (sum (m + 1) n) (k + 1)).work xsys σ i ≤
       116 * m + 33 * n + 267 + k * (48 * m + 15 * n + 85) := by
@@ -43714,7 +43854,7 @@ theorem threads_any_second (m n k : Nat) (hk1 : 1 ≤ k) (hk : 18 * k ≤ m + 14
       (sum (m + 1) n).agents.take (t + 1), .idle⟩ : XThread Arith))
     (A := 17 * m - 1)
     (fun T hT a ha => by
-      obtain ⟨t, ht, rfl, RL, -⟩ := turn_readList m n k hk hT
+      obtain ⟨t, ht, rfl, RL, -⟩ := turn_readList m n k hm hk hT
       have h := rr_quiet RL a (.inl (by omega))
       exact ⟨h.1, h.2.1⟩) (17 * m - 1) (Nat.le_refl _)
   rw [hl, es, tr1] at tr
@@ -43732,7 +43872,7 @@ theorem threads_any_second (m n k : Nat) (hk1 : 1 ≤ k) (hk : 18 * k ≤ m + 14
     (Nat.succ_pos k) xsys_bounded hs hn' σ hst hcl
     (fun R hRm => by
       obtain ⟨T, hT, rfl⟩ := List.mem_map.1 hRm
-      obtain ⟨t, ht, rfl, RL, el⟩ := turn_readList m n k hk hT
+      obtain ⟨t, ht, rfl, RL, el⟩ := turn_readList m n k hm hk hT
       obtain ⟨b, lo, hR, -⟩ := rr_reads RL (17 * m - 1) (.inl (by omega))
       obtain ⟨pre, hp⟩ := rr_suffix RL (17 * m - 1) (.inl (by omega))
       exact ⟨hR.reading, pre, t + 1, by rw [hp, el]⟩) i
@@ -43756,7 +43896,7 @@ theorem two_threads_round_robin (m n : Nat) (hm : 4 ≤ m) (hn : 3 * n + 16 ≤ 
       soloWork (m + 1) n + (4 * m + 3 * n + 15)) ∧
     ∀ i, 2 * soloWork (m + 1) n ≤ i →
       soloWork (m + 1) n ≤ (XMach.init (sum (m + 1) n) 2).work xsys (fun i => i % 2) i := by
-  have h := threads_round_robin m n 1 (by omega) hn
+  have h := threads_round_robin m n 1 hm (by omega) hn
   refine ⟨fun i => ?_, fun i hi => h.2 i (by omega)⟩
   have h1 := h.1 i
   show (XMach.init (sum (m + 1) n) (1 + 1)).work xsys (fun i => i % (1 + 1)) i ≤ _
@@ -43773,7 +43913,7 @@ theorem two_threads_linear (m n : Nat) (hm : 4 ≤ m) (hn : 3 * n + 16 ≤ 13 * 
 theorem two_threads_rest (m n : Nat) (hm : 4 ≤ m) (hn : 3 * n + 16 ≤ 13 * m) :
     ((XMach.init (sum (m + 1) n) 2).trace xsys (fun i => i % 2)
       (2 * soloWork (m + 1) n)).1.resting = true :=
-  threads_rest m n 1 (by omega) hn
+  threads_rest m n 1 hm (by omega) hn
 
 /-- **The order of the actions decides between linear and quadratic.**  On
 the same net, with the same two threads, acting in turn costs less than
@@ -43797,7 +43937,7 @@ actions. -/
 theorem two_threads_any_second (m n : Nat) (hm : 4 ≤ m) (σ : Nat → Nat)
     (hσ : ∀ j, j < 34 * m - 2 → σ j = j % 2) (i : Nat) :
     (XMach.init (sum (m + 1) n) 2).work xsys σ i ≤ 164 * m + 48 * n + 352 := by
-  have h := threads_any_second m n 1 (by omega) (by omega) σ (fun j hj => hσ j (by omega)) i
+  have h := threads_any_second m n 1 hm (by omega) σ (fun j hj => hσ j (by omega)) i
   show (XMach.init (sum (m + 1) n) (1 + 1)).work xsys σ i ≤ _
   omega
 
@@ -43807,15 +43947,15 @@ theorem two_threads_linear_any (m n : Nat) (hm : 4 ≤ m) (i : Nat) :
 
 /-- Three threads: at most one thread's work and `4 * m + 3 * n + 15` more
 for each of the two others. -/
-theorem three_threads_round_robin (m n : Nat) (hm : 22 ≤ m) (hn : 3 * n + 16 ≤ 13 * m) :
+theorem three_threads_round_robin (m n : Nat) (hm : 8 ≤ m) (hn : 3 * n + 16 ≤ 13 * m) :
     (∀ i, (XMach.init (sum (m + 1) n) 3).work xsys (fun i => i % 3) i ≤
       soloWork (m + 1) n + 2 * (4 * m + 3 * n + 15)) ∧
     ∀ i, 3 * soloWork (m + 1) n ≤ i →
       soloWork (m + 1) n ≤ (XMach.init (sum (m + 1) n) 3).work xsys (fun i => i % 3) i := by
-  have h := threads_round_robin m n 2 (by omega) hn
+  have h := threads_round_robin m n 2 (by omega) (by omega) hn
   exact ⟨fun i => h.1 i, fun i hi => h.2 i (by omega)⟩
 
-theorem three_threads_linear (m n : Nat) (hm : 22 ≤ m) (hn : 3 * n + 16 ≤ 13 * m) (i : Nat) :
+theorem three_threads_linear (m n : Nat) (hm : 8 ≤ m) (hn : 3 * n + 16 ≤ 13 * m) (i : Nat) :
     (XMach.init (sum (m + 1) n) 3).work xsys (fun i => i % 3) i ≤ 30 * m + 9 * n + 65 := by
   have h := (three_threads_round_robin m n hm hn).1 i
   have e := soloWork_succ m n
@@ -43824,135 +43964,29 @@ theorem three_threads_linear (m n : Nat) (hm : 22 ≤ m) (hn : 3 * n + 16 ≤ 13
 /-- Three threads, whatever the second argument: at most
 `212 * m + 63 * n + 437`, with any schedule after the first `51 * m - 3`
 actions. -/
-theorem three_threads_any_second (m n : Nat) (hm : 22 ≤ m) (σ : Nat → Nat)
+theorem three_threads_any_second (m n : Nat) (hm : 8 ≤ m) (σ : Nat → Nat)
     (hσ : ∀ j, j < 51 * m - 3 → σ j = j % 3) (i : Nat) :
     (XMach.init (sum (m + 1) n) 3).work xsys σ i ≤ 212 * m + 63 * n + 437 := by
   have h := threads_any_second m n 2 (by omega) (by omega) σ (fun j hj => hσ j (by omega)) i
   show (XMach.init (sum (m + 1) n) (2 + 1)).work xsys σ i ≤ _
   omega
 
-theorem three_threads_linear_any (m n : Nat) (hm : 22 ≤ m) (i : Nat) :
+theorem three_threads_linear_any (m n : Nat) (hm : 8 ≤ m) (i : Nat) :
     (XMach.init (sum (m + 1) n) 3).work xsys (fun i => i % 3) i ≤ 212 * m + 63 * n + 437 :=
   three_threads_any_second m n hm (fun i => i % 3) (fun _ _ => rfl) i
 
 /-- Ten threads add `400` and `100` in turn in at most 26,312 actions that
 are not rests; one thread needs 9,113. -/
 example (i : Nat) : (XMach.init (sum 400 100) 10).work xsys (fun i => i % 10) i ≤ 26312 :=
-  Nat.le_trans ((threads_round_robin 399 100 9 (by decide) (by decide)).1 i) (by decide)
+  Nat.le_trans ((threads_round_robin 399 100 9 (by decide) (by decide) (by decide)).1 i)
+    (by decide)
 
-/-- What the first round needs of the memory at the start: the top
-successor is first in the list and faces the adder. -/
-theorem Start.pair {n : Nat} {X : XNet Arith} {hi : Nat} (st : Start n X hi) :
-    ∃ rest, X.agents = ([hi + 1], .succ) :: rest ∧ assoc [hi + 1] X.agents = some .succ ∧
-      assoc (([hi + 1], 0) : Port) X.wires = some ([1], 0) ∧ ([hi + 1] : Id) ≠ [1] ∧
-      assoc [1] (X.takeAgent [hi + 1]).agents = some .add := by
-  obtain ⟨rest, hA⟩ := st.head
-  have hne : ([hi + 1] : Id) ≠ [1] := fun e => by
-    have ht := st.top
-    injection e with e1
-    omega
-  have h₁ : assoc [hi + 1] X.agents = some .succ := by
-    rw [hA]
-    show (if ([hi + 1] : Id) = [hi + 1] then some Arith.succ else assoc _ rest) = _
-    rw [ite_pos' rfl]
-  have h₂ : assoc (([hi + 1], 0) : Port) X.wires = some ([1], 0) :=
-    assoc_eq_of_unique ((st.first _).2 rfl) (fun q' hq => (st.first q').1 hq)
-  have h₄ : assoc [1] (X.takeAgent [hi + 1]).agents = some .add := by
-    show assoc [1] (X.agents.filter fun e => decide (e.1 ≠ [hi + 1])) = _
-    rw [assoc_filter_ne, ite_neg' hne]
-    exact st.adder
-  exact ⟨rest, hA, h₁, h₂, hne, h₄⟩
-
-/-- What a later round needs of the memory before it: the adder is first
-in the list, and one point away from the next successor of the chain. -/
-theorem Steady.pair {n : Nat} {X : XNet Arith} {h : Nat} (st : Steady n X (h + 1))
-    (hn : n + 4 ≤ h + 1) :
-    ∃ rest, X.agents = ([0, h + 1 + 1], .add) :: rest ∧
-      assoc [0, h + 1 + 1] X.agents = some .add ∧
-      assoc (([0, h + 1 + 1], 0) : Port) X.wires = some ([h + 1 + 1], 1) ∧
-      nextSeg X.wires ([h + 1 + 1], 1) ([0, h + 1 + 1], 0) = some ([h + 1], 0) ∧
-      assoc [h + 1] X.agents = some .succ ∧ ([0, h + 1 + 1] : Id) ≠ [h + 1] ∧
-      assoc [h + 1] (X.takeAgent [0, h + 1 + 1]).agents = some .succ := by
-  obtain ⟨rest, hA⟩ := st.head
-  have hb : below n (h + 1) = [h + 1] := below_pos hn
-  have hne : ([0, h + 1 + 1] : Id) ≠ [h + 1] := fun e => by
-    injection e with _ e2
-    cases e2
-  have h₁ : assoc [0, h + 1 + 1] X.agents = some .add := by
-    rw [hA]
-    show (if ([0, h + 1 + 1] : Id) = [0, h + 1 + 1] then some Arith.add
-      else assoc _ rest) = _
-    rw [ite_pos' rfl]
-  have h₂ : assoc (([0, h + 1 + 1], 0) : Port) X.wires = some ([h + 1 + 1], 1) :=
-    assoc_eq_of_unique ((st.first _).2 rfl) (fun q' hq => (st.first q').1 hq)
-  have h₂' : nextSeg X.wires ([h + 1 + 1], 1) ([0, h + 1 + 1], 0) = some ([h + 1], 0) := by
-    refine nextSeg_some ((st.mid _).2 (.inr (by rw [hb]))) (fun e => ?_) (fun q hq hqp => ?_)
-    · injection e with e1 _
-      injection e1 with _ e2
-      cases e2
-    · rcases (st.mid q).1 hq with e | e
-      · exact absurd e hqp
-      · rw [e, hb]
-  have h₃ : assoc [h + 1] X.agents = some .succ := st.chain.live (h + 1) hn (Nat.le_refl _)
-  have h₄ : assoc [h + 1] (X.takeAgent [0, h + 1 + 1]).agents = some .succ := by
-    show assoc [h + 1] (X.agents.filter fun e => decide (e.1 ≠ [0, h + 1 + 1])) = _
-    rw [assoc_filter_ne, ite_neg' hne]
-    exact h₃
-  exact ⟨rest, hA, h₁, h₂, h₂', h₃, hne, h₄⟩
-
-/-- **What the first thread has not taken is still there.**  On the net for
-`(m + 1) + n`, through the first `ρ + 1` rounds of one thread, that is its
-first `16 + 17 * ρ` actions, every agent of the start numbered from `2` up
-to the successor `ρ + 1` below the top one is in memory with its symbol,
-after every action: the rounds have taken the first adder and the `ρ + 1`
-top successors, and nothing else. -/
-theorem solo_alive (m n : Nat) : ∀ ρ, ρ ≤ m → ∀ (j : Nat) (γ : Arith) (u : Nat), 2 ≤ j →
-    j + ρ ≤ n + 3 + m → u ≤ 16 + 17 * ρ →
-    assoc [j] (sum (m + 1) n).agents = some γ →
-    assoc [j]
-      (XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ u).1.agents = some γ
-  | 0, _, j, γ, u, hj2, hj, hu, hx => by
-    have st := start_sum m n
-    obtain ⟨rest, hA, h₁, h₂, hne, h₄⟩ := st.pair
-    have hR : xsys.rule .succ .add = some addSucc.swap.toX := rfl
-    have k := XMach.solo_direct_keeps (xs := xsys) rest h₁ h₂ st.adder hne h₄ hR
-      (x := [j]) (γ := γ) hx (by ports_differ) (by ports_differ)
-      (fun e he => single_ne_new (by omega) (new_head hR he)) u (by
-        rw [newAgents_swap (a := [1]) (s := [m + n + 3 + 1]) (fun e => hne e.symm)]
-        show u ≤ 5 + (2 + 8 + 1)
-        omega)
-    rw [← hA] at k
-    exact k
-  | ρ + 1, hρ, j, γ, u, hj2, hj, hu, hx => by
-    by_cases hu' : u ≤ 16 + 17 * ρ
-    · exact solo_alive m n ρ (by omega) j γ u hj2 (by omega) hu' hx
-    · obtain ⟨X1, w1, st⟩ := solo_steady m n ρ (m + n + 3 - ρ) (by omega) (by omega)
-      have ih := solo_alive m n ρ (by omega) j γ (16 + 17 * ρ) hj2 (by omega)
-        (Nat.le_refl _) hx
-      rw [w1.solo.1] at ih
-      obtain ⟨h, eh⟩ : ∃ h, m + n + 3 - ρ = h + 1 := ⟨m + n + 2 - ρ, by omega⟩
-      rw [eh] at st
-      obtain ⟨rest, hA, h₁, h₂, h₂', h₃, hne, h₄⟩ := st.pair (by omega)
-      have hR : xsys.rule .add .succ = some addSucc.toX := rfl
-      obtain ⟨u', rfl⟩ : ∃ u', u = 16 + 17 * ρ + u' := ⟨u - (16 + 17 * ρ), by omega⟩
-      have k := XMach.solo_via_keeps (xs := xsys) (c := ([h + 1 + 1], 1)) rest h₁ h₂ rfl h₂'
-        h₃ hne h₄ hR (x := [j]) (γ := γ) ih (by ports_differ) (by ports_differ)
-        (fun e he => single_ne_new (by omega) (new_head hR he)) u' (by
-          rw [newAgents_add hne]
-          show u' ≤ 6 + (2 + 8 + 1)
-          omega)
-      rw [← hA] at k
-      rw [XMach.solo_add, w1.solo.1]
-      exact k
-
-/-- In particular the second argument and the zero of the first are there
-through all the rounds on the successors of the first argument. -/
-theorem solo_alive_snd (m n : Nat) {j : Nat} {γ : Arith} {u : Nat} (hj2 : 2 ≤ j)
-    (hj : j ≤ n + 3) (hu : u ≤ 16 + 17 * m)
-    (hx : assoc [j] (sum (m + 1) n).agents = some γ) :
-    assoc [j]
-      (XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ u).1.agents = some γ :=
-  solo_alive m n m (Nat.le_refl m) j γ u hj2 (by omega) hu hx
+/-- Ten threads are covered from a first argument of `56` on: on `56 + 10`
+they do at most 3,660 actions that are not rests; one thread needs
+1,275. -/
+example (i : Nat) : (XMach.init (sum 56 10) 10).work xsys (fun i => i % 10) i ≤ 3660 :=
+  Nat.le_trans ((threads_round_robin 55 10 9 (by decide) (by decide) (by decide)).1 i)
+    (by decide)
 
 end Arith
 
