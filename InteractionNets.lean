@@ -985,6 +985,17 @@ fresh start on the memory left by the last.
                                 it is
 * `INet.XMach.restart`          from there the run is the run on that
                                 memory, and the claims and the work add up
+* `INet.Works.work`, `INet.Works.write`
+                                a counted run without rests is all work;
+                                the writes of a claim as a counted run
+* `INet.Works.claim_direct`, `INet.Works.claim_via`
+                                a whole round, counted: the thread takes
+                                the first agent of its list, finds the
+                                partner on the next segment or one point
+                                further, claims, writes, and is idle with
+                                every agent of the new memory in its
+                                list, in five or six actions and the
+                                writes
 
 Closed loops.  `Net.Dead` marks the components of the wiring that reach no
 end, `Net.DeadCount` counts them, and `Loops` counts the loops closed by a
@@ -1698,7 +1709,10 @@ holds up to equality rather than up to renaming.
   here: after a claim is written the single thread is the program started
   afresh on the memory as it is (`XMach.single_claim`, `XMach.restart`),
   so a run is a sequence of rounds and the law can be proved one round at
-  a time.  The round on a net of any size is not done.  What is proved
+  a time.  A round is counted for any system (`Works.claim_direct`,
+  `Works.claim_via`), given what the lookups of the thread return.  That
+  the memories of an addition return it at every round, on a net of any
+  size, is not done.  What is proved
   for every size is that a run whose work is
   known is bounded by it (`Arith.ztime_of_work`, `Arith.btime_of_work`).
   For `12 + 12` on one thread the 313 actions give 267,615 counted and
@@ -34403,6 +34417,161 @@ theorem XMach.restart {X X' : XNet S} {i : Nat}
   exact ⟨ab1, ab2, c⟩
 
 end Rounds
+
+section CountedRounds
+
+variable [DecidableEq S] {xs : XSys S}
+
+omit [DecidableEq S] in
+theorem XThread.busy_of_ne_rest {T : XThread S} (h : T ≠ ⟨[], .idle⟩) : T.busy = 1 := by
+  obtain ⟨todo, st⟩ := T
+  cases st with
+  | idle =>
+    cases todo with
+    | nil => exact absurd rfl h
+    | cons e rest => rfl
+  | look a α => rfl
+  | seek a α p c => rfl
+  | ready a b α β => rfl
+  | half a b α β => rfl
+  | write as ls => rfl
+
+/-- **A counted run without rests is all work**: after its `k` actions the
+work is `k` more than nothing, and from there it is the work of the run
+from the state reached. -/
+theorem Works.work {X X' : XNet S} {T T' : XThread S} {c k : Nat}
+    (w : Works xs X T X' T' c k) :
+    ∀ j, (XMach.single X T).work xs (fun _ => 0) (k + j) =
+      k + (XMach.single X' T').work xs (fun _ => 0) j := by
+  induction w with
+  | refl X T =>
+    intro j
+    rw [Nat.zero_add, Nat.zero_add]
+  | @step X X₁ X' T T₁ T' c₁ c k hT h _ ih =>
+    intro j
+    have f := (XMach.single_front xs X T (k + j)).2.2
+    rw [h] at f
+    have e : k + 1 + j = k + j + 1 := by omega
+    rw [e, f, XThread.busy_of_ne_rest hT]
+    show 1 + (XMach.single X₁ T₁).work xs (fun _ => 0) (k + j) = _
+    rw [ih j]
+    omega
+
+/-- **The writes of a claim, as a counted run**: one action for each agent
+and each segment and one more, none a rest, and the thread is left idle
+with every agent of the memory in its list. -/
+theorem Works.write (xs : XSys S) (todo : List (Id × S)) :
+    ∀ (as : List (Id × S)) (ls : List (Port × Port)) (X : XNet S),
+      Works xs X ⟨todo, .write as ls⟩ ((X.putAgents as).putLinks ls)
+        ⟨((X.putAgents as).putLinks ls).agents, .idle⟩ 0 (as.length + ls.length + 1)
+  | e :: as, ls, X => by
+    obtain ⟨i, γ⟩ := e
+    have w := Works.write xs todo as ls (X.putAgent i γ)
+    have s : XMach.act xs X ⟨todo, .write ((i, γ) :: as) ls⟩ =
+        (X.putAgent i γ, ⟨todo, .write as ls⟩, 0) := rfl
+    have e : ((i, γ) :: as).length + ls.length + 1 = as.length + ls.length + 1 + 1 := by
+      show as.length + 1 + ls.length + 1 = _
+      omega
+    rw [e]
+    exact .step (c₁ := 0) (c := 0) (fun h => by cases h) s w
+  | [], e :: ls, X => by
+    obtain ⟨p, q⟩ := e
+    have w := Works.write xs todo [] ls (X.putLink p q)
+    have s : XMach.act xs X ⟨todo, .write [] ((p, q) :: ls)⟩ =
+        (X.putLink p q, ⟨todo, .write [] ls⟩, 0) := rfl
+    exact .step (c₁ := 0) (c := 0) (fun h => by cases h) s w
+  | [], [], X =>
+    .step (c₁ := 0) (c := 0) (k := 0) (fun h => by cases h) rfl (.refl _ _)
+
+/-- **A round on a pair that faces the thread directly.**  A single thread
+whose first agent has its principal port on a segment to the principal
+port of an agent it has a rule with claims the pair, writes the right-hand
+side, and is left idle with every agent of the new memory in its list:
+five actions and the writes, none a rest, and one claim. -/
+theorem Works.claim_direct {X : XNet S} {a b : Id} {α β : S} {R : XRhs S}
+    (rest : List (Id × S)) (h₁ : assoc a X.agents = some α)
+    (h₂ : assoc (a, 0) X.wires = some (b, 0)) (h₃ : assoc b X.agents = some β) (hne : a ≠ b)
+    (h₄ : assoc b (X.takeAgent a).agents = some β) (hR : xs.rule α β = some R) :
+    Works xs X ⟨(a, α) :: rest, .idle⟩
+      ((((X.takeAgent a).takeAgent b).putAgents (R.newAgents a b)).putLinks
+        (R.newLinks xs.sys.ar a b α β))
+      ⟨((((X.takeAgent a).takeAgent b).putAgents (R.newAgents a b)).putLinks
+        (R.newLinks xs.sys.ar a b α β)).agents, .idle⟩ 1
+      (5 + ((R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length + 1)) := by
+  have s₁ : XMach.act xs X ⟨(a, α) :: rest, .idle⟩ = (X, ⟨rest, .look a α⟩, 0) :=
+    XMach.act_idle_pos h₁
+  have s₂ : XMach.act xs X ⟨rest, .look a α⟩ = (X, ⟨rest, .seek a α (a, 0) (b, 0)⟩, 0) :=
+    XMach.act_look h₂
+  have s₃ : XMach.act xs X ⟨rest, .seek a α (a, 0) (b, 0)⟩ =
+      (X, ⟨rest, .ready a b α β⟩, 0) :=
+    XMach.act_seek_found (c := (b, 0))
+      (by
+        show (if (0 : Nat) = 0 then assoc b X.agents else none) = some β
+        rw [ite_pos' rfl]
+        exact h₃)
+      ⟨hne, by rw [hR]; rfl⟩
+  have s₄ : XMach.act xs X ⟨rest, .ready a b α β⟩ =
+      (X.takeAgent a, ⟨rest, .half a b α β⟩, 0) := XMach.act_ready h₁
+  have s₅ : XMach.act xs (X.takeAgent a) ⟨rest, .half a b α β⟩ =
+      ((X.takeAgent a).takeAgent b,
+        ⟨rest, .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β)⟩, 1) :=
+    XMach.act_half (by rw [ite_pos' ⟨h₄, hne⟩]; exact hR)
+  have w₁ : Works xs X ⟨(a, α) :: rest, .idle⟩ ((X.takeAgent a).takeAgent b)
+      ⟨rest, .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β)⟩ 1 5 :=
+    .step (c₁ := 0) (c := 1) (k := 4) (fun h => by cases h) s₁
+      (.step (c₁ := 0) (c := 1) (k := 3) (fun h => by cases h) s₂
+        (.step (c₁ := 0) (c := 1) (k := 2) (fun h => by cases h) s₃
+          (.step (c₁ := 0) (c := 1) (k := 1) (fun h => by cases h) s₄
+            (.step (c₁ := 1) (c := 0) (k := 0) (fun h => by cases h) s₅ (.refl _ _)))))
+  exact w₁.trans (Works.write xs rest _ _ _)
+
+/-- **A round on a pair one point away.**  As `Works.claim_direct`, but the
+segment from the principal port of the first agent goes to a point that is
+not the principal port of an agent, and the next segment from that point
+reaches the partner: six actions and the writes. -/
+theorem Works.claim_via {X : XNet S} {a b : Id} {α β : S} {R : XRhs S} {c : Port}
+    (rest : List (Id × S)) (h₁ : assoc a X.agents = some α)
+    (h₂ : assoc (a, 0) X.wires = some c)
+    (hc : (if c.2 = 0 then assoc c.1 X.agents else none) = none)
+    (h₂' : nextSeg X.wires c (a, 0) = some (b, 0)) (h₃ : assoc b X.agents = some β)
+    (hne : a ≠ b) (h₄ : assoc b (X.takeAgent a).agents = some β)
+    (hR : xs.rule α β = some R) :
+    Works xs X ⟨(a, α) :: rest, .idle⟩
+      ((((X.takeAgent a).takeAgent b).putAgents (R.newAgents a b)).putLinks
+        (R.newLinks xs.sys.ar a b α β))
+      ⟨((((X.takeAgent a).takeAgent b).putAgents (R.newAgents a b)).putLinks
+        (R.newLinks xs.sys.ar a b α β)).agents, .idle⟩ 1
+      (6 + ((R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length + 1)) := by
+  have s₁ : XMach.act xs X ⟨(a, α) :: rest, .idle⟩ = (X, ⟨rest, .look a α⟩, 0) :=
+    XMach.act_idle_pos h₁
+  have s₂ : XMach.act xs X ⟨rest, .look a α⟩ = (X, ⟨rest, .seek a α (a, 0) c⟩, 0) :=
+    XMach.act_look h₂
+  have s₂' : XMach.act xs X ⟨rest, .seek a α (a, 0) c⟩ =
+      (X, ⟨rest, .seek a α c (b, 0)⟩, 0) := XMach.act_seek_next hc h₂'
+  have s₃ : XMach.act xs X ⟨rest, .seek a α c (b, 0)⟩ = (X, ⟨rest, .ready a b α β⟩, 0) :=
+    XMach.act_seek_found (c := (b, 0))
+      (by
+        show (if (0 : Nat) = 0 then assoc b X.agents else none) = some β
+        rw [ite_pos' rfl]
+        exact h₃)
+      ⟨hne, by rw [hR]; rfl⟩
+  have s₄ : XMach.act xs X ⟨rest, .ready a b α β⟩ =
+      (X.takeAgent a, ⟨rest, .half a b α β⟩, 0) := XMach.act_ready h₁
+  have s₅ : XMach.act xs (X.takeAgent a) ⟨rest, .half a b α β⟩ =
+      ((X.takeAgent a).takeAgent b,
+        ⟨rest, .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β)⟩, 1) :=
+    XMach.act_half (by rw [ite_pos' ⟨h₄, hne⟩]; exact hR)
+  have w₁ : Works xs X ⟨(a, α) :: rest, .idle⟩ ((X.takeAgent a).takeAgent b)
+      ⟨rest, .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β)⟩ 1 6 :=
+    .step (c₁ := 0) (c := 1) (k := 5) (fun h => by cases h) s₁
+      (.step (c₁ := 0) (c := 1) (k := 4) (fun h => by cases h) s₂
+        (.step (c₁ := 0) (c := 1) (k := 3) (fun h => by cases h) s₂'
+          (.step (c₁ := 0) (c := 1) (k := 2) (fun h => by cases h) s₃
+            (.step (c₁ := 0) (c := 1) (k := 1) (fun h => by cases h) s₄
+              (.step (c₁ := 1) (c := 0) (k := 0) (fun h => by cases h) s₅ (.refl _ _))))))
+  exact w₁.trans (Works.write xs rest _ _ _)
+
+end CountedRounds
 
 /-! ### Systems as data
 
