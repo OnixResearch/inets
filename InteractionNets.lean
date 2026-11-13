@@ -972,6 +972,20 @@ does what the program with long names does, and its names stay short.
                                 it, counted and in bits: 267,615 and
                                 16,056,900 for `12 + 12` on one thread
 
+One thread.  A run of a single thread is a sequence of rounds, each a
+fresh start on the memory left by the last.
+
+* `INet.XMach.work_add`         the work of a run is the work up to a cut
+                                and the work after it
+* `INet.XMach.single_write`, `INet.XMach.single_claim`
+                                from a claim, the single thread writes the
+                                right-hand side in one action for each
+                                agent and segment and two more, and is
+                                then the program started on the memory as
+                                it is
+* `INet.XMach.restart`          from there the run is the run on that
+                                memory, and the claims and the work add up
+
 Closed loops.  `Net.Dead` marks the components of the wiring that reach no
 end, `Net.DeadCount` counts them, and `Loops` counts the loops closed by a
 reduction: the dead components gained, minus one per step.
@@ -1680,8 +1694,12 @@ holds up to equality rather than up to renaming.
   That law is checked by the kernel for all `m` and `n` below nine
   (`Arith.solo_work_checked`).  It is a computation for each size and not
   a proof for every size: proving it needs the program followed through a
-  whole round on a net of any size, list by list, which this file does
-  not do.  What is proved for every size is that a run whose work is
+  whole round on a net of any size, list by list.  The first step is
+  here: after a claim is written the single thread is the program started
+  afresh on the memory as it is (`XMach.single_claim`, `XMach.restart`),
+  so a run is a sequence of rounds and the law can be proved one round at
+  a time.  The round on a net of any size is not done.  What is proved
+  for every size is that a run whose work is
   known is bounded by it (`Arith.ztime_of_work`, `Arith.btime_of_work`).
   For `12 + 12` on one thread the 313 actions give 267,615 counted and
   16,056,900 bits (`Arith.sum12_solo`), against 7,028,955 and 421,737,300
@@ -34209,6 +34227,182 @@ theorem foldr_max_le : ∀ (l : List Nat) (b : Nat), (∀ x ∈ l, x ≤ b) → 
     show max y (l.foldr max 0) ≤ b
     exact Nat.max_le.2 ⟨h y List.mem_cons_self,
       foldr_max_le l b (fun x hx => h x (List.mem_cons_of_mem _ hx))⟩
+
+/-! ### One thread, round by round
+
+A single thread that has written a claim is back where the program
+starts: idle, with every agent of the memory in its list.  So its run is
+a sequence of rounds, each the start of the run on the memory left by the
+last, and what a run costs can be counted one round at a time. -/
+
+section Rounds
+
+variable [DecidableEq S] {xs : XSys S}
+
+/-- The work of a run is the work up to a cut and the work after it. -/
+theorem XMach.work_add (xs : XSys S) (σ : Nat → Nat) (M : XMach S) (i : Nat) :
+    ∀ k, M.work xs σ (i + k) =
+      M.work xs σ i + (M.trace xs σ i).1.work xs (fun j => σ (i + j)) k
+  | 0 => rfl
+  | k + 1 => by
+    have ih := XMach.work_add xs σ M i k
+    have a : (M.trace xs σ (i + k)).1 =
+        ((M.trace xs σ i).1.trace xs (fun j => σ (i + j)) k).1 :=
+      by rw [XMach.trace_add xs σ M i k]
+    show M.work xs σ (i + k) + (M.trace xs σ (i + k)).1.stepTally XThread.busy (σ (i + k)) =
+      M.work xs σ i + ((M.trace xs σ i).1.work xs (fun j => σ (i + j)) k +
+        ((M.trace xs σ i).1.trace xs (fun j => σ (i + j)) k).1.stepTally XThread.busy
+          (σ (i + k)))
+    rw [ih, a, Nat.add_assoc]
+
+/-- The program with one thread. -/
+def XMach.single (X : XNet S) (T : XThread S) : XMach S := ⟨X, [T]⟩
+
+/-- **One action of the single thread, then the rest of the run.** -/
+theorem XMach.single_front (xs : XSys S) (X : XNet S) (T : XThread S) (k : Nat) :
+    ((XMach.single X T).trace xs (fun _ => 0) (k + 1)).1 =
+        ((XMach.single (XMach.act xs X T).1 (XMach.act xs X T).2.1).trace xs
+          (fun _ => 0) k).1 ∧
+      ((XMach.single X T).trace xs (fun _ => 0) (k + 1)).2 =
+        (XMach.act xs X T).2.2 +
+          ((XMach.single (XMach.act xs X T).1 (XMach.act xs X T).2.1).trace xs
+            (fun _ => 0) k).2 ∧
+      (XMach.single X T).work xs (fun _ => 0) (k + 1) =
+        T.busy + (XMach.single (XMach.act xs X T).1 (XMach.act xs X T).2.1).work xs
+          (fun _ => 0) k := by
+  have h := XMach.trace_add xs (fun _ => 0) (XMach.single X T) 1 k
+  have hw := XMach.work_add xs (fun _ => 0) (XMach.single X T) 1 k
+  rw [Nat.add_comm 1 k] at h hw
+  have h1 := congrArg Prod.fst h
+  have h2 := congrArg Prod.snd h
+  refine ⟨h1, ?_, ?_⟩
+  · rw [h2]
+    show 0 + (XMach.act xs X T).2.2 + _ = _
+    rw [Nat.zero_add]
+    rfl
+  · rw [hw]
+    show 0 + T.busy + _ = _
+    rw [Nat.zero_add]
+    rfl
+
+/-- Write a list of agents, the first of the list first. -/
+def XNet.putAgents (X : XNet S) (as : List (Id × S)) : XNet S :=
+  as.foldl (fun X e => X.putAgent e.1 e.2) X
+
+/-- Write a list of segments, the first of the list first. -/
+def XNet.putLinks (X : XNet S) (ls : List (Port × Port)) : XNet S :=
+  ls.foldl (fun X e => X.putLink e.1 e.2) X
+
+/-- **The writes of a claim end in a fresh start.**  A single thread that
+has agents and segments to write takes one action for each and one more,
+none of them a rest and none a claim, and then the program is the program
+started on the memory as it then is. -/
+theorem XMach.single_write (xs : XSys S) (todo : List (Id × S)) :
+    ∀ (as : List (Id × S)) (ls : List (Port × Port)) (X : XNet S),
+      ((XMach.single X ⟨todo, .write as ls⟩).trace xs (fun _ => 0)
+          (as.length + ls.length + 1)).1 = XMach.init ((X.putAgents as).putLinks ls) 1 ∧
+        ((XMach.single X ⟨todo, .write as ls⟩).trace xs (fun _ => 0)
+          (as.length + ls.length + 1)).2 = 0 ∧
+        (XMach.single X ⟨todo, .write as ls⟩).work xs (fun _ => 0)
+          (as.length + ls.length + 1) = as.length + ls.length + 1
+  | e :: as, ls, X => by
+    obtain ⟨i, γ⟩ := e
+    obtain ⟨a, b, c⟩ := XMach.single_write xs todo as ls (X.putAgent i γ)
+    obtain ⟨f1, f2, f3⟩ := XMach.single_front xs X ⟨todo, .write ((i, γ) :: as) ls⟩
+      (as.length + ls.length + 1)
+    have e : ((i, γ) :: as).length + ls.length + 1 = as.length + ls.length + 1 + 1 := by
+      show as.length + 1 + ls.length + 1 = _
+      omega
+    rw [e]
+    refine ⟨f1.trans a, ?_, ?_⟩
+    · rw [f2]
+      show 0 + _ = 0
+      rw [Nat.zero_add]
+      exact b
+    · rw [f3]
+      show 1 + (XMach.single (X.putAgent i γ) ⟨todo, .write as ls⟩).work xs (fun _ => 0)
+        (as.length + ls.length + 1) = _
+      rw [c]
+      omega
+  | [], e :: ls, X => by
+    obtain ⟨p, q⟩ := e
+    obtain ⟨a, b, c⟩ := XMach.single_write xs todo [] ls (X.putLink p q)
+    obtain ⟨f1, f2, f3⟩ := XMach.single_front xs X ⟨todo, .write [] ((p, q) :: ls)⟩
+      (([] : List (Id × S)).length + ls.length + 1)
+    have e : ([] : List (Id × S)).length + ((p, q) :: ls).length + 1 =
+        ([] : List (Id × S)).length + ls.length + 1 + 1 := by
+      show 0 + (ls.length + 1) + 1 = 0 + ls.length + 1 + 1
+      omega
+    rw [e]
+    refine ⟨f1.trans a, ?_, ?_⟩
+    · rw [f2]
+      show 0 + _ = 0
+      rw [Nat.zero_add]
+      exact b
+    · rw [f3]
+      show 1 + (XMach.single (X.putLink p q) ⟨todo, .write [] ls⟩).work xs (fun _ => 0)
+        (([] : List (Id × S)).length + ls.length + 1) = _
+      rw [c]
+      omega
+  | [], [], X => by
+    refine ⟨?_, rfl, rfl⟩
+    exact (XMach.init_one X).symm
+
+/-- **From a claim to the fresh start.**  A single thread that holds one
+agent and finds its partner claims, writes, and starts afresh on the memory
+with the pair taken out and the right-hand side written: two actions more
+than there are agents and segments to write, none of them a rest, and one
+claim. -/
+theorem XMach.single_claim {X : XNet S} {todo : List (Id × S)} {a b : Id} {α β : S} {R : XRhs S}
+    (h : (if assoc b X.agents = some β ∧ a ≠ b then xs.rule α β else none) = some R) :
+    ((XMach.single X ⟨todo, .half a b α β⟩).trace xs (fun _ => 0)
+        ((R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length + 1 + 1)).1 =
+      XMach.init (((X.takeAgent b).putAgents (R.newAgents a b)).putLinks
+        (R.newLinks xs.sys.ar a b α β)) 1 ∧
+      ((XMach.single X ⟨todo, .half a b α β⟩).trace xs (fun _ => 0)
+        ((R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length + 1 + 1)).2 = 1 ∧
+      (XMach.single X ⟨todo, .half a b α β⟩).work xs (fun _ => 0)
+        ((R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length + 1 + 1) =
+        (R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length + 1 + 1 := by
+  obtain ⟨f1, f2, f3⟩ := XMach.single_front xs X ⟨todo, .half a b α β⟩
+    ((R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length + 1)
+  rw [XMach.act_half h] at f1 f2 f3
+  obtain ⟨a', b', c'⟩ := XMach.single_write xs todo (R.newAgents a b)
+    (R.newLinks xs.sys.ar a b α β) (X.takeAgent b)
+  refine ⟨f1.trans a', ?_, ?_⟩
+  · rw [f2]
+    show 1 + ((XMach.single (X.takeAgent b) ⟨todo, .write (R.newAgents a b)
+      (R.newLinks xs.sys.ar a b α β)⟩).trace xs (fun _ => 0)
+        ((R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length + 1)).2 = 1
+    rw [b']
+  · rw [f3]
+    show 1 + (XMach.single (X.takeAgent b) ⟨todo, .write (R.newAgents a b)
+      (R.newLinks xs.sys.ar a b α β)⟩).work xs (fun _ => 0)
+        ((R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length + 1) = _
+    rw [c']
+    omega
+
+/-- **After a claim is written the program runs as from the start.**  If
+the single thread has come back to its start on a memory `X'`, the rest of
+the run is the run on `X'`, and the claims and the work add up. -/
+theorem XMach.restart {X X' : XNet S} {i : Nat}
+    (h : ((XMach.init X 1).trace xs (fun _ => 0) i).1 = XMach.init X' 1) (k : Nat) :
+    ((XMach.init X 1).trace xs (fun _ => 0) (i + k)).1 =
+        ((XMach.init X' 1).trace xs (fun _ => 0) k).1 ∧
+      ((XMach.init X 1).trace xs (fun _ => 0) (i + k)).2 =
+        ((XMach.init X 1).trace xs (fun _ => 0) i).2 +
+          ((XMach.init X' 1).trace xs (fun _ => 0) k).2 ∧
+      (XMach.init X 1).work xs (fun _ => 0) (i + k) =
+        (XMach.init X 1).work xs (fun _ => 0) i +
+          (XMach.init X' 1).work xs (fun _ => 0) k := by
+  have ab := XMach.trace_add xs (fun _ => 0) (XMach.init X 1) i k
+  have c := XMach.work_add xs (fun _ => 0) (XMach.init X 1) i k
+  rw [h] at ab c
+  have ab1 := congrArg Prod.fst ab
+  have ab2 := congrArg Prod.snd ab
+  exact ⟨ab1, ab2, c⟩
+
+end Rounds
 
 /-! ### Systems as data
 
