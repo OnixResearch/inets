@@ -996,6 +996,19 @@ fresh start on the memory left by the last.
                                 every agent of the new memory in its
                                 list, in five or six actions and the
                                 writes
+* `INet.Arith.Start.round`, `INet.Arith.Steady.round`
+                                the rounds of an addition on a net of any
+                                size: the first in sixteen actions, each
+                                later one in seventeen, and the memory is
+                                ready for the next
+* `INet.Arith.start_sum`        the net for `(m + 1) + n` is ready for the
+                                first round
+* `INet.Arith.solo_work_le`     one thread adds `m` and `n` in at most
+                                `83 * m + 22 * n + 152` actions, for every
+                                `m` and `n`
+* `INet.Arith.solo_ztime_le`, `INet.Arith.solo_btime_le`
+                                so its count and its bits are bounded by
+                                that many times the cost of an action
 
 Closed loops.  `Net.Dead` marks the components of the wiring that reach no
 end, `Net.DeadCount` counts them, and `Loops` counts the loops closed by a
@@ -1696,30 +1709,35 @@ holds up to equality rather than up to renaming.
   474,055 bits for a count of 133,172 and `768 + 768` takes 6,549,085 for
   1,444,360: about 3.6 and 4.5 bits for each unit, where the counter ends
   at 484 and at 3,844, numbers of 9 and 12 bits.
-* One thread.  For one thread the bound on the work is `n + 1` passes,
-  each as long as a pass over every agent can be.  A pass can be that
-  long when the pair is the last that the thread tries, and nothing here
-  shows that the general bound can be made much smaller for one thread.
-  On addition the passes are short in every run computed, and the runs
-  take `22 * m + 3 * n + 13` actions (`6 * n + 13` when `m` is zero).
-  That law is checked by the kernel for all `m` and `n` below nine
-  (`Arith.solo_work_checked`).  It is a computation for each size and not
-  a proof for every size: proving it needs the program followed through a
-  whole round on a net of any size, list by list.  The first step is
-  here: after a claim is written the single thread is the program started
-  afresh on the memory as it is (`XMach.single_claim`, `XMach.restart`),
-  so a run is a sequence of rounds and the law can be proved one round at
-  a time.  A round is counted for any system (`Works.claim_direct`,
-  `Works.claim_via`), given what the lookups of the thread return.  That
-  the memories of an addition return it at every round, on a net of any
-  size, is not done.  What is proved
-  for every size is that a run whose work is
-  known is bounded by it (`Arith.ztime_of_work`, `Arith.btime_of_work`).
-  For `12 + 12` on one thread the 313 actions give 267,615 counted and
-  16,056,900 bits (`Arith.sum12_solo`), against 7,028,955 and 421,737,300
-  for every schedule; the run takes 10,999 and 28,984.  What is left of
-  the gap is the cost of an action, which is bounded as four operations
-  on trees of full depth.
+* One thread.  For one thread the general bound on the work is `n + 1`
+  passes, each as long as a pass over every agent can be.  A pass can be
+  that long when the pair is the last that the thread tries, and nothing
+  here shows that the general bound can be made much smaller for one
+  thread.  On addition the passes are short, and that is proved for
+  every size.  After a claim is written the single thread is the program
+  started afresh on the memory as it is (`XMach.single_claim`,
+  `XMach.restart`), so a run is a sequence of rounds.  A round is counted
+  for any system (`Works.claim_direct`, `Works.claim_via`), given what
+  the lookups of the thread return.  For addition an invariant of the
+  memory gives those lookups at every round (`Arith.Start`,
+  `Arith.Steady`): the first round takes sixteen actions and each later
+  one seventeen, while successors are left on the first argument.  The
+  rest of the run, the last claim and the last pass, is bounded by the
+  general bound on a net one step from its normal form.  So one thread
+  adds `m` and `n` in at most `83 * m + 22 * n + 152` actions
+  (`Arith.solo_work_le`), and its count and its bits are bounded by that
+  many times the cost of an action (`Arith.solo_ztime_le`,
+  `Arith.solo_btime_le`).  This is a bound, not the law of the runs: they
+  take `22 * m + 3 * n + 13` actions (`6 * n + 13` when `m` is zero),
+  which the kernel checks for all `m` and `n` below nine
+  (`Arith.solo_work_checked`) and which is not proved for every size,
+  because the last pass is not followed entry by entry.  For `12 + 12`
+  the bound for every size gives 1,412 actions, 1,207,260 counted and
+  72,435,600 bits; the 313 actions of the run give 267,615 and 16,056,900
+  (`Arith.sum12_solo`); the bounds for every schedule are 7,028,955 and
+  421,737,300; and the run takes 10,999 and 28,984.  What is left of the
+  gap is mostly the cost of an action, which is bounded as four
+  operations on trees of full depth.
 * An executable system (`XSys`) carries proofs: that its rules are the rules
   of a `System`, and that the slots of each right-hand side are listed.  For
   a system given as data (`SysData`) these follow from the evaluation of
@@ -34573,6 +34591,72 @@ theorem Works.claim_via {X : XNet S} {a b : Id} {α β : S} {R : XRhs S} {c : Po
 
 end CountedRounds
 
+section StepMemory
+
+theorem XNet.putLinks_agents : ∀ (ls : List (Port × Port)) (X : XNet S),
+    (X.putLinks ls).agents = X.agents
+  | [], _ => rfl
+  | l :: ls, X => XNet.putLinks_agents ls (X.putLink l.1 l.2)
+
+theorem XNet.putAgents_wires : ∀ (as : List (Id × S)) (X : XNet S),
+    (X.putAgents as).wires = X.wires
+  | [], _ => rfl
+  | e :: as, X => XNet.putAgents_wires as (X.putAgent e.1 e.2)
+
+theorem XNet.mem_putLinks {e : Port × Port} : ∀ (ls : List (Port × Port)) (X : XNet S),
+    e ∈ (X.putLinks ls).wires ↔ e ∈ ls ∨ e ∈ X.wires
+  | [], _ => ⟨.inr, fun h => h.elim (fun h' => absurd h' List.not_mem_nil) id⟩
+  | l :: ls, X => by
+    have ih := XNet.mem_putLinks (e := e) ls (X.putLink l.1 l.2)
+    have hc : e ∈ (X.putLink l.1 l.2).wires ↔ e = l ∨ e ∈ X.wires := List.mem_cons
+    show e ∈ ((X.putLink l.1 l.2).putLinks ls).wires ↔ _
+    rw [ih, hc, List.mem_cons]
+    constructor
+    · rintro (h | h | h)
+      · exact .inl (.inr h)
+      · exact .inl (.inl h)
+      · exact .inr h
+    · rintro ((h | h) | h)
+      · exact .inr (.inl h)
+      · exact .inl h
+      · exact .inr (.inr h)
+
+/-- The segments of the memory after a round: those written and those
+there before. -/
+theorem XNet.mem_step_wires [DecidableEq S] (X : XNet S) (x y : Id) (as : List (Id × S))
+    (L : List (Port × Port)) (e : Port × Port) :
+    e ∈ ((((X.takeAgent x).takeAgent y).putAgents as).putLinks L).wires ↔
+      e ∈ L ∨ e ∈ X.wires := by
+  rw [XNet.mem_putLinks, XNet.putAgents_wires]
+  rfl
+
+/-- The agents of the memory after a round that writes two. -/
+theorem XNet.step_agents [DecidableEq S] (X : XNet S) (x y : Id) (e₁ e₂ : Id × S)
+    (L : List (Port × Port)) :
+    ((((X.takeAgent x).takeAgent y).putAgents [e₁, e₂]).putLinks L).agents =
+      e₂ :: e₁ :: (X.agents.filter fun e => decide (e.1 ≠ x)).filter
+        fun e => decide (e.1 ≠ y) := by
+  rw [XNet.putLinks_agents]
+  rfl
+
+theorem dedupFst_pair {A B : Type} [DecidableEq A] {x y : A × B} (h : x.1 ≠ y.1) :
+    dedupFst [x, y] = [x, y] := by
+  have e : dedupFst [y] = [y] := rfl
+  show (if x.1 ∈ (dedupFst [y]).map Prod.fst then dedupFst [y] else x :: dedupFst [y]) = _
+  rw [e, ite_neg' (fun hm : x.1 ∈ [y].map Prod.fst => h (List.mem_singleton.1 hm))]
+
+end StepMemory
+
+theorem mem_insert1_wires {S : Type} (X : XNet S) (u : Id) (γ : S) (p q : Port)
+    (e : Port × Port) :
+    e ∈ (X.insert1 u γ p q).wires ↔
+      e = (p, (u, 0)) ∨ e = ((u, 0), p) ∨ e = ((u, 1), q) ∨ e = (q, (u, 1)) ∨
+        (e ∈ X.wires ∧ e.1 ≠ p ∧ e.1 ≠ q) := by
+  show e ∈ (p, (u, 0)) :: ((u, 0), p) :: ((u, 1), q) :: (q, (u, 1)) ::
+    X.wires.filter (fun e => decide (e.1 ≠ p ∧ e.1 ≠ q)) ↔ _
+  rw [List.mem_cons, List.mem_cons, List.mem_cons, List.mem_cons, List.mem_filter,
+    decide_eq_true_iff]
+
 /-! ### Systems as data
 
 A right-hand side given as two finite tables, and a system given as a
@@ -37421,6 +37505,661 @@ theorem sum12_solo : ∀ i,
   have hr : ((XMach.init (sum 12 12) 1).trace xsys (fun _ => 0) 320).1.resting = true := by
     decide +kernel
   exact fun i => ⟨ztime_of_work 12 12 hr sum12_work.1 i, btime_of_work 12 12 hr sum12_work.1 i⟩
+
+/-- Where the chain of the first argument goes on: the successor numbered
+`t`, or the zero at its end. -/
+def below (n t : Nat) : Id := if n + 4 ≤ t then [t] else [2]
+
+/-- **The chain of the first argument.**  The successors numbered from
+`n + 4` to `hi` are agents of the memory, and the only segment at the
+auxiliary port of each goes to the principal port of the one below. -/
+structure Chain (n : Nat) (X : XNet Arith) (hi : Nat) : Prop where
+  live : ∀ t, n + 4 ≤ t → t ≤ hi → assoc [t] X.agents = some .succ
+  seg : ∀ t, n + 4 ≤ t → t ≤ hi → ∀ q, (([t], 1), q) ∈ X.wires ↔ q = (below n (t - 1), 0)
+
+/-- **The memory before the first round**: the successor numbered `hi + 1`
+is first in the list of agents and faces the adder. -/
+structure Start (n : Nat) (X : XNet Arith) (hi : Nat) : Prop where
+  head : ∃ rest, X.agents = ([hi + 1], .succ) :: rest
+  top : n + 4 ≤ hi + 1
+  adder : assoc [1] X.agents = some .add
+  first : ∀ q, (([hi + 1], 0), q) ∈ X.wires ↔ q = ([1], 0)
+  chain : Chain n X (hi + 1)
+  fresh : ∀ t, n + 4 ≤ t → t ≤ hi + 1 → ∀ k q, (([0, t], k), q) ∉ X.wires
+
+/-- **The memory before a later round**: the adder made in the last round
+is first in the list of agents, and its principal port is one point away
+from the next agent of the chain. -/
+structure Steady (n : Nat) (X : XNet Arith) (hi : Nat) : Prop where
+  head : ∃ rest, X.agents = ([0, hi + 1], .add) :: rest
+  first : ∀ q, (([0, hi + 1], 0), q) ∈ X.wires ↔ q = ([hi + 1], 1)
+  mid : ∀ q, (([hi + 1], 1), q) ∈ X.wires ↔ q = ([0, hi + 1], 0) ∨ q = (below n hi, 0)
+  chain : Chain n X hi
+  fresh : ∀ t, n + 4 ≤ t → t ≤ hi → ∀ k q, (([0, t], k), q) ∉ X.wires
+
+/-- What the rounds need of the segments that a step between the adder `a`
+and the successor `s` writes. -/
+structure StepLinks (a s : Id) (L : List (Port × Port)) : Prop where
+  adder : ∀ q, ((0 :: s, 0), q) ∈ L ↔ q = (s, 1)
+  succ : ∀ q, ((s, 1), q) ∈ L ↔ q = (0 :: s, 0)
+  names : ∀ e ∈ L, e.1.1 = a ∨ e.1.1 = s ∨ e.1.1 = 0 :: s ∨ e.1.1 = 0 :: a
+
+theorem newLinks_add (a s : Id) : addSucc.toX.newLinks ar a s .add .succ =
+    [((a, 1), (0 :: s, 1)), ((a, 2), (0 :: a, 0)), ((s, 1), (0 :: s, 0)),
+     ((0 :: a, 0), (a, 2)), ((0 :: a, 1), (0 :: s, 2)), ((0 :: s, 0), (s, 1)),
+     ((0 :: s, 1), (a, 1)), ((0 :: s, 2), (0 :: a, 1))] := rfl
+
+theorem newLinks_swap (s a : Id) : addSucc.swap.toX.newLinks ar s a .succ .add =
+    [((s, 1), (0 :: s, 0)), ((a, 1), (0 :: s, 1)), ((a, 2), (0 :: a, 0)),
+     ((0 :: a, 0), (a, 2)), ((0 :: a, 1), (0 :: s, 2)), ((0 :: s, 0), (s, 1)),
+     ((0 :: s, 1), (a, 1)), ((0 :: s, 2), (0 :: a, 1))] := rfl
+
+theorem newAgents_add {a s : Id} (h : a ≠ s) :
+    addSucc.toX.newAgents a s = [(0 :: a, .succ), (0 :: s, .add)] :=
+  dedupFst_pair (x := (0 :: a, Arith.succ)) (y := (0 :: s, Arith.add))
+    (fun e => h (List.cons.inj e).2)
+
+theorem newAgents_swap {a s : Id} (h : a ≠ s) :
+    addSucc.swap.toX.newAgents s a = [(0 :: a, .succ), (0 :: s, .add)] :=
+  dedupFst_pair (x := (0 :: a, Arith.succ)) (y := (0 :: s, Arith.add))
+    (fun e => h (List.cons.inj e).2)
+
+theorem stepLinks_add {a s : Id} (h1 : a ≠ s) (h2 : s ≠ 0 :: a) :
+    StepLinks a s (addSucc.toX.newLinks ar a s .add .succ) := by
+  have hs : s ≠ 0 :: s := fun e => List.cons_ne_self 0 s e.symm
+  rw [newLinks_add]
+  refine ⟨fun q => ?_, fun q => ?_, fun e he => ?_⟩
+  · simp [h1.symm, hs.symm]
+  · simp [h1.symm, h2, hs]
+  · simp only [List.mem_cons, List.mem_nil_iff, or_false] at he
+    rcases he with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> simp
+
+theorem stepLinks_swap {a s : Id} (h1 : a ≠ s) (h2 : s ≠ 0 :: a) :
+    StepLinks a s (addSucc.swap.toX.newLinks ar s a .succ .add) := by
+  have hs : s ≠ 0 :: s := fun e => List.cons_ne_self 0 s e.symm
+  rw [newLinks_swap]
+  refine ⟨fun q => ?_, fun q => ?_, fun e he => ?_⟩
+  · simp [h1.symm, hs.symm]
+  · simp [h1.symm, h2, hs]
+  · simp only [List.mem_cons, List.mem_nil_iff, or_false] at he
+    rcases he with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> simp
+
+theorem below_pos {n t : Nat} (h : n + 4 ≤ t) : below n t = [t] := by
+  unfold below
+  rw [ite_pos' h]
+
+/-- **After a step the memory is ready for the next round.**  When the
+adder `a` and the successor numbered `h + 1` have fired, the new adder
+`[0, h + 1]` is first in the list of agents, one point away from the next
+agent of the chain, and the rest of the chain is as it was. -/
+theorem steady_of_step {n : Nat} {X X' : XNet Arith} {a : Id} {h : Nat}
+    {L : List (Port × Port)} (SL : StepLinks a [h + 1] L)
+    (hW : ∀ e, e ∈ X'.wires ↔ e ∈ L ∨ e ∈ X.wires)
+    (hHead : ∃ rest, X'.agents = ([0, h + 1], .add) :: rest)
+    (hLive : ∀ t, n + 4 ≤ t → t ≤ h → assoc [t] X'.agents = assoc [t] X.agents)
+    (ha1 : ∀ t, n + 4 ≤ t → a ≠ [t]) (ha2 : ∀ t, n + 4 ≤ t → t ≤ h → a ≠ [0, t])
+    (ch : Chain n X (h + 1))
+    (fr : ∀ t, n + 4 ≤ t → t ≤ h + 1 → ∀ k q, (([0, t], k), q) ∉ X.wires)
+    (hn : n + 4 ≤ h + 1) : Steady n X' h := by
+  have hname : ∀ t, n + 4 ≤ t → t ≤ h → ∀ k q, ((([t], k), q) : Port × Port) ∉ L := by
+    intro t ht1 ht2 k q hm
+    rcases SL.names _ hm with e | e | e | e
+    · exact ha1 t ht1 e.symm
+    · have e' : ([t] : Id) = [h + 1] := e
+      injection e' with e1
+      omega
+    · have e' : ([t] : Id) = [0, h + 1] := e
+      injection e' with _ e2
+      cases e2
+    · have e' : ([t] : Id) = 0 :: a := e
+      injection e' with e1
+      omega
+  have hfresh : ∀ t, n + 4 ≤ t → t ≤ h → ∀ k q, ((([0, t], k), q) : Port × Port) ∉ L := by
+    intro t ht1 ht2 k q hm
+    rcases SL.names _ hm with e | e | e | e
+    · exact ha2 t ht1 ht2 e.symm
+    · have e' : ([0, t] : Id) = [h + 1] := e
+      injection e' with _ e2
+      cases e2
+    · have e' : ([0, t] : Id) = [0, h + 1] := e
+      injection e' with _ e2
+      injection e2 with e3
+      omega
+    · have e' : ([0, t] : Id) = 0 :: a := e
+      injection e' with _ e2
+      exact ha1 t ht1 e2.symm
+  refine ⟨hHead, fun q => ?_, fun q => ?_, ⟨fun t ht1 ht2 => ?_, fun t ht1 ht2 q => ?_⟩,
+    fun t ht1 ht2 k q hm => ?_⟩
+  · constructor
+    · intro hm
+      rcases (hW _).1 hm with hl | hx
+      · exact (SL.adder q).1 hl
+      · exact absurd hx (fr (h + 1) hn (Nat.le_refl _) 0 q)
+    · intro e
+      exact (hW _).2 (.inl ((SL.adder q).2 e))
+  · have hseg := ch.seg (h + 1) hn (Nat.le_refl _) q
+    rw [Nat.add_sub_cancel] at hseg
+    constructor
+    · intro hm
+      rcases (hW _).1 hm with hl | hx
+      · exact .inl ((SL.succ q).1 hl)
+      · exact .inr (hseg.1 hx)
+    · rintro (e | e)
+      · exact (hW _).2 (.inl ((SL.succ q).2 e))
+      · exact (hW _).2 (.inr (hseg.2 e))
+  · rw [hLive t ht1 ht2]
+    exact ch.live t ht1 (by omega)
+  · have hseg := ch.seg t ht1 (by omega) q
+    constructor
+    · intro hm
+      rcases (hW _).1 hm with hl | hx
+      · exact absurd hl (hname t ht1 ht2 1 q)
+      · exact hseg.1 hx
+    · intro e
+      exact (hW _).2 (.inr (hseg.2 e))
+  · rcases (hW _).1 hm with hl | hx
+    · exact hfresh t ht1 ht2 k q hl
+    · exact fr t ht1 (by omega) k q hx
+
+/-- **A later round of an addition, counted.**  The single thread takes the
+adder, follows two segments to the next successor of the chain, claims,
+writes two agents and eight segments, and is at a fresh start on a memory
+ready for the next round: seventeen actions, none a rest. -/
+theorem Steady.round {n : Nat} {X : XNet Arith} {h : Nat} (st : Steady n X (h + 1))
+    (hn : n + 4 ≤ h + 1) :
+    ∃ X', Works xsys X ⟨X.agents, .idle⟩ X' ⟨X'.agents, .idle⟩ 1 17 ∧ Steady n X' h := by
+  obtain ⟨rest, hA⟩ := st.head
+  have hb : below n (h + 1) = [h + 1] := below_pos hn
+  have hne : ([0, h + 1 + 1] : Id) ≠ [h + 1] := fun e => by
+    injection e with _ e2
+    cases e2
+  have h₁ : assoc [0, h + 1 + 1] X.agents = some .add := by
+    rw [hA]
+    show (if ([0, h + 1 + 1] : Id) = [0, h + 1 + 1] then some Arith.add
+      else assoc _ rest) = _
+    rw [ite_pos' rfl]
+  have h₂ : assoc (([0, h + 1 + 1], 0) : Port) X.wires = some ([h + 1 + 1], 1) :=
+    assoc_eq_of_unique ((st.first _).2 rfl) (fun q' hq => (st.first q').1 hq)
+  have h₂' : nextSeg X.wires ([h + 1 + 1], 1) ([0, h + 1 + 1], 0) = some ([h + 1], 0) := by
+    refine nextSeg_some ((st.mid _).2 (.inr (by rw [hb]))) (fun e => ?_) (fun q hq hqp => ?_)
+    · injection e with e1 _
+      injection e1 with _ e2
+      cases e2
+    · rcases (st.mid q).1 hq with e | e
+      · exact absurd e hqp
+      · rw [e, hb]
+  have h₃ : assoc [h + 1] X.agents = some .succ := st.chain.live (h + 1) hn (Nat.le_refl _)
+  have h₄ : assoc [h + 1] (X.takeAgent [0, h + 1 + 1]).agents = some .succ := by
+    show assoc [h + 1] (X.agents.filter fun e => decide (e.1 ≠ [0, h + 1 + 1])) = _
+    rw [assoc_filter_ne, ite_neg' hne]
+    exact h₃
+  have hR : xsys.rule .add .succ = some addSucc.toX := rfl
+  have w := Works.claim_via (xs := xsys) (c := ([h + 1 + 1], 1)) rest h₁ h₂ rfl h₂' h₃ hne h₄ hR
+  rw [← hA] at w
+  have eA := newAgents_add (a := [0, h + 1 + 1]) (s := [h + 1]) hne
+  have eK : 6 + ((addSucc.toX.newAgents [0, h + 1 + 1] [h + 1]).length +
+      (addSucc.toX.newLinks xsys.sys.ar [0, h + 1 + 1] [h + 1] .add .succ).length + 1) =
+      17 := by
+    rw [eA]
+    rfl
+  rw [eK] at w
+  refine ⟨_, w, ?_⟩
+  have SL := stepLinks_add (a := [0, h + 1 + 1]) (s := [h + 1]) hne
+    (fun e => by injection e with _ e2; cases e2)
+  refine steady_of_step SL (fun e => XNet.mem_step_wires X _ _ _ _ e) ?_ ?_ ?_ ?_ st.chain
+    st.fresh hn
+  · rw [eA, XNet.step_agents]
+    exact ⟨_, rfl⟩
+  · intro t ht1 ht2
+    have n1 : ¬ ([0, h + 1] : Id) = [t] := fun e => by injection e with _ e2; cases e2
+    have n2 : ¬ ([0, 0, h + 1 + 1] : Id) = [t] := fun e => by injection e with _ e2; cases e2
+    have n3 : ¬ ([h + 1] : Id) = [t] := fun e => by injection e with e1; omega
+    have n4 : ¬ ([0, h + 1 + 1] : Id) = [t] := fun e => by injection e with _ e2; cases e2
+    rw [eA, XNet.step_agents]
+    show (if ([0, h + 1] : Id) = [t] then some Arith.add
+      else if ([0, 0, h + 1 + 1] : Id) = [t] then some Arith.succ
+      else assoc [t] ((X.agents.filter fun e => decide (e.1 ≠ [0, h + 1 + 1])).filter
+        fun e => decide (e.1 ≠ [h + 1]))) = _
+    rw [ite_neg' n1, ite_neg' n2, assoc_filter_ne, ite_neg' n3, assoc_filter_ne, ite_neg' n4]
+  · intro t _ e
+    injection e with _ e2
+    cases e2
+  · intro t _ ht2 e
+    injection e with _ e2
+    injection e2 with e3
+    omega
+
+/-- **The first round of an addition, counted.**  The single thread takes
+the successor that faces the adder, claims, writes, and is at a fresh
+start on a memory ready for the later rounds: sixteen actions, none a
+rest. -/
+theorem Start.round {n : Nat} {X : XNet Arith} {hi : Nat} (st : Start n X hi) :
+    ∃ X', Works xsys X ⟨X.agents, .idle⟩ X' ⟨X'.agents, .idle⟩ 1 16 ∧ Steady n X' hi := by
+  obtain ⟨rest, hA⟩ := st.head
+  have ht := st.top
+  have hne : ([hi + 1] : Id) ≠ [1] := fun e => by
+    injection e with e1
+    omega
+  have hne' : ([1] : Id) ≠ [hi + 1] := fun e => hne e.symm
+  have h₁ : assoc [hi + 1] X.agents = some .succ := by
+    rw [hA]
+    show (if ([hi + 1] : Id) = [hi + 1] then some Arith.succ else assoc _ rest) = _
+    rw [ite_pos' rfl]
+  have h₂ : assoc (([hi + 1], 0) : Port) X.wires = some ([1], 0) :=
+    assoc_eq_of_unique ((st.first _).2 rfl) (fun q' hq => (st.first q').1 hq)
+  have h₄ : assoc [1] (X.takeAgent [hi + 1]).agents = some .add := by
+    show assoc [1] (X.agents.filter fun e => decide (e.1 ≠ [hi + 1])) = _
+    rw [assoc_filter_ne, ite_neg' hne]
+    exact st.adder
+  have hR : xsys.rule .succ .add = some addSucc.swap.toX := rfl
+  have w := Works.claim_direct (xs := xsys) rest h₁ h₂ st.adder hne h₄ hR
+  rw [← hA] at w
+  have eA := newAgents_swap (a := [1]) (s := [hi + 1]) hne'
+  have eK : 5 + ((addSucc.swap.toX.newAgents [hi + 1] [1]).length +
+      (addSucc.swap.toX.newLinks xsys.sys.ar [hi + 1] [1] .succ .add).length + 1) = 16 := by
+    rw [eA]
+    rfl
+  rw [eK] at w
+  refine ⟨_, w, ?_⟩
+  have SL := stepLinks_swap (a := [1]) (s := [hi + 1]) hne'
+    (fun e => by injection e with _ e2; cases e2)
+  refine steady_of_step SL (fun e => XNet.mem_step_wires X _ _ _ _ e) ?_ ?_ ?_ ?_ st.chain
+    st.fresh ht
+  · rw [eA, XNet.step_agents]
+    exact ⟨_, rfl⟩
+  · intro t ht1 ht2
+    have n1 : ¬ ([0, hi + 1] : Id) = [t] := fun e => by injection e with _ e2; cases e2
+    have n2 : ¬ ([0, 1] : Id) = [t] := fun e => by injection e with _ e2; cases e2
+    have n3 : ¬ ([1] : Id) = [t] := fun e => by injection e with e1; omega
+    have n4 : ¬ ([hi + 1] : Id) = [t] := fun e => by injection e with e1; omega
+    rw [eA, XNet.step_agents]
+    show (if ([0, hi + 1] : Id) = [t] then some Arith.add
+      else if ([0, 1] : Id) = [t] then some Arith.succ
+      else assoc [t] ((X.agents.filter fun e => decide (e.1 ≠ [hi + 1])).filter
+        fun e => decide (e.1 ≠ [1]))) = _
+    rw [ite_neg' n1, ite_neg' n2, assoc_filter_ne, ite_neg' n3, assoc_filter_ne, ite_neg' n4]
+  · intro t ht1 e
+    injection e with e1
+    omega
+  · intro t _ _ e
+    injection e with _ e2
+    cases e2
+
+/-- **The later rounds, one after the other**: `d` rounds of seventeen
+actions each take the chain of the first argument down to its end. -/
+theorem Steady.rounds {n : Nat} : ∀ (d : Nat) {X : XNet Arith}, Steady n X (n + 3 + d) →
+    ∃ X', Works xsys X ⟨X.agents, .idle⟩ X' ⟨X'.agents, .idle⟩ d (17 * d) ∧
+      Steady n X' (n + 3)
+  | 0, X, st => ⟨X, .refl _ _, st⟩
+  | d + 1, X, st => by
+    obtain ⟨X₁, w₁, st₁⟩ := Steady.round (h := n + 3 + d) st (by omega)
+    obtain ⟨X', w, st'⟩ := Steady.rounds d st₁
+    refine ⟨X', ?_, st'⟩
+    have w' := w₁.trans w
+    have e1 : 1 + d = d + 1 := by omega
+    have e2 : 17 + 17 * d = 17 * (d + 1) := by omega
+    rw [e1, e2] at w'
+    exact w'
+
+/-- **All the rounds on the successors of the first argument, counted.**
+From a memory in which `d + 1` successors are left, the single thread
+claims each in turn, in `16 + 17 * d` actions, none of them a rest. -/
+theorem Start.rounds {n d : Nat} {X : XNet Arith} (st : Start n X (n + 3 + d)) :
+    ∃ X', Works xsys X ⟨X.agents, .idle⟩ X' ⟨X'.agents, .idle⟩ (d + 1) (16 + 17 * d) ∧
+      Steady n X' (n + 3) := by
+  obtain ⟨X₁, w₁, st₁⟩ := st.round
+  obtain ⟨X', w, st'⟩ := Steady.rounds d st₁
+  refine ⟨X', ?_, st'⟩
+  have w' := w₁.trans w
+  have e1 : 1 + d = d + 1 := by omega
+  rw [e1] at w'
+  exact w'
+
+theorem push_some {X : XNet Arith} {p q : Port} (u : Id) (h : assoc p X.wires = some q) :
+    push X p u = X.insert1 u .succ p q := by
+  unfold push
+  rw [h]
+
+/-- What a successor put on the principal port of the adder does to the
+segments. -/
+theorem push_princ {X : XNet Arith} {u b : Id} (hu1 : u ≠ [1]) (hb1 : b ≠ [1]) (hbu : b ≠ u)
+    (hfresh : ∀ k q, (((u, k), q) : Port × Port) ∉ X.wires) :
+    (∀ q', ((([1], 0), q') : Port × Port) ∈ (X.insert1 u .succ ([1], 0) (b, 0)).wires ↔
+        q' = (u, 0)) ∧
+      (∀ q', (((u, 0), q') : Port × Port) ∈ (X.insert1 u .succ ([1], 0) (b, 0)).wires ↔
+        q' = ([1], 0)) ∧
+      (∀ q', (((u, 1), q') : Port × Port) ∈ (X.insert1 u .succ ([1], 0) (b, 0)).wires ↔
+        q' = (b, 0)) ∧
+      ∀ i q', i ≠ u → ((((i, 1), q') : Port × Port) ∈
+        (X.insert1 u .succ ([1], 0) (b, 0)).wires ↔ ((i, 1), q') ∈ X.wires) := by
+  have hu1' := hu1.symm
+  have hb1' := hb1.symm
+  have hbu' := hbu.symm
+  refine ⟨fun q' => ?_, fun q' => ?_, fun q' => ?_, fun i q' hi => ?_⟩
+  · rw [mem_insert1_wires]
+    simp [*]
+  · have h0 := hfresh 0 q'
+    rw [mem_insert1_wires]
+    simp [*]
+  · have h1 := hfresh 1 q'
+    rw [mem_insert1_wires]
+    simp [*]
+  · have hi' := hi.symm
+    rw [mem_insert1_wires]
+    simp [*]
+
+theorem below_cases (n t : Nat) :
+    (below n t = [t] ∧ n + 4 ≤ t) ∨ (below n t = [2] ∧ t < n + 4) := by
+  unfold below
+  by_cases h : n + 4 ≤ t
+  · rw [ite_pos' h]
+    exact .inl ⟨rfl, h⟩
+  · rw [ite_neg' h]
+    exact .inr ⟨rfl, by omega⟩
+
+/-- In the net for `0 + n` the adder is an agent and its principal port
+faces the zero numbered two. -/
+theorem sumSnd_facts : ∀ n, assoc [1] (sumSnd n).agents = some .add ∧
+    ∀ q, ((([1], 0), q) : Port × Port) ∈ (sumSnd n).wires ↔ q = ([2], 0)
+  | 0 => by
+    have hall : ∀ e ∈ base.wires, e.1 = ([1], 0) → e.2 = ([2], 0) := by decide
+    have hmem : ((([1], 0), ([2], 0)) : Port × Port) ∈ base.wires := by decide
+    refine ⟨by decide, fun q => ⟨fun h => hall _ h rfl, fun e => ?_⟩⟩
+    rw [e]
+    exact hmem
+  | n + 1 => by
+    obtain ⟨ad, pr⟩ := sumSnd_facts n
+    have hu : ([n + 4] : Id) ≠ [1] := fun e => by
+      injection e with e1
+      omega
+    cases hq : assoc (([1], 1) : Port) (sumSnd n).wires with
+    | none =>
+      have e : sumSnd (n + 1) = sumSnd n := by
+        show push (sumSnd n) ([1], 1) [n + 4] = sumSnd n
+        unfold push
+        rw [hq]
+      rw [e]
+      exact ⟨ad, pr⟩
+    | some q' =>
+      have e : sumSnd (n + 1) = (sumSnd n).insert1 [n + 4] .succ ([1], 1) q' :=
+        push_some [n + 4] hq
+      have hs : (q', (([1], 1) : Port)) ∈ (sumSnd n).wires :=
+        (good_sumSnd n).ok.1.symm (assoc_mem hq)
+      have hq' : q' ≠ ([1], 0) := by
+        intro e'
+        rw [e'] at hs
+        have h2 := (pr _).1 hs
+        injection h2 with h3 _
+        injection h3 with h4
+        omega
+      have hq'' := hq'.symm
+      have hu' := hu.symm
+      rw [e]
+      refine ⟨?_, fun q => ?_⟩
+      · show (if ([n + 4] : Id) = [1] then some Arith.succ
+          else assoc [1] (sumSnd n).agents) = _
+        rw [ite_neg' hu]
+        exact ad
+      · rw [mem_insert1_wires]
+        simp [*]
+
+/-- **The net for `m + n`, as the first round finds it.**  The adder is
+an agent, its principal port faces the top of the chain of the first
+argument, and the chain is in place. -/
+structure Init (m n : Nat) (X : XNet Arith) : Prop where
+  adder : assoc [1] X.agents = some .add
+  princ : ∀ q, ((([1], 0), q) : Port × Port) ∈ X.wires ↔ q = (below n (m + n + 3), 0)
+  chain : Chain n X (m + n + 3)
+
+theorem init_sum : ∀ m n, Init m n (sum m n) ∧
+    (1 ≤ m → (∃ rest, (sum m n).agents = ([m + n + 3], .succ) :: rest) ∧
+      ∀ q, ((([m + n + 3], 0), q) : Port × Port) ∈ (sum m n).wires ↔ q = ([1], 0))
+  | 0, n => by
+    obtain ⟨ad, pr⟩ := sumSnd_facts n
+    have e : below n (0 + n + 3) = [2] := by
+      unfold below
+      rw [ite_neg' (by omega)]
+    refine ⟨⟨ad, fun q => ?_, ⟨fun t h1 h2 => absurd h2 (by omega),
+      fun t h1 h2 => absurd h2 (by omega)⟩⟩, fun h => absurd h (by omega)⟩
+    rw [e]
+    exact pr q
+  | m + 1, n => by
+    obtain ⟨I, -⟩ := init_sum m n
+    have hassoc : assoc (([1], 0) : Port) (sum m n).wires = some (below n (m + n + 3), 0) :=
+      assoc_eq_of_unique ((I.princ _).2 rfl) (fun q' hq => (I.princ q').1 hq)
+    have e : sum (m + 1) n =
+        (sum m n).insert1 [m + n + 4] .succ ([1], 0) (below n (m + n + 3), 0) :=
+      push_some [m + n + 4] hassoc
+    have hu1 : ([m + n + 4] : Id) ≠ [1] := fun e => by
+      injection e with e1
+      omega
+    have hb1 : below n (m + n + 3) ≠ [1] := by
+      rcases below_cases n (m + n + 3) with ⟨hb, -⟩ | ⟨hb, -⟩ <;> rw [hb] <;> intro e' <;>
+        injection e' with e1 <;> omega
+    have hbu : below n (m + n + 3) ≠ [m + n + 4] := by
+      rcases below_cases n (m + n + 3) with ⟨hb, -⟩ | ⟨hb, -⟩ <;> rw [hb] <;> intro e' <;>
+        injection e' with e1 <;> omega
+    have hfresh : ∀ k q, ((([m + n + 4], k), q) : Port × Port) ∉ (sum m n).wires := by
+      intro k q hm
+      obtain ⟨j, hj, ej⟩ := (good_sum m n).below [m + n + 4] (.inr (.inl ⟨k, q, hm⟩))
+      injection ej with e1
+      omega
+    obtain ⟨F1, F2, F3, F4⟩ := push_princ hu1 hb1 hbu hfresh
+    have e2 : m + 1 + n + 3 = m + n + 4 := by omega
+    rw [e, e2]
+    have hch : Chain n ((sum m n).insert1 [m + n + 4] .succ ([1], 0)
+        (below n (m + n + 3), 0)) (m + n + 4) := by
+      refine ⟨fun t h1 h2 => ?_, fun t h1 h2 q' => ?_⟩
+      · show (if ([m + n + 4] : Id) = [t] then some Arith.succ
+          else assoc [t] (sum m n).agents) = _
+        by_cases ht : t = m + n + 4
+        · rw [ite_pos' (by rw [ht])]
+        · rw [ite_neg' (fun e' => ht (by injection e' with e1; omega))]
+          exact I.chain.live t h1 (by omega)
+      · by_cases ht : t = m + n + 4
+        · have e3 : t - 1 = m + n + 3 := by omega
+          rw [e3, ht]
+          exact F3 q'
+        · rw [F4 [t] q' (fun e' => ht (by injection e' with e1))]
+          exact I.chain.seg t h1 (by omega) q'
+    have hch' : Chain n ((sum m n).insert1 [m + n + 4] .succ ([1], 0)
+        (below n (m + n + 3), 0)) (m + 1 + n + 3) := by
+      rw [e2]
+      exact hch
+    refine ⟨⟨?_, fun q => ?_, hch'⟩, fun _ => ⟨⟨_, rfl⟩, F2⟩⟩
+    · show (if ([m + n + 4] : Id) = [1] then some Arith.succ
+        else assoc [1] (sum m n).agents) = _
+      rw [ite_neg' hu1]
+      exact I.adder
+    · rw [e2, below_pos (t := m + n + 4) (by omega)]
+      exact F1 q
+
+/-- **The net for `(m + 1) + n` is ready for the first round.** -/
+theorem start_sum (m n : Nat) : Start n (sum (m + 1) n) (m + n + 3) := by
+  obtain ⟨I, h⟩ := init_sum (m + 1) n
+  obtain ⟨hd, fst⟩ := h (Nat.succ_pos m)
+  have e : m + 1 + n + 3 = m + n + 3 + 1 := by omega
+  rw [e] at hd fst
+  have ch := I.chain
+  rw [e] at ch
+  refine ⟨hd, by omega, I.adder, fst, ch, fun t _ _ k q hm => ?_⟩
+  obtain ⟨j, -, ej⟩ := (good_sum (m + 1) n).below [0, t] (.inr (.inl ⟨k, q, hm⟩))
+  injection ej with _ e2
+  cases e2
+
+/-- **One thread adds in linear time, for every size.**  On the net for
+`(m + 1) + n` the single thread makes its `m + 1` claims on successors in
+`16 + 17 * m` actions, and the rest of the run, one more claim and the
+last pass, is bounded by the general bound on a net that is one step from
+its normal form. -/
+theorem solo_work_succ (m n : Nat) (i : Nat) :
+    (XMach.init (sum (m + 1) n) 1).work xsys (fun _ => 0) i ≤ 83 * m + 22 * n + 235 := by
+  have st := start_sum m n
+  have e : m + n + 3 = n + 3 + m := by omega
+  rw [e] at st
+  obtain ⟨X', w, -⟩ := st.rounds
+  have g := good_sum (m + 1) n
+  have hX := g.ok.1
+  have hnd := sum_nodup (m + 1) n
+  obtain ⟨N', hs, hn', -⟩ := add_correct g.config
+  have hK : (XMach.init (sum (m + 1) n) 1).trace xsys (fun _ => 0) (16 + 17 * m) =
+      (XMach.init X' 1, m + 1) := by
+    rw [XMach.init_one, XMach.init_one]
+    exact w.trace.1
+  -- the memory after the rounds is one step from the normal form
+  have run : MRun xsys.sys ((XMach.init (sum (m + 1) n) 1).trace xsys (fun _ => 0)
+      (16 + 17 * m)).2 (Mach.init (sum (m + 1) n).toNet)
+      ((XMach.init (sum (m + 1) n) 1).trace xsys (fun _ => 0) (16 + 17 * m)).1.toMach := by
+    have h := XMach.trace_run xsys (fun _ => 0) (XMach.init (sum (m + 1) n) 1) (16 + 17 * m)
+    rw [XMach.init_toMach] at h
+    exact h
+  rw [hK] at run
+  have run' : MRun xsys.sys (m + 1) (Mach.init (sum (m + 1) n).toNet)
+      (Mach.init X'.toNet) := by
+    have h : MRun xsys.sys (m + 1) (Mach.init (sum (m + 1) n).toNet)
+        (XMach.init X' 1).toMach := run
+    rw [XMach.init_toMach] at h
+    exact h
+  have sts : Steps (Step xsys.sys) (m + 1) (sum (m + 1) n).toNet X'.toNet :=
+    run'.quiet hX (Mach.init_quiet _)
+  obtain ⟨-, rest⟩ := reduction_bounded hX hs hn' sts
+  have e1 : m + 1 + 1 - (m + 1) = 1 := by omega
+  rw [e1] at rest
+  have hX' : X'.toNet.WF xsys.sys.ar := Steps.wf hX sts
+  -- no two agents of one name
+  have live := XMach.trace_live (xs := xsys) (fun _ => 0)
+    (XMach.init_live hX Nat.zero_lt_one)
+  have nd : ∀ j, (((XMach.init (sum (m + 1) n) 1).trace xsys (fun _ => 0) j).1.mem.agents.map
+      Prod.fst).Nodup := by
+    intro j
+    induction j with
+    | zero => exact hnd
+    | succ j ih => exact XMach.step_nodup (live j) ih 0
+  have hnd' : (X'.agents.map Prod.fst).Nodup := by
+    have h := nd (16 + 17 * m)
+    rw [hK] at h
+    exact h
+  -- the sizes of the memory after the rounds
+  obtain ⟨Φ, -, hΦ⟩ := XMach.work_measure hX hnd Nat.zero_lt_one xsys_bounded hs hn'
+    (fun _ => 0)
+  have hA' : X'.agents.length ≤ (sum (m + 1) n).agents.length + 2 * (m + 1 + 1) := by
+    have h := (hΦ (16 + 17 * m)).1
+    rw [hK] at h
+    exact h
+  have hW' : X'.wires.length ≤ (sum (m + 1) n).wires.length + 8 * (m + 1 + 1) := by
+    have h := XMach.wires_le (xs := xsys) hX Nat.zero_lt_one xsys_bounded hs hn'
+      (fun _ => 0) (16 + 17 * m)
+    rw [hK] at h
+    exact h
+  have ha := sum_agents_length_le (m + 1) n
+  have hwl := sum_wires_length_le (m + 1) n
+  -- the rest of the run
+  have tail : ∀ j, (XMach.init X' 1).work xsys (fun _ => 0) j ≤ 66 * m + 22 * n + 219 := by
+    intro j
+    have h := XMach.work_le hX' hnd' Nat.zero_lt_one xsys_bounded rest hn' (fun _ => 0) j
+    have hp : X'.passBound 1 2 8 = 7 * (X'.agents.length + 2 * 1) + (X'.wires.length + 8 * 1) :=
+      rfl
+    rw [hp] at h
+    omega
+  -- the work up to the fresh start is the count of the rounds
+  have hwK : ∀ j, (XMach.init (sum (m + 1) n) 1).work xsys (fun _ => 0) (16 + 17 * m + j) =
+      16 + 17 * m + (XMach.init X' 1).work xsys (fun _ => 0) j := by
+    intro j
+    rw [XMach.init_one, XMach.init_one]
+    exact w.work j
+  by_cases hi : i ≤ 16 + 17 * m
+  · have h := XMach.work_mono (xs := xsys) (fun _ => 0) (XMach.init (sum (m + 1) n) 1) hi
+    have h0 : (XMach.init (sum (m + 1) n) 1).work xsys (fun _ => 0) (16 + 17 * m) =
+        16 + 17 * m + (XMach.init X' 1).work xsys (fun _ => 0) 0 := hwK 0
+    have t0 := tail 0
+    rw [h0] at h
+    omega
+  · obtain ⟨j, rfl⟩ : ∃ j, i = 16 + 17 * m + j := ⟨i - (16 + 17 * m), by omega⟩
+    have t := tail j
+    rw [hwK j]
+    omega
+
+/-- **One thread adds `m` and `n` in at most `83 * m + 22 * n + 152`
+actions**, for every `m` and `n`.  The runs computed take
+`22 * m + 3 * n + 13`. -/
+theorem solo_work_le (m n : Nat) (i : Nat) :
+    (XMach.init (sum m n) 1).work xsys (fun _ => 0) i ≤ 83 * m + 22 * n + 152 := by
+  cases m with
+  | zero =>
+    have g := good_sum 0 n
+    obtain ⟨N', hs, hn', -⟩ := add_correct g.config
+    have h := XMach.work_le g.ok.1 (sum_nodup 0 n) Nat.zero_lt_one xsys_bounded hs hn'
+      (fun _ => 0) i
+    have ha := sum_agents_length_le 0 n
+    have hw := sum_wires_length_le 0 n
+    have hp : (sum 0 n).passBound (0 + 1) 2 8 =
+        7 * ((sum 0 n).agents.length + 2 * (0 + 1)) + ((sum 0 n).wires.length + 8 * (0 + 1)) :=
+      rfl
+    rw [hp] at h
+    omega
+  | succ m =>
+    have h := solo_work_succ m n i
+    omega
+
+/-- **One thread adds, numbered, in a count that is linear but for a
+logarithm**, for every `m` and `n`: the linear bound on its work times
+the cost of an action. -/
+theorem solo_ztime_le (m n : Nat) (i : Nat) :
+    (ZMach.init (sum m n) 1).ftime xsys (fun _ => 0) i ≤
+      (83 * m + 22 * n + 152) * (15 + 84 * lg (15 * m + 5 * n + 19)) := by
+  have g := good_sum m n
+  obtain ⟨N', hs, hn', -⟩ := add_correct g.config
+  obtain ⟨hL, -⟩ := Below.sizes g.below g.ok.1.symm
+  have hwi := solo_work_le m n i
+  have h := ZMach.ftime_le_work (xs := xsys) g.ok.1 (sum_nodup m n) Nat.zero_lt_one
+    xsys_bounded hL hs hn' (fun _ => 0) i
+  have ha := sum_agents_length_le m n
+  have hwl := sum_wires_length_le m n
+  have hl := lg_mono (show (sum m n).agents.length + 2 * (m + 1) +
+    ((sum m n).wires.length + 8 * (m + 1)) ≤ 15 * m + 5 * n + 19 by omega)
+  have hc : 2 + 8 + 5 + 4 * ((max 1 1 + 6) * (3 * lg ((sum m n).agents.length + 2 * (m + 1) +
+      ((sum m n).wires.length + 8 * (m + 1))))) ≤ 15 + 84 * lg (15 * m + 5 * n + 19) := by
+    rw [Nat.max_self]
+    omega
+  rw [Nat.mul_comm (83 * m + 22 * n + 152)]
+  exact Nat.le_trans h (Nat.mul_le_mul hc hwi)
+
+/-- The same in bits. -/
+theorem solo_btime_le (m n : Nat) (i : Nat) :
+    (ZMach.init (sum m n) 1).btime xsys (fun _ => 0) i ≤
+      3 * ((lg (5 * m + 2 * n + 13 + sumWork m n 1) + 5) *
+        ((83 * m + 22 * n + 152) * (15 + 84 * lg (15 * m + 5 * n + 19)))) := by
+  have g := good_sum m n
+  obtain ⟨N', hs, hn', -⟩ := add_correct g.config
+  obtain ⟨hL, htop⟩ := Below.sizes g.below g.ok.1.symm
+  have ha := sum_agents_length_le m n
+  have h₁ := Nat.mul_le_mul_left (1 + m + 1) (sum_passBound_le m n)
+  have hwork : (1 + (m + 1)) * (sum m n).passBound (m + 1) 2 8 + (m + 1) * (2 + 8 + 1) ≤
+      sumWork m n 1 := by
+    show (1 + m + 1) * (sum m n).passBound (m + 1) 2 8 + (m + 1) * (2 + 8 + 1) ≤
+      (1 + m + 1) * (33 * m + 11 * n + 49) + 11 * (m + 1)
+    omega
+  have hpow := lt_pow_lg (5 * m + 2 * n + 13 + sumWork m n 1)
+  have hW : (sum m n).top + 3 * (m + 1 + 1) <
+      2 ^ lg (5 * m + 2 * n + 13 + sumWork m n 1) := by omega
+  have hW' : (sum m n).agents.length + ((1 + (m + 1)) * (sum m n).passBound (m + 1) 2 8 +
+      (m + 1) * (2 + 8 + 1)) < 2 ^ lg (5 * m + 2 * n + 13 + sumWork m n 1) := by omega
+  have h := ZMach.btime_le_ftime (xs := xsys) g.ok.1 (sum_nodup m n) xsys_span xsys_ports
+    (sum_ports m n) Nat.zero_lt_one xsys_bounded hL hs hn' (fun _ => 0) hW hW' i
+  refine Nat.le_trans h (Nat.mul_le_mul_left 3
+    (Nat.mul_le_mul ?_ (solo_ztime_le m n i)))
+  have e1 : lg 2 = 3 := by decide
+  rw [Nat.max_self, Nat.one_mul, e1]
+  omega
+
+/-- `12 + 12` on one thread, from the bound for every size: at most 1,412
+actions that are not rests, 1,207,260 counted and 72,435,600 bits.  The
+run takes 313, 10,999 and 28,984. -/
+example : ∀ i : Nat,
+    (XMach.init (sum 12 12) 1).work xsys (fun _ => 0) i ≤ 1412 ∧
+      (ZMach.init (sum 12 12) 1).ftime xsys (fun _ => 0) i ≤ 1207260 ∧
+      (ZMach.init (sum 12 12) 1).btime xsys (fun _ => 0) i ≤ 72435600 :=
+  fun i => ⟨solo_work_le 12 12 i, solo_ztime_le 12 12 i, solo_btime_le 12 12 i⟩
 
 end Arith
 
