@@ -1089,6 +1089,10 @@ Two threads.  A second thread can make the program slower.
 * `INet.XMach.act_wires_sub`, `INet.XMach.act_gone`
                                 an action removes no segment, and an agent
                                 that is gone stays gone
+* `INet.XMach.solo_direct_keeps`, `INet.XMach.solo_via_keeps`
+                                a round takes only its pair: any other
+                                agent is in memory after each of its
+                                actions
 * `INet.XMach.work_energy`, `INet.XMach.work_tail`,
   `INet.XMach.work_after_reading`
                                 the measure of the general bound in the
@@ -1126,6 +1130,10 @@ Two threads.  A second thread can make the program slower.
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
+* `INet.Arith.solo_alive`       on an addition, through the first rounds
+                                of one thread, every agent of the start
+                                that those rounds do not take is in memory
+                                after every action
 
 Closed loops.  `Net.Dead` marks the components of the wiring that reach no
 end, `Net.DeadCount` counts them, and `Loops` counts the loops closed by a
@@ -1918,9 +1926,12 @@ holds up to equality rather than up to renaming.
   thread has made an action for each agent before, which gives
   `18 * t ≤ m + 14`.  For two threads that is `m` from four on, for three
   from twenty-two on; in the runs computed the other threads never claim
-  at smaller sizes either.  Nothing is proved for more threads than
-  that, or for schedules that leave round robin earlier.  The
-  alternating run is followed while successors are left on
+  at smaller sizes either.  That the agents the first thread has not
+  taken are in memory after each of its actions is proved
+  (`Arith.solo_alive`), but not yet used to time the other threads
+  exactly.  Nothing is proved for more threads than that, or for
+  schedules that leave round robin earlier.  The alternating run is
+  followed while successors are left on
   the first argument only, so the count is a lower bound on the work of
   the whole run, not its work.
 * An executable system (`XSys`) carries proofs: that its rules are the rules
@@ -36770,6 +36781,188 @@ theorem XMach.init_succ (X : XNet S) (k : Nat) :
   rw [List.append_nil]
   rfl
 
+/-- A run of one thread in two parts. -/
+theorem XMach.solo_add (xs : XSys S) : ∀ (j₁ : Nat) (X : XNet S) (T : XThread S) (j₂ : Nat),
+    XMach.solo xs X T (j₁ + j₂) =
+      XMach.solo xs (XMach.solo xs X T j₁).1 (XMach.solo xs X T j₁).2 j₂
+  | 0, X, T, j₂ => by
+    rw [Nat.zero_add]
+    rfl
+  | j₁ + 1, X, T, j₂ => by
+    rw [Nat.add_right_comm]
+    exact XMach.solo_add xs j₁ (XMach.act xs X T).1 (XMach.act xs X T).2.1 j₂
+
+/-- Writing segments takes no agent away. -/
+theorem XMach.solo_links_keep (xs : XSys S) {x : Id} {γ : S} (rest : List (Id × S)) :
+    ∀ (ls : List (Port × Port)) (Y : XNet S) (j : Nat), j ≤ ls.length + 1 →
+      assoc x Y.agents = some γ →
+      assoc x (XMach.solo xs Y ⟨rest, .write [] ls⟩ j).1.agents = some γ
+  | _, _, 0, _, h => h
+  | [], Y, j + 1, hj, h => by
+    have e : j = 0 := by
+      have : j + 1 ≤ 0 + 1 := hj
+      omega
+    subst e
+    exact h
+  | (p, q) :: ls, Y, j + 1, hj, h =>
+    XMach.solo_links_keep xs rest ls (Y.putLink p q) j (Nat.le_of_succ_le_succ hj) h
+
+/-- **The writes of a round take no agent away**: an agent that no new
+agent is named after is there after each of them. -/
+theorem XMach.solo_write_keeps (xs : XSys S) {x : Id} {γ : S} (rest : List (Id × S)) :
+    ∀ (as : List (Id × S)) (ls : List (Port × Port)) (Y : XNet S) (j : Nat),
+      j ≤ as.length + ls.length + 1 → (∀ e ∈ as, e.1 ≠ x) → assoc x Y.agents = some γ →
+      assoc x (XMach.solo xs Y ⟨rest, .write as ls⟩ j).1.agents = some γ
+  | _, _, _, 0, _, _, h => h
+  | [], ls, Y, j + 1, hj, _, h =>
+    XMach.solo_links_keep xs rest ls Y (j + 1) (by
+      have h' : j + 1 ≤ 0 + ls.length + 1 := hj
+      omega) h
+  | (i, δ) :: as, ls, Y, j + 1, hj, hn, h =>
+    XMach.solo_write_keeps xs rest as ls (Y.putAgent i δ) j (by
+      have h' : j + 1 ≤ as.length + 1 + ls.length + 1 := hj
+      omega) (fun e he => hn e (List.mem_cons_of_mem _ he)) (by
+      show (if i = x then some δ else assoc x Y.agents) = some γ
+      rw [ite_neg' (hn (i, δ) List.mem_cons_self)]
+      exact h)
+
+/-- **A round on a facing pair takes only its pair**: any other agent is
+there after each action of the round. -/
+theorem XMach.solo_direct_keeps {X : XNet S} {a b : Id} {α β : S} {R : XRhs S}
+    (rest : List (Id × S)) (h₁ : assoc a X.agents = some α)
+    (h₂ : assoc (a, 0) X.wires = some (b, 0)) (h₃ : assoc b X.agents = some β) (hne : a ≠ b)
+    (h₄ : assoc b (X.takeAgent a).agents = some β) (hR : xs.rule α β = some R)
+    {x : Id} {γ : S} (hx : assoc x X.agents = some γ) (hxa : a ≠ x) (hxb : b ≠ x)
+    (hnew : ∀ e ∈ R.newAgents a b, e.1 ≠ x) (j : Nat)
+    (hj : j ≤ 5 + ((R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length + 1)) :
+    assoc x (XMach.solo xs X ⟨(a, α) :: rest, .idle⟩ j).1.agents = some γ := by
+  have s₁ : XMach.act xs X ⟨(a, α) :: rest, .idle⟩ = (X, ⟨rest, .look a α⟩, 0) :=
+    XMach.act_idle_pos h₁
+  have s₂ : XMach.act xs X ⟨rest, .look a α⟩ = (X, ⟨rest, .seek a α (a, 0) (b, 0)⟩, 0) :=
+    XMach.act_look h₂
+  have s₃ : XMach.act xs X ⟨rest, .seek a α (a, 0) (b, 0)⟩ =
+      (X, ⟨rest, .ready a b α β⟩, 0) :=
+    XMach.act_seek_found (c := (b, 0))
+      (by
+        show (if (0 : Nat) = 0 then assoc b X.agents else none) = some β
+        rw [ite_pos' rfl]
+        exact h₃)
+      ⟨hne, by rw [hR]; rfl⟩
+  have s₄ : XMach.act xs X ⟨rest, .ready a b α β⟩ =
+      (X.takeAgent a, ⟨rest, .half a b α β⟩, 0) := XMach.act_ready h₁
+  have w1 : Works xs X ⟨(a, α) :: rest, .idle⟩ X ⟨rest, .look a α⟩ 0 1 :=
+    .step (c₁ := 0) (c := 0) (k := 0) (fun h => by cases h) s₁ (.refl _ _)
+  have w2 : Works xs X ⟨(a, α) :: rest, .idle⟩ X ⟨rest, .seek a α (a, 0) (b, 0)⟩ 0 2 :=
+    .step (c₁ := 0) (c := 0) (k := 1) (fun h => by cases h) s₁
+      (.step (c₁ := 0) (c := 0) (k := 0) (fun h => by cases h) s₂ (.refl _ _))
+  have w3 : Works xs X ⟨(a, α) :: rest, .idle⟩ X ⟨rest, .ready a b α β⟩ 0 3 :=
+    .step (c₁ := 0) (c := 0) (k := 2) (fun h => by cases h) s₁
+      (.step (c₁ := 0) (c := 0) (k := 1) (fun h => by cases h) s₂
+        (.step (c₁ := 0) (c := 0) (k := 0) (fun h => by cases h) s₃ (.refl _ _)))
+  have w4 : Works xs X ⟨(a, α) :: rest, .idle⟩ (X.takeAgent a) ⟨rest, .half a b α β⟩ 0 4 :=
+    .step (c₁ := 0) (c := 0) (k := 3) (fun h => by cases h) s₁
+      (.step (c₁ := 0) (c := 0) (k := 2) (fun h => by cases h) s₂
+        (.step (c₁ := 0) (c := 0) (k := 1) (fun h => by cases h) s₃
+          (.step (c₁ := 0) (c := 0) (k := 0) (fun h => by cases h) s₄ (.refl _ _))))
+  have e5 := (XMach.solo_claim_start (xs := xs) rest h₁ h₂ h₃ hne h₄ hR).2
+  have keepA : assoc x (X.takeAgent a).agents = some γ := by
+    show assoc x (X.agents.filter fun e => decide (e.1 ≠ a)) = some γ
+    rw [assoc_filter_ne, ite_neg' hxa]
+    exact hx
+  have keepB : assoc x ((X.takeAgent a).takeAgent b).agents = some γ := by
+    show assoc x ((X.takeAgent a).agents.filter fun e => decide (e.1 ≠ b)) = some γ
+    rw [assoc_filter_ne, ite_neg' hxb]
+    exact keepA
+  by_cases h5 : 5 ≤ j
+  · obtain ⟨j', rfl⟩ : ∃ j', j = 5 + j' := ⟨j - 5, by omega⟩
+    rw [XMach.solo_add, e5]
+    exact XMach.solo_write_keeps xs rest _ _ _ j' (by omega) hnew keepB
+  · have e : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 ∨ j = 4 := by omega
+    rcases e with rfl | rfl | rfl | rfl | rfl
+    · exact hx
+    · rw [show XMach.solo xs X ⟨(a, α) :: rest, .idle⟩ 1 = _ from w1.solo.1]
+      exact hx
+    · rw [show XMach.solo xs X ⟨(a, α) :: rest, .idle⟩ 2 = _ from w2.solo.1]
+      exact hx
+    · rw [show XMach.solo xs X ⟨(a, α) :: rest, .idle⟩ 3 = _ from w3.solo.1]
+      exact hx
+    · rw [show XMach.solo xs X ⟨(a, α) :: rest, .idle⟩ 4 = _ from w4.solo.1]
+      exact keepA
+
+/-- **A round on a pair one point away takes only its pair.** -/
+theorem XMach.solo_via_keeps {X : XNet S} {a b : Id} {α β : S} {R : XRhs S} {c : Port}
+    (rest : List (Id × S)) (h₁ : assoc a X.agents = some α)
+    (h₂ : assoc (a, 0) X.wires = some c)
+    (hc : (if c.2 = 0 then assoc c.1 X.agents else none) = none)
+    (h₂' : nextSeg X.wires c (a, 0) = some (b, 0)) (h₃ : assoc b X.agents = some β)
+    (hne : a ≠ b) (h₄ : assoc b (X.takeAgent a).agents = some β)
+    (hR : xs.rule α β = some R)
+    {x : Id} {γ : S} (hx : assoc x X.agents = some γ) (hxa : a ≠ x) (hxb : b ≠ x)
+    (hnew : ∀ e ∈ R.newAgents a b, e.1 ≠ x) (j : Nat)
+    (hj : j ≤ 6 + ((R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length + 1)) :
+    assoc x (XMach.solo xs X ⟨(a, α) :: rest, .idle⟩ j).1.agents = some γ := by
+  have s₁ : XMach.act xs X ⟨(a, α) :: rest, .idle⟩ = (X, ⟨rest, .look a α⟩, 0) :=
+    XMach.act_idle_pos h₁
+  have s₂ : XMach.act xs X ⟨rest, .look a α⟩ = (X, ⟨rest, .seek a α (a, 0) c⟩, 0) :=
+    XMach.act_look h₂
+  have s₂' : XMach.act xs X ⟨rest, .seek a α (a, 0) c⟩ =
+      (X, ⟨rest, .seek a α c (b, 0)⟩, 0) := XMach.act_seek_next hc h₂'
+  have s₃ : XMach.act xs X ⟨rest, .seek a α c (b, 0)⟩ = (X, ⟨rest, .ready a b α β⟩, 0) :=
+    XMach.act_seek_found (c := (b, 0))
+      (by
+        show (if (0 : Nat) = 0 then assoc b X.agents else none) = some β
+        rw [ite_pos' rfl]
+        exact h₃)
+      ⟨hne, by rw [hR]; rfl⟩
+  have s₄ : XMach.act xs X ⟨rest, .ready a b α β⟩ =
+      (X.takeAgent a, ⟨rest, .half a b α β⟩, 0) := XMach.act_ready h₁
+  have w1 : Works xs X ⟨(a, α) :: rest, .idle⟩ X ⟨rest, .look a α⟩ 0 1 :=
+    .step (c₁ := 0) (c := 0) (k := 0) (fun h => by cases h) s₁ (.refl _ _)
+  have w2 : Works xs X ⟨(a, α) :: rest, .idle⟩ X ⟨rest, .seek a α (a, 0) c⟩ 0 2 :=
+    .step (c₁ := 0) (c := 0) (k := 1) (fun h => by cases h) s₁
+      (.step (c₁ := 0) (c := 0) (k := 0) (fun h => by cases h) s₂ (.refl _ _))
+  have w3 : Works xs X ⟨(a, α) :: rest, .idle⟩ X ⟨rest, .seek a α c (b, 0)⟩ 0 3 :=
+    .step (c₁ := 0) (c := 0) (k := 2) (fun h => by cases h) s₁
+      (.step (c₁ := 0) (c := 0) (k := 1) (fun h => by cases h) s₂
+        (.step (c₁ := 0) (c := 0) (k := 0) (fun h => by cases h) s₂' (.refl _ _)))
+  have w4 : Works xs X ⟨(a, α) :: rest, .idle⟩ X ⟨rest, .ready a b α β⟩ 0 4 :=
+    .step (c₁ := 0) (c := 0) (k := 3) (fun h => by cases h) s₁
+      (.step (c₁ := 0) (c := 0) (k := 2) (fun h => by cases h) s₂
+        (.step (c₁ := 0) (c := 0) (k := 1) (fun h => by cases h) s₂'
+          (.step (c₁ := 0) (c := 0) (k := 0) (fun h => by cases h) s₃ (.refl _ _))))
+  have w5 : Works xs X ⟨(a, α) :: rest, .idle⟩ (X.takeAgent a) ⟨rest, .half a b α β⟩ 0 5 :=
+    .step (c₁ := 0) (c := 0) (k := 4) (fun h => by cases h) s₁
+      (.step (c₁ := 0) (c := 0) (k := 3) (fun h => by cases h) s₂
+        (.step (c₁ := 0) (c := 0) (k := 2) (fun h => by cases h) s₂'
+          (.step (c₁ := 0) (c := 0) (k := 1) (fun h => by cases h) s₃
+            (.step (c₁ := 0) (c := 0) (k := 0) (fun h => by cases h) s₄ (.refl _ _)))))
+  have e6 := (Works.via_start (xs := xs) rest h₁ h₂ hc h₂' h₃ hne h₄ hR).solo.1
+  have keepA : assoc x (X.takeAgent a).agents = some γ := by
+    show assoc x (X.agents.filter fun e => decide (e.1 ≠ a)) = some γ
+    rw [assoc_filter_ne, ite_neg' hxa]
+    exact hx
+  have keepB : assoc x ((X.takeAgent a).takeAgent b).agents = some γ := by
+    show assoc x ((X.takeAgent a).agents.filter fun e => decide (e.1 ≠ b)) = some γ
+    rw [assoc_filter_ne, ite_neg' hxb]
+    exact keepA
+  by_cases h6 : 6 ≤ j
+  · obtain ⟨j', rfl⟩ : ∃ j', j = 6 + j' := ⟨j - 6, by omega⟩
+    rw [XMach.solo_add, e6]
+    exact XMach.solo_write_keeps xs rest _ _ _ j' (by omega) hnew keepB
+  · have e : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 ∨ j = 4 ∨ j = 5 := by omega
+    rcases e with rfl | rfl | rfl | rfl | rfl | rfl
+    · exact hx
+    · rw [show XMach.solo xs X ⟨(a, α) :: rest, .idle⟩ 1 = _ from w1.solo.1]
+      exact hx
+    · rw [show XMach.solo xs X ⟨(a, α) :: rest, .idle⟩ 2 = _ from w2.solo.1]
+      exact hx
+    · rw [show XMach.solo xs X ⟨(a, α) :: rest, .idle⟩ 3 = _ from w3.solo.1]
+      exact hx
+    · rw [show XMach.solo xs X ⟨(a, α) :: rest, .idle⟩ 4 = _ from w4.solo.1]
+      exact hx
+    · rw [show XMach.solo xs X ⟨(a, α) :: rest, .idle⟩ 5 = _ from w5.solo.1]
+      exact keepA
+
 end Reader
 
 /-! ### Systems as data
@@ -43646,6 +43839,120 @@ theorem three_threads_linear_any (m n : Nat) (hm : 22 ≤ m) (i : Nat) :
 are not rests; one thread needs 9,113. -/
 example (i : Nat) : (XMach.init (sum 400 100) 10).work xsys (fun i => i % 10) i ≤ 26312 :=
   Nat.le_trans ((threads_round_robin 399 100 9 (by decide) (by decide)).1 i) (by decide)
+
+/-- What the first round needs of the memory at the start: the top
+successor is first in the list and faces the adder. -/
+theorem Start.pair {n : Nat} {X : XNet Arith} {hi : Nat} (st : Start n X hi) :
+    ∃ rest, X.agents = ([hi + 1], .succ) :: rest ∧ assoc [hi + 1] X.agents = some .succ ∧
+      assoc (([hi + 1], 0) : Port) X.wires = some ([1], 0) ∧ ([hi + 1] : Id) ≠ [1] ∧
+      assoc [1] (X.takeAgent [hi + 1]).agents = some .add := by
+  obtain ⟨rest, hA⟩ := st.head
+  have hne : ([hi + 1] : Id) ≠ [1] := fun e => by
+    have ht := st.top
+    injection e with e1
+    omega
+  have h₁ : assoc [hi + 1] X.agents = some .succ := by
+    rw [hA]
+    show (if ([hi + 1] : Id) = [hi + 1] then some Arith.succ else assoc _ rest) = _
+    rw [ite_pos' rfl]
+  have h₂ : assoc (([hi + 1], 0) : Port) X.wires = some ([1], 0) :=
+    assoc_eq_of_unique ((st.first _).2 rfl) (fun q' hq => (st.first q').1 hq)
+  have h₄ : assoc [1] (X.takeAgent [hi + 1]).agents = some .add := by
+    show assoc [1] (X.agents.filter fun e => decide (e.1 ≠ [hi + 1])) = _
+    rw [assoc_filter_ne, ite_neg' hne]
+    exact st.adder
+  exact ⟨rest, hA, h₁, h₂, hne, h₄⟩
+
+/-- What a later round needs of the memory before it: the adder is first
+in the list, and one point away from the next successor of the chain. -/
+theorem Steady.pair {n : Nat} {X : XNet Arith} {h : Nat} (st : Steady n X (h + 1))
+    (hn : n + 4 ≤ h + 1) :
+    ∃ rest, X.agents = ([0, h + 1 + 1], .add) :: rest ∧
+      assoc [0, h + 1 + 1] X.agents = some .add ∧
+      assoc (([0, h + 1 + 1], 0) : Port) X.wires = some ([h + 1 + 1], 1) ∧
+      nextSeg X.wires ([h + 1 + 1], 1) ([0, h + 1 + 1], 0) = some ([h + 1], 0) ∧
+      assoc [h + 1] X.agents = some .succ ∧ ([0, h + 1 + 1] : Id) ≠ [h + 1] ∧
+      assoc [h + 1] (X.takeAgent [0, h + 1 + 1]).agents = some .succ := by
+  obtain ⟨rest, hA⟩ := st.head
+  have hb : below n (h + 1) = [h + 1] := below_pos hn
+  have hne : ([0, h + 1 + 1] : Id) ≠ [h + 1] := fun e => by
+    injection e with _ e2
+    cases e2
+  have h₁ : assoc [0, h + 1 + 1] X.agents = some .add := by
+    rw [hA]
+    show (if ([0, h + 1 + 1] : Id) = [0, h + 1 + 1] then some Arith.add
+      else assoc _ rest) = _
+    rw [ite_pos' rfl]
+  have h₂ : assoc (([0, h + 1 + 1], 0) : Port) X.wires = some ([h + 1 + 1], 1) :=
+    assoc_eq_of_unique ((st.first _).2 rfl) (fun q' hq => (st.first q').1 hq)
+  have h₂' : nextSeg X.wires ([h + 1 + 1], 1) ([0, h + 1 + 1], 0) = some ([h + 1], 0) := by
+    refine nextSeg_some ((st.mid _).2 (.inr (by rw [hb]))) (fun e => ?_) (fun q hq hqp => ?_)
+    · injection e with e1 _
+      injection e1 with _ e2
+      cases e2
+    · rcases (st.mid q).1 hq with e | e
+      · exact absurd e hqp
+      · rw [e, hb]
+  have h₃ : assoc [h + 1] X.agents = some .succ := st.chain.live (h + 1) hn (Nat.le_refl _)
+  have h₄ : assoc [h + 1] (X.takeAgent [0, h + 1 + 1]).agents = some .succ := by
+    show assoc [h + 1] (X.agents.filter fun e => decide (e.1 ≠ [0, h + 1 + 1])) = _
+    rw [assoc_filter_ne, ite_neg' hne]
+    exact h₃
+  exact ⟨rest, hA, h₁, h₂, h₂', h₃, hne, h₄⟩
+
+/-- **What the first thread has not taken is still there.**  On the net for
+`(m + 1) + n`, through the first `ρ + 1` rounds of one thread, that is its
+first `16 + 17 * ρ` actions, every agent of the start numbered from `2` up
+to the successor `ρ + 1` below the top one is in memory with its symbol,
+after every action: the rounds have taken the first adder and the `ρ + 1`
+top successors, and nothing else. -/
+theorem solo_alive (m n : Nat) : ∀ ρ, ρ ≤ m → ∀ (j : Nat) (γ : Arith) (u : Nat), 2 ≤ j →
+    j + ρ ≤ n + 3 + m → u ≤ 16 + 17 * ρ →
+    assoc [j] (sum (m + 1) n).agents = some γ →
+    assoc [j]
+      (XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ u).1.agents = some γ
+  | 0, _, j, γ, u, hj2, hj, hu, hx => by
+    have st := start_sum m n
+    obtain ⟨rest, hA, h₁, h₂, hne, h₄⟩ := st.pair
+    have hR : xsys.rule .succ .add = some addSucc.swap.toX := rfl
+    have k := XMach.solo_direct_keeps (xs := xsys) rest h₁ h₂ st.adder hne h₄ hR
+      (x := [j]) (γ := γ) hx (by ports_differ) (by ports_differ)
+      (fun e he => single_ne_new (by omega) (new_head hR he)) u (by
+        rw [newAgents_swap (a := [1]) (s := [m + n + 3 + 1]) (fun e => hne e.symm)]
+        show u ≤ 5 + (2 + 8 + 1)
+        omega)
+    rw [← hA] at k
+    exact k
+  | ρ + 1, hρ, j, γ, u, hj2, hj, hu, hx => by
+    by_cases hu' : u ≤ 16 + 17 * ρ
+    · exact solo_alive m n ρ (by omega) j γ u hj2 (by omega) hu' hx
+    · obtain ⟨X1, w1, st⟩ := solo_steady m n ρ (m + n + 3 - ρ) (by omega) (by omega)
+      have ih := solo_alive m n ρ (by omega) j γ (16 + 17 * ρ) hj2 (by omega)
+        (Nat.le_refl _) hx
+      rw [w1.solo.1] at ih
+      obtain ⟨h, eh⟩ : ∃ h, m + n + 3 - ρ = h + 1 := ⟨m + n + 2 - ρ, by omega⟩
+      rw [eh] at st
+      obtain ⟨rest, hA, h₁, h₂, h₂', h₃, hne, h₄⟩ := st.pair (by omega)
+      have hR : xsys.rule .add .succ = some addSucc.toX := rfl
+      obtain ⟨u', rfl⟩ : ∃ u', u = 16 + 17 * ρ + u' := ⟨u - (16 + 17 * ρ), by omega⟩
+      have k := XMach.solo_via_keeps (xs := xsys) (c := ([h + 1 + 1], 1)) rest h₁ h₂ rfl h₂'
+        h₃ hne h₄ hR (x := [j]) (γ := γ) ih (by ports_differ) (by ports_differ)
+        (fun e he => single_ne_new (by omega) (new_head hR he)) u' (by
+          rw [newAgents_add hne]
+          show u' ≤ 6 + (2 + 8 + 1)
+          omega)
+      rw [← hA] at k
+      rw [XMach.solo_add, w1.solo.1]
+      exact k
+
+/-- In particular the second argument and the zero of the first are there
+through all the rounds on the successors of the first argument. -/
+theorem solo_alive_snd (m n : Nat) {j : Nat} {γ : Arith} {u : Nat} (hj2 : 2 ≤ j)
+    (hj : j ≤ n + 3) (hu : u ≤ 16 + 17 * m)
+    (hx : assoc [j] (sum (m + 1) n).agents = some γ) :
+    assoc [j]
+      (XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ u).1.agents = some γ :=
+  solo_alive m n m (Nat.le_refl m) j γ u hj2 (by omega) hu hx
 
 end Arith
 
