@@ -1027,10 +1027,27 @@ fresh start on the memory left by the last.
                                 `m` and `n` (`6 * n + 13` when `m` is
                                 zero): at rest then and not before, and no
                                 action a rest
-* `INet.Arith.solo_ztime_all`, `INet.Arith.solo_btime_all`
-                                so its count and its bits are within that
-                                many times the cost of an action, for
-                                every size
+* `INet.XThread.ops`, `INet.Opers`
+                                the operations on maps that an action is
+                                charged, by the state of the thread, and
+                                counted runs that carry them
+* `INet.ZMach.ftime_le_ops`     the count of the numbered program is at
+                                most the size of a rule and five for each
+                                action, and the cost of one operation on
+                                a tree of full depth for each operation
+                                charged
+* `INet.ZMach.work_le_ftime`    and it is at least one for each action
+                                that is not a rest
+* `INet.Arith.solo_ops`         one thread adds `m` and `n` charged
+                                `46 * m + 7 * n + 28` operations, for
+                                every `m` and `n` (`14 * n + 28` when `m`
+                                is zero)
+* `INet.Arith.solo_ztime_ops`, `INet.Arith.solo_ztime_ge`,
+  `INet.Arith.solo_btime_ops`   so its count is at most fifteen for each
+                                action and `21 * lg` of the size for each
+                                operation, and at least its work, for
+                                every size; and its bits are bounded with
+                                the count
 
 Closed loops.  `Net.Dead` marks the components of the wiring that reach no
 end, `Net.DeadCount` counts them, and `Loops` counts the loops closed by a
@@ -1753,17 +1770,28 @@ holds up to equality rather than up to renaming.
   before it stops, and gives up on every other entry after three.  So
   one thread adds `m` and `n` in exactly `22 * m + 3 * n + 13` actions
   (`6 * n + 13` when `m` is zero), for every `m` and `n`
-  (`Arith.solo_work`), and its count and its bits are within that many
-  times the cost of an action (`Arith.solo_ztime_all`,
-  `Arith.solo_btime_all`).  The law is that of this program on these
-  nets, with the agents listed in this order; it is not a law of
-  addition, and another order of the list gives other passes.  For
-  `12 + 12` it gives 313 actions, 267,615 counted and 16,056,900 bits
+  (`Arith.solo_work`).  The law is that of this program on these nets,
+  with the agents listed in this order; it is not a law of addition, and
+  another order of the list gives other passes.  The actions are not
+  charged alike.  By its state an action is charged from none to four
+  operations on maps (`XThread.ops`), and the same runs, followed with
+  that charge (`Opers`), come to `46 * m + 7 * n + 28` operations
+  (`14 * n + 28` when `m` is zero; `Arith.solo_ops`).  The charge is a
+  bound, by the state alone: two for every segment followed, where one
+  lookup is often enough.  The count of the numbered program is then at
+  most fifteen for each action and, for each operation, the cost of one
+  on a tree of full depth (`ZMach.ftime_le_ops`,
+  `Arith.solo_ztime_ops`), and at least one for each action
+  (`ZMach.work_le_ftime`, `Arith.solo_ztime_ge`); the bits follow
+  (`Arith.solo_btime_ops`).  For `12 + 12` that is 313 actions and 664
+  operations, so between 313 and 144,135 counted, and at most 8,648,100
+  bits; four operations for every action gave 267,615 and 16,056,900
   (`Arith.sum12_solo`); the bounds for every schedule are 7,028,955 and
   421,737,300; and the run takes 10,999 and 28,984.  For `1000 + 1000`,
-  a size not computed here, it gives 25,013 actions, 33,992,667 counted
-  and 3,263,296,032 bits.  What is left of the gap is the cost of an
-  action, which is bounded as four operations on trees of full depth.
+  a size not computed here, it is 25,013 actions and 53,028 operations,
+  at most 18,192,603 counted and 1,746,489,888 bits.  What is left of the
+  gap is the cost of one operation, which is charged as on a tree of full
+  depth with a full comparison at every level.
 * An executable system (`XSys`) carries proofs: that its rules are the rules
   of a `System`, and that the slots of each right-hand side are listed.  For
   a system given as data (`SysData`) these follow from the evaluation of
@@ -34796,6 +34824,713 @@ theorem assoc_of_nodup {A B : Type} [DecidableEq A] : ∀ {l : List (A × B)},
     · rw [ite_neg' (fun ek => hnd'.1 (by rw [ek]; exact List.mem_map_of_mem h'))]
       exact assoc_of_nodup hnd'.2 h'
 
+section OpsCount
+
+variable [DecidableEq S] {xs : XSys S}
+
+/-- **The operations on maps that an action is charged for**, by the state
+of the thread alone: four to take an entry from the list, one to look a
+port up, two to follow a segment, three to take an agent, two for each
+agent or segment written. -/
+def XThread.ops (T : XThread S) : Nat :=
+  match T.st with
+  | .idle =>
+    match T.todo with
+    | [] => 0
+    | _ :: _ => 4
+  | .look _ _ => 1
+  | .seek _ _ _ _ => 2
+  | .ready _ _ _ _ => 3
+  | .half _ _ _ _ => 3
+  | .write (_ :: _) _ => 2
+  | .write [] (_ :: _) => 2
+  | .write [] [] => 0
+
+omit [DecidableEq S] in
+theorem XThread.ops_map (g : Id → Id) (T : XThread S) : (T.map g).ops = T.ops := by
+  obtain ⟨todo, st⟩ := T
+  cases st with
+  | idle => cases todo <;> rfl
+  | write as ls => cases as <;> cases ls <;> rfl
+  | _ => rfl
+
+/-- What a run comes to at a rate is what it comes to up to a cut and
+what the rest comes to. -/
+theorem XMach.tally_add (κ : XThread S → Nat) (xs : XSys S) (σ : Nat → Nat) (M : XMach S)
+    (i : Nat) : ∀ k, M.tally κ xs σ (i + k) =
+      M.tally κ xs σ i + (M.trace xs σ i).1.tally κ xs (fun j => σ (i + j)) k
+  | 0 => rfl
+  | k + 1 => by
+    have ih := XMach.tally_add κ xs σ M i k
+    have a : (M.trace xs σ (i + k)).1 =
+        ((M.trace xs σ i).1.trace xs (fun j => σ (i + j)) k).1 :=
+      by rw [XMach.trace_add xs σ M i k]
+    show M.tally κ xs σ (i + k) + (M.trace xs σ (i + k)).1.stepTally κ (σ (i + k)) =
+      M.tally κ xs σ i + ((M.trace xs σ i).1.tally κ xs (fun j => σ (i + j)) k +
+        ((M.trace xs σ i).1.trace xs (fun j => σ (i + j)) k).1.stepTally κ (σ (i + k)))
+    rw [ih, a, Nat.add_assoc]
+
+theorem XMach.single_tally (κ : XThread S → Nat) (xs : XSys S) (X : XNet S) (T : XThread S)
+    (k : Nat) :
+    (XMach.single X T).tally κ xs (fun _ => 0) (k + 1) =
+      κ T + (XMach.single (XMach.act xs X T).1 (XMach.act xs X T).2.1).tally κ xs
+        (fun _ => 0) k := by
+  have hw := XMach.tally_add κ xs (fun _ => 0) (XMach.single X T) 1 k
+  rw [Nat.add_comm 1 k] at hw
+  rw [hw]
+  show 0 + κ T + _ = _
+  rw [Nat.zero_add]
+  rfl
+
+theorem XMach.tally_mono (κ : XThread S → Nat) (σ : Nat → Nat) (M : XMach S) {a b : Nat}
+    (h : a ≤ b) : M.tally κ xs σ a ≤ M.tally κ xs σ b := by
+  obtain ⟨d, rfl⟩ : ∃ d, b = a + d := ⟨b - a, by omega⟩
+  clear h
+  induction d with
+  | zero => exact Nat.le_refl _
+  | succ d ih => exact Nat.le_trans ih (Nat.le_add_right _ _)
+
+omit [DecidableEq S] in
+theorem XMach.stepTally_ops_resting {M : XMach S} (h : M.resting = true) (t : Nat) :
+    M.stepTally XThread.ops t = 0 := by
+  unfold XMach.stepTally
+  split
+  · rename_i T hT
+    rw [XThread.eq_rest (List.all_eq_true.1 h T (List.mem_of_getElem? hT))]
+    rfl
+  · rfl
+
+/-- Once the threads rest no more operations are charged. -/
+theorem XMach.ops_rest {M : XMach S} (σ : Nat → Nat) {B : Nat}
+    (h : (M.trace xs σ B).1.resting = true) :
+    ∀ d, M.tally XThread.ops xs σ (B + d) = M.tally XThread.ops xs σ B
+  | 0 => rfl
+  | d + 1 => by
+    show M.tally XThread.ops xs σ (B + d) +
+      (M.trace xs σ (B + d)).1.stepTally XThread.ops (σ (B + d)) = _
+    rw [XMach.stepTally_ops_resting (XMach.resting_trace σ h d), Nat.add_zero]
+    exact XMach.ops_rest σ h d
+
+/-- `Opers xs X T X' T' c k w`: a counted run of one thread, as `Works`,
+that is charged `w` operations on maps. -/
+inductive Opers (xs : XSys S) :
+    XNet S → XThread S → XNet S → XThread S → Nat → Nat → Nat → Prop
+  | refl (X : XNet S) (T : XThread S) : Opers xs X T X T 0 0 0
+  | step {X X₁ X' : XNet S} {T T₁ T' : XThread S} {c₁ c k w : Nat} :
+      T ≠ ⟨[], .idle⟩ → XMach.act xs X T = (X₁, T₁, c₁) → Opers xs X₁ T₁ X' T' c k w →
+      Opers xs X T X' T' (c₁ + c) (k + 1) (T.ops + w)
+
+theorem Opers.works {X X' : XNet S} {T T' : XThread S} {c k w : Nat}
+    (r : Opers xs X T X' T' c k w) : Works xs X T X' T' c k := by
+  induction r with
+  | refl X T => exact .refl _ _
+  | step hT h _ ih => exact .step hT h ih
+
+theorem Opers.trans {X X₁ X₂ : XNet S} {T T₁ T₂ : XThread S} {c₁ c₂ k₁ k₂ w₁ w₂ : Nat}
+    (r₁ : Opers xs X T X₁ T₁ c₁ k₁ w₁) (r₂ : Opers xs X₁ T₁ X₂ T₂ c₂ k₂ w₂) :
+    Opers xs X T X₂ T₂ (c₁ + c₂) (k₁ + k₂) (w₁ + w₂) := by
+  induction r₁ with
+  | refl X T =>
+    rw [Nat.zero_add, Nat.zero_add, Nat.zero_add]
+    exact r₂
+  | @step X X₁ X' T T₁ T' c₁ c k w hT h _ ih =>
+    have e1 : c₁ + c + c₂ = c₁ + (c + c₂) := Nat.add_assoc _ _ _
+    have e2 : k + 1 + k₂ = k + k₂ + 1 := Nat.add_right_comm _ _ _
+    have e3 : T.ops + w + w₂ = T.ops + (w + w₂) := Nat.add_assoc _ _ _
+    rw [e1, e2, e3]
+    exact .step hT h (ih r₂)
+
+/-- **What a counted run is charged**: after its `k` actions the run has
+been charged `w` operations, and from there what the run from the state
+reached is charged. -/
+theorem Opers.tally {X X' : XNet S} {T T' : XThread S} {c k w : Nat}
+    (r : Opers xs X T X' T' c k w) :
+    ∀ j, (XMach.single X T).tally XThread.ops xs (fun _ => 0) (k + j) =
+      w + (XMach.single X' T').tally XThread.ops xs (fun _ => 0) j := by
+  induction r with
+  | refl X T =>
+    intro j
+    rw [Nat.zero_add, Nat.zero_add]
+  | @step X X₁ X' T T₁ T' c₁ c k w hT h _ ih =>
+    intro j
+    have f := XMach.single_tally XThread.ops xs X T (k + j)
+    rw [h] at f
+    have e : k + 1 + j = k + j + 1 := by omega
+    rw [e, f]
+    show T.ops + (XMach.single X₁ T₁).tally XThread.ops xs (fun _ => 0) (k + j) = _
+    rw [ih j, Nat.add_assoc]
+
+/-- **A counted run to the empty list is charged its operations and no
+more**, at any time. -/
+theorem Opers.total {X X' : XNet S} {T : XThread S} {c k w : Nat}
+    (r : Opers xs X T X' ⟨[], .idle⟩ c k w) :
+    (XMach.single X T).tally XThread.ops xs (fun _ => 0) k = w ∧
+      ∀ i, (XMach.single X T).tally XThread.ops xs (fun _ => 0) i ≤ w := by
+  have hz : ∀ j, (XMach.single X' ⟨[], .idle⟩).tally XThread.ops xs (fun _ => 0) j = 0 := by
+    intro j
+    have h := XMach.ops_rest (xs := xs) (M := XMach.single X' ⟨[], .idle⟩) (fun _ => 0)
+      (B := 0) rfl j
+    rw [Nat.zero_add] at h
+    exact h
+  have hk : (XMach.single X T).tally XThread.ops xs (fun _ => 0) k = w := by
+    have h := r.tally 0
+    rw [hz 0] at h
+    exact h
+  refine ⟨hk, fun i => ?_⟩
+  by_cases hi : i ≤ k
+  · have h := XMach.tally_mono (xs := xs) XThread.ops (fun _ => 0) (XMach.single X T) hi
+    omega
+  · obtain ⟨j, rfl⟩ : ∃ j, i = k + j := ⟨i - k, by omega⟩
+    rw [r.tally j, hz j]
+    exact Nat.le_refl _
+
+theorem Opers.write (xs : XSys S) (todo : List (Id × S)) :
+    ∀ (as : List (Id × S)) (ls : List (Port × Port)) (X : XNet S),
+      Opers xs X ⟨todo, .write as ls⟩ ((X.putAgents as).putLinks ls)
+        ⟨((X.putAgents as).putLinks ls).agents, .idle⟩ 0 (as.length + ls.length + 1)
+        (2 * (as.length + ls.length))
+  | e :: as, ls, X => by
+    obtain ⟨i, γ⟩ := e
+    have w := Opers.write xs todo as ls (X.putAgent i γ)
+    have s : XMach.act xs X ⟨todo, .write ((i, γ) :: as) ls⟩ =
+        (X.putAgent i γ, ⟨todo, .write as ls⟩, 0) := rfl
+    have e : ((i, γ) :: as).length + ls.length + 1 = as.length + ls.length + 1 + 1 := by
+      show as.length + 1 + ls.length + 1 = _
+      omega
+    have e' : 2 * (((i, γ) :: as).length + ls.length) = 2 + 2 * (as.length + ls.length) := by
+      show 2 * (as.length + 1 + ls.length) = _
+      omega
+    rw [e, e']
+    exact .step (c₁ := 0) (c := 0) (fun h => by cases h) s w
+  | [], e :: ls, X => by
+    obtain ⟨p, q⟩ := e
+    have w := Opers.write xs todo [] ls (X.putLink p q)
+    have s : XMach.act xs X ⟨todo, .write [] ((p, q) :: ls)⟩ =
+        (X.putLink p q, ⟨todo, .write [] ls⟩, 0) := rfl
+    have e' : 2 * (([] : List (Id × S)).length + ((p, q) :: ls).length) =
+        2 + 2 * (([] : List (Id × S)).length + ls.length) := by
+      show 2 * (0 + (ls.length + 1)) = 2 + 2 * (0 + ls.length)
+      omega
+    rw [e']
+    exact .step (c₁ := 0) (c := 0) (fun h => by cases h) s w
+  | [], [], X =>
+    .step (c₁ := 0) (c := 0) (k := 0) (w := 0) (fun h => by cases h) rfl (.refl _ _)
+
+/-- **A round on a pair that faces the thread directly, with what it is
+charged**: thirteen operations and two for each agent and segment
+written. -/
+theorem Opers.claim_direct {X : XNet S} {a b : Id} {α β : S} {R : XRhs S}
+    (rest : List (Id × S)) (h₁ : assoc a X.agents = some α)
+    (h₂ : assoc (a, 0) X.wires = some (b, 0)) (h₃ : assoc b X.agents = some β) (hne : a ≠ b)
+    (h₄ : assoc b (X.takeAgent a).agents = some β) (hR : xs.rule α β = some R) :
+    Opers xs X ⟨(a, α) :: rest, .idle⟩
+      ((((X.takeAgent a).takeAgent b).putAgents (R.newAgents a b)).putLinks
+        (R.newLinks xs.sys.ar a b α β))
+      ⟨((((X.takeAgent a).takeAgent b).putAgents (R.newAgents a b)).putLinks
+        (R.newLinks xs.sys.ar a b α β)).agents, .idle⟩ 1
+      (5 + ((R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length + 1))
+      (13 + 2 * ((R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length)) := by
+  have s₁ : XMach.act xs X ⟨(a, α) :: rest, .idle⟩ = (X, ⟨rest, .look a α⟩, 0) :=
+    XMach.act_idle_pos h₁
+  have s₂ : XMach.act xs X ⟨rest, .look a α⟩ = (X, ⟨rest, .seek a α (a, 0) (b, 0)⟩, 0) :=
+    XMach.act_look h₂
+  have s₃ : XMach.act xs X ⟨rest, .seek a α (a, 0) (b, 0)⟩ =
+      (X, ⟨rest, .ready a b α β⟩, 0) :=
+    XMach.act_seek_found (c := (b, 0))
+      (by
+        show (if (0 : Nat) = 0 then assoc b X.agents else none) = some β
+        rw [ite_pos' rfl]
+        exact h₃)
+      ⟨hne, by rw [hR]; rfl⟩
+  have s₄ : XMach.act xs X ⟨rest, .ready a b α β⟩ =
+      (X.takeAgent a, ⟨rest, .half a b α β⟩, 0) := XMach.act_ready h₁
+  have s₅ : XMach.act xs (X.takeAgent a) ⟨rest, .half a b α β⟩ =
+      ((X.takeAgent a).takeAgent b,
+        ⟨rest, .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β)⟩, 1) :=
+    XMach.act_half (by rw [ite_pos' ⟨h₄, hne⟩]; exact hR)
+  have w₁ : Opers xs X ⟨(a, α) :: rest, .idle⟩ ((X.takeAgent a).takeAgent b)
+      ⟨rest, .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β)⟩ 1 5 13 :=
+    .step (c₁ := 0) (c := 1) (k := 4) (w := 9) (fun h => by cases h) s₁
+      (.step (c₁ := 0) (c := 1) (k := 3) (w := 8) (fun h => by cases h) s₂
+        (.step (c₁ := 0) (c := 1) (k := 2) (w := 6) (fun h => by cases h) s₃
+          (.step (c₁ := 0) (c := 1) (k := 1) (w := 3) (fun h => by cases h) s₄
+            (.step (c₁ := 1) (c := 0) (k := 0) (w := 0) (fun h => by cases h) s₅
+              (.refl _ _)))))
+  exact w₁.trans (Opers.write xs rest _ _ _)
+
+/-- **A round on a pair one point away, with what it is charged**:
+fifteen operations and two for each agent and segment written. -/
+theorem Opers.claim_via {X : XNet S} {a b : Id} {α β : S} {R : XRhs S} {c : Port}
+    (rest : List (Id × S)) (h₁ : assoc a X.agents = some α)
+    (h₂ : assoc (a, 0) X.wires = some c)
+    (hc : (if c.2 = 0 then assoc c.1 X.agents else none) = none)
+    (h₂' : nextSeg X.wires c (a, 0) = some (b, 0)) (h₃ : assoc b X.agents = some β)
+    (hne : a ≠ b) (h₄ : assoc b (X.takeAgent a).agents = some β)
+    (hR : xs.rule α β = some R) :
+    Opers xs X ⟨(a, α) :: rest, .idle⟩
+      ((((X.takeAgent a).takeAgent b).putAgents (R.newAgents a b)).putLinks
+        (R.newLinks xs.sys.ar a b α β))
+      ⟨((((X.takeAgent a).takeAgent b).putAgents (R.newAgents a b)).putLinks
+        (R.newLinks xs.sys.ar a b α β)).agents, .idle⟩ 1
+      (6 + ((R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length + 1))
+      (15 + 2 * ((R.newAgents a b).length + (R.newLinks xs.sys.ar a b α β).length)) := by
+  have s₁ : XMach.act xs X ⟨(a, α) :: rest, .idle⟩ = (X, ⟨rest, .look a α⟩, 0) :=
+    XMach.act_idle_pos h₁
+  have s₂ : XMach.act xs X ⟨rest, .look a α⟩ = (X, ⟨rest, .seek a α (a, 0) c⟩, 0) :=
+    XMach.act_look h₂
+  have s₂' : XMach.act xs X ⟨rest, .seek a α (a, 0) c⟩ =
+      (X, ⟨rest, .seek a α c (b, 0)⟩, 0) := XMach.act_seek_next hc h₂'
+  have s₃ : XMach.act xs X ⟨rest, .seek a α c (b, 0)⟩ = (X, ⟨rest, .ready a b α β⟩, 0) :=
+    XMach.act_seek_found (c := (b, 0))
+      (by
+        show (if (0 : Nat) = 0 then assoc b X.agents else none) = some β
+        rw [ite_pos' rfl]
+        exact h₃)
+      ⟨hne, by rw [hR]; rfl⟩
+  have s₄ : XMach.act xs X ⟨rest, .ready a b α β⟩ =
+      (X.takeAgent a, ⟨rest, .half a b α β⟩, 0) := XMach.act_ready h₁
+  have s₅ : XMach.act xs (X.takeAgent a) ⟨rest, .half a b α β⟩ =
+      ((X.takeAgent a).takeAgent b,
+        ⟨rest, .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β)⟩, 1) :=
+    XMach.act_half (by rw [ite_pos' ⟨h₄, hne⟩]; exact hR)
+  have w₁ : Opers xs X ⟨(a, α) :: rest, .idle⟩ ((X.takeAgent a).takeAgent b)
+      ⟨rest, .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β)⟩ 1 6 15 :=
+    .step (c₁ := 0) (c := 1) (k := 5) (w := 11) (fun h => by cases h) s₁
+      (.step (c₁ := 0) (c := 1) (k := 4) (w := 10) (fun h => by cases h) s₂
+        (.step (c₁ := 0) (c := 1) (k := 3) (w := 8) (fun h => by cases h) s₂'
+          (.step (c₁ := 0) (c := 1) (k := 2) (w := 6) (fun h => by cases h) s₃
+            (.step (c₁ := 0) (c := 1) (k := 1) (w := 3) (fun h => by cases h) s₄
+              (.step (c₁ := 1) (c := 0) (k := 0) (w := 0) (fun h => by cases h) s₅
+                (.refl _ _))))))
+  exact w₁.trans (Opers.write xs rest _ _ _)
+
+theorem Opers.seek_dead {X : XNet S} {todo : List (Id × S)} {a : Id} {α : S} {p c : Port}
+    {k : Nat} (h : X.Dead p c k) :
+    Opers xs X ⟨todo, .seek a α p c⟩ X ⟨todo, .idle⟩ 0 k (2 * k) := by
+  induction h with
+  | stop h1 h2 =>
+    exact .step (c₁ := 0) (c := 0) (k := 0) (w := 0) (fun h => by cases h)
+      (XMach.act_seek_stop h1 h2) (.refl _ _)
+  | @step p c q k h1 h2 _ ih =>
+    have e : 2 * (k + 1) = 2 + 2 * k := by omega
+    rw [e]
+    exact .step (c₁ := 0) (c := 0) (fun h => by cases h) (XMach.act_seek_next h1 h2) ih
+
+/-- **A thread passes an agent whose wire leads nowhere, charged five
+operations and two for each point of the walk.** -/
+theorem Opers.dead {X : XNet S} {e : Id × S} {c : Port} {k : Nat} (rest : List (Id × S))
+    (h₁ : assoc e.1 X.agents = some e.2) (h₂ : assoc (e.1, 0) X.wires = some c)
+    (hd : X.Dead (e.1, 0) c k) :
+    Opers xs X ⟨e :: rest, .idle⟩ X ⟨rest, .idle⟩ 0 (k + 2) (2 * k + 5) := by
+  have w := Opers.seek_dead (xs := xs) (todo := rest) (a := e.1) (α := e.2) hd
+  have e1 : 2 * k + 5 = 4 + (1 + 2 * k) := by omega
+  rw [e1]
+  exact .step (c₁ := 0) (c := 0) (k := k + 1) (fun h => by cases h) (XMach.act_idle_pos h₁)
+    (.step (c₁ := 0) (c := 0) (fun h => by cases h) (XMach.act_look h₂) w)
+
+theorem Opers.inert {X : XNet S} {e : Id × S} (rest : List (Id × S)) (h : X.Inert e) :
+    Opers xs X ⟨e :: rest, .idle⟩ X ⟨rest, .idle⟩ 0 3 7 := by
+  obtain ⟨h₁, q, h₂, h₃, h₄⟩ := h
+  exact Opers.dead (k := 1) rest h₁ h₂ (.stop h₃ h₄)
+
+theorem Opers.inert_pass {X : XNet S} (rest : List (Id × S)) : ∀ (l : List (Id × S)),
+    (∀ e, e ∈ l → X.Inert e) →
+      Opers xs X ⟨l ++ rest, .idle⟩ X ⟨rest, .idle⟩ 0 (3 * l.length) (7 * l.length)
+  | [], _ => .refl _ _
+  | e :: l, h => by
+    have w₁ : Opers xs X ⟨e :: (l ++ rest), .idle⟩ X ⟨l ++ rest, .idle⟩ 0 3 7 :=
+      Opers.inert _ (h e List.mem_cons_self)
+    have w₂ := Opers.inert_pass rest l fun e' he' => h e' (List.mem_cons_of_mem _ he')
+    have w := w₁.trans w₂
+    have e1 : 3 * (e :: l).length = 3 + 3 * l.length := by
+      show 3 * (l.length + 1) = _
+      omega
+    have e2 : 7 * (e :: l).length = 7 + 7 * l.length := by
+      show 7 * (l.length + 1) = _
+      omega
+    rw [e1, e2]
+    exact w
+
+/-- **Everything counted, an action costs the size of a rule, four, and
+its operations**, each at most `L + 6` for each level of a tree under `Dm`
+deep.  As `OMach.fcost_le`, with the operations of the action in the place
+of four. -/
+theorem OMach.fcost_ops {C D : Nat} (hb : xs.Bounded C D) (O : OMem S) (T : TThread S)
+    {Dm L : Nat} (hc : tdepth O.cells + 1 ≤ Dm) (hl : ndepth O.live + 1 ≤ Dm)
+    (hn : ndepth O.nbrs + 1 ≤ Dm) (ht : tdepth T.todo + 1 ≤ Dm)
+    (hf : ∀ p c, findCells p (O.nb c) ≤ 2) (hN : T.toX.NamesLe L) :
+    OMach.fcost xs O T ≤ (C + D + 4) * T.toX.busy + (L + 6) * Dm * T.toX.ops := by
+  have hD : Dm ≤ (L + 6) * Dm := Nat.le_mul_of_pos_left _ (Nat.succ_pos _)
+  have symB : ∀ i : Id, i.length ≤ L → O.symF i ≤ (L + 6) * Dm := fun i hi =>
+    op_le (ngetF_snd O.live i) (by omega) hl (by omega)
+  have nbB : ∀ p : Port, p.1.length ≤ L → O.nbF p ≤ (L + 6) * Dm := fun p hp =>
+    op_le (ngetF_snd O.nbrs (portKey p)) (by omega)
+      hn (by show (p.2 :: p.1).length + 5 ≤ L + 6; show p.1.length + 1 + 5 ≤ L + 6; omega)
+  have takeB : ∀ a : Id, a.length ≤ L → O.takeF a ≤ 2 * ((L + 6) * Dm) := by
+    intro a ha
+    unfold OMem.takeF
+    cases O.live[a]? with
+    | none => exact Nat.zero_le _
+    | some v =>
+      have h₁ := op_le (L := L + 6) (teraseF_snd O.cells v.1) (by omega) hc (by omega)
+      have h₂ := op_le (L := L + 6) (neraseF_snd O.live a) (by omega) hl (by omega)
+      show (teraseF O.cells v.1).2 + (neraseF O.live a).2 ≤ 2 * ((L + 6) * Dm)
+      omega
+  have putB : ∀ (i : Id) (γ : S), i.length ≤ L → O.putF i γ ≤ 2 * ((L + 6) * Dm) := by
+    intro i γ hi
+    have h₁ := op_le (L := L + 6) (tinsertF_snd O.cells O.stamp (i, γ)) (by omega) hc
+      (by omega)
+    have h₂ := op_le (L := L + 6) (ninsertF_snd O.live i (O.stamp, γ)) (by omega) hl
+      (by omega)
+    show (tinsertF O.cells O.stamp (i, γ)).2 + (ninsertF O.live i (O.stamp, γ)).2 ≤
+      2 * ((L + 6) * Dm)
+    omega
+  have linkB : ∀ p q : Port, p.1.length ≤ L → O.linkF p q ≤ 2 * ((L + 6) * Dm) := by
+    intro p q hp
+    have h₁ := nbB p hp
+    have h₂ := op_le (L := L + 6)
+      (ninsertF_snd O.nbrs (portKey p) (pushNb q (O.nb p))) (by omega) hn
+      (by show (p.2 :: p.1).length + 5 ≤ L + 6; show p.1.length + 1 + 5 ≤ L + 6; omega)
+    show O.nbF p + (ninsertF O.nbrs (portKey p) (pushNb q (O.nb p))).2 ≤ 2 * ((L + 6) * Dm)
+    omega
+  obtain ⟨todo, s⟩ := T
+  have ht' : tdepth todo + 1 ≤ Dm := ht
+  obtain ⟨hNd, hNs⟩ := hN
+  cases s with
+  | idle =>
+    cases hmax : (tmaxC todo).1 with
+    | none =>
+      have e : OMach.fcost xs O ⟨todo, .idle⟩ = 0 := by
+        unfold OMach.fcost
+        dsimp only
+        rw [hmax]
+      rw [e]
+      exact Nat.zero_le _
+    | some s =>
+      have hmax' : todo.maxKey? = some s := by rw [← tmaxC_fst, hmax]
+      obtain ⟨v, -, hlst⟩ := treeList_max todo hmax'
+      have eb : (TThread.toX (⟨todo, .idle⟩ : TThread S)).busy = 1 := by
+        show XThread.busy ⟨treeList todo, .idle⟩ = 1
+        rw [hlst]
+        rfl
+      have eo : (TThread.toX (⟨todo, .idle⟩ : TThread S)).ops = 4 := by
+        show XThread.ops ⟨treeList todo, .idle⟩ = 4
+        rw [hlst]
+        rfl
+      have h₁ := tmaxC_snd todo
+      have h₂ := op_le (L := L + 6) (tgetF_snd todo s) (by omega) ht' (by omega)
+      have h₃ := op_le (L := L + 6) (teraseF_snd todo s) (by omega) ht' (by omega)
+      have e : OMach.fcost xs O ⟨todo, .idle⟩ =
+          match todo[s]? with
+          | some e =>
+            1 + ((tmaxC todo).2 + (tgetF todo s).2 + (teraseF todo s).2) + O.symF e.1
+          | none => 1 + ((tmaxC todo).2 + (tgetF todo s).2) := by
+        unfold OMach.fcost
+        dsimp only
+        rw [hmax] <;> rfl
+      rw [e, eb, eo]
+      cases hg : todo[s]? with
+      | none =>
+        show 1 + ((tmaxC todo).2 + (tgetF todo s).2) ≤ (C + D + 4) * 1 + (L + 6) * Dm * 4
+        omega
+      | some e =>
+        have h₄ := symB e.1 (hNd e ((mem_treeList todo e).2 ⟨s, hg⟩))
+        show 1 + ((tmaxC todo).2 + (tgetF todo s).2 + (teraseF todo s).2) + O.symF e.1 ≤
+          (C + D + 4) * 1 + (L + 6) * Dm * 4
+        omega
+  | look a α =>
+    have ha : a.length ≤ L := hNs
+    have h₁ := nbB (a, 0) ha
+    show 2 + O.nbF (a, 0) ≤ (C + D + 4) * 1 + (L + 6) * Dm * 1
+    omega
+  | seek a α p c =>
+    obtain ⟨-, -, hc'⟩ : a.length ≤ L ∧ p.1.length ≤ L ∧ c.1.length ≤ L := hNs
+    have h₁ := symB c.1 hc'
+    have h₂ := nbB c hc'
+    have h₃ := hf p c
+    show (if c.2 = 0 then
+        1 + O.symF c.1 + (if (O.sym c.1).isSome then 0 else O.nbF c + findCells p (O.nb c))
+      else 1 + O.nbF c + findCells p (O.nb c)) ≤ (C + D + 4) * 1 + (L + 6) * Dm * 2
+    split
+    · split <;> omega
+    · omega
+  | ready a b α β =>
+    obtain ⟨ha, -⟩ : a.length ≤ L ∧ b.length ≤ L := hNs
+    have h₁ := symB a ha
+    have h₂ := takeB a ha
+    show 1 + O.symF a + (if O.sym a = some α then O.takeF a else 0) ≤
+      (C + D + 4) * 1 + (L + 6) * Dm * 3
+    split <;> omega
+  | half a b α β =>
+    obtain ⟨ha, hb'⟩ : a.length ≤ L ∧ b.length ≤ L := hNs
+    have h₁ := symB b hb'
+    have h₂ := takeB b hb'
+    have h₃ := putB a α ha
+    have eb : (TThread.toX (⟨todo, .half a b α β⟩ : TThread S)).busy = 1 := rfl
+    have eo : (TThread.toX (⟨todo, .half a b α β⟩ : TThread S)).ops = 3 := rfl
+    rw [eb, eo]
+    unfold OMach.fcost
+    dsimp only
+    split
+    · split
+      · rename_i R hR
+        obtain ⟨hC, hD'⟩ := hb α β R hR
+        have hal := Nat.le_trans (R.newAgents_length a b) hC
+        have hll := Nat.le_trans (R.newLinks_length xs.sys.ar a b α β) hD'
+        show 1 + O.symF b + (O.takeF b + (R.newAgents a b).length +
+          (R.newLinks xs.sys.ar a b α β).length) ≤ (C + D + 4) * 1 + (L + 6) * Dm * 3
+        omega
+      · show 1 + O.symF b + O.putF a α ≤ (C + D + 4) * 1 + (L + 6) * Dm * 3
+        omega
+    · show 1 + O.symF b + O.putF a α ≤ (C + D + 4) * 1 + (L + 6) * Dm * 3
+      omega
+  | write as ls =>
+    obtain ⟨has, hls⟩ : (∀ e ∈ as, e.1.length ≤ L) ∧
+        ∀ e ∈ ls, e.1.1.length ≤ L ∧ e.2.1.length ≤ L := hNs
+    cases as with
+    | cons e as =>
+      obtain ⟨i, γ⟩ := e
+      have h₁ := putB i γ (has (i, γ) List.mem_cons_self)
+      show 1 + O.putF i γ ≤ (C + D + 4) * 1 + (L + 6) * Dm * 2
+      omega
+    | nil =>
+      cases ls with
+      | cons e ls =>
+        obtain ⟨p, q⟩ := e
+        have h₁ := linkB p q (hls (p, q) List.mem_cons_self).1
+        show 4 + O.linkF p q ≤ (C + D + 4) * 1 + (L + 6) * Dm * 2
+        omega
+      | nil =>
+        show 1 ≤ (C + D + 4) * 1 + (L + 6) * Dm * 0
+        omega
+
+/-- The same for the numbered program: the size of a rule, five, and the
+operations of the action. -/
+theorem ZMach.fcost_ops {C D : Nat} (hb : xs.Bounded C D) (O : OMem S) (cnt : Nat)
+    (T : TThread S) {Dm L : Nat} (hc : tdepth O.cells + 1 ≤ Dm) (hl : ndepth O.live + 1 ≤ Dm)
+    (hn : ndepth O.nbrs + 1 ≤ Dm) (ht : tdepth T.todo + 1 ≤ Dm)
+    (hf : ∀ p c, findCells p (O.nb c) ≤ 2) (hN : T.toX.NamesLe L) :
+    ZMach.fcost xs O cnt T ≤ (C + D + 5) * T.toX.busy + (L + 6) * Dm * T.toX.ops := by
+  have h₁ := ZMach.fcost_le_named xs O cnt T
+  have h₂ := OMach.fcost_ops hb O T hc hl hn ht hf hN
+  have e : (C + D + 5) * T.toX.busy = (C + D + 4) * T.toX.busy + T.toX.busy := by
+    rw [show C + D + 5 = (C + D + 4) + 1 from rfl, Nat.add_mul, Nat.one_mul]
+  omega
+
+/-- What one action of the numbered program costs, against the named
+program: the size of a rule and five if it is not a rest, and its
+operations at the depth of the trees. -/
+theorem ZMach.stepFcost_ops {C D : Nat} (hb : xs.Bounded C D) {Z : ZMach S} {H : TMem S}
+    (hA : Z.mem.Agree H) (hk : H.Ok) (hsz : Z.mem.Sized) {g : Id → Id} {M : XMach S}
+    (hM : M = Z.toY.toX.map g) {L A W : Nat} (hN : Z.toY.toX.NamesLe L)
+    (hAg : M.mem.agents.length ≤ A) (hW : M.mem.wires.length ≤ W)
+    (htd : ∀ T ∈ M.ths, T.todo.length ≤ A) (t : Nat) :
+    Z.stepFcost xs t ≤ (C + D + 5) * M.stepTally XThread.busy t +
+      (L + 6) * (3 * lg (A + W)) * M.stepTally XThread.ops t := by
+  subst hM
+  have hcells : Z.mem.cells.size ≤ A := by
+    rw [← treeList_length]
+    have e : ((treeList Z.mem.cells).map fun e => (g e.1, e.2)).length ≤ A := hAg
+    rw [List.length_map] at e
+    exact e
+  have hwires : Z.mem.wires.length ≤ W := by
+    have e : (Z.mem.wires.map fun e => (mapPort g e.1, mapPort g e.2)).length ≤ W := hW
+    rw [List.length_map] at e
+    exact e
+  have hm : (Z.toY.toX.map g).ths[t]? = (Z.ths[t]?).map fun T => T.toX.map g := by
+    show ((Z.ths.map TThread.toX).map (XThread.map g))[t]? = _
+    rw [List.getElem?_map, List.getElem?_map]
+    cases Z.ths[t]? <;> rfl
+  have d₁ := tdepth_lt Z.mem.cells
+  have d₂ := ndepth_lt Z.mem.live
+  have d₃ := ndepth_lt Z.mem.nbrs
+  have m₁ := lg_mono (Nat.le_trans hcells (Nat.le_add_right _ W))
+  have m₂ := lg_mono (Nat.le_trans (Nat.le_trans hsz.live hcells) (Nat.le_add_right _ W))
+  have m₃ := lg_mono (Nat.le_trans (Nat.le_trans hsz.nbrs hwires) (Nat.le_add_left _ A))
+  have hfc : ∀ p c, findCells p (Z.mem.nb c) ≤ 2 := by
+    intro p c
+    rw [hA.nb c, hk.nbrs c]
+    exact findCells_nbOf _ c p
+  unfold ZMach.stepFcost XMach.stepTally
+  rw [hm]
+  cases hT : Z.ths[t]? with
+  | none => exact Nat.zero_le _
+  | some T =>
+    have hTm : T ∈ Z.ths := List.mem_of_getElem? hT
+    have hTX : T.toX.map g ∈ (Z.toY.toX.map g).ths :=
+      List.mem_map.2 ⟨T.toX, List.mem_map.2 ⟨T, hTm, rfl⟩, rfl⟩
+    have htodo : T.todo.size ≤ A := by
+      have e : ((treeList T.todo).map fun e => (g e.1, e.2)).length ≤ A := htd _ hTX
+      rw [List.length_map, treeList_length] at e
+      exact e
+    have m₄ := lg_mono (Nat.le_trans htodo (Nat.le_add_right _ W))
+    have d₄ := tdepth_lt T.todo
+    have hNT : T.toX.NamesLe L := hN.2 T.toX (List.mem_map.2 ⟨T, hTm, rfl⟩)
+    have hb' := ZMach.fcost_ops hb Z.mem Z.cnt T (Dm := 3 * lg (A + W)) (by omega) (by omega)
+      (by omega) (by omega) hfc hNT
+    show ZMach.fcost xs Z.mem Z.cnt T ≤
+      (C + D + 5) * (T.toX.map g).busy + (L + 6) * (3 * lg (A + W)) * (T.toX.map g).ops
+    rw [XThread.busy_map, XThread.ops_map]
+    exact hb'
+
+/-- **The running time of the numbered program, everything counted, by
+its work and its operations.**  Under any schedule the time is at most
+the size of a rule and five for each action that is not a rest, and for
+each operation charged
+
+    (max L 1 + 6) * (3 * lg m)
+
+with `m` what the memory can hold. -/
+theorem ZMach.ftime_le_ops {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
+    (hnd : (X.agents.map Prod.fst).Nodup) {nt : Nat} (hnt : 0 < nt) {C D : Nat}
+    (hb : xs.Bounded C D) {L : Nat} (hL : X.NamesLe L) {n : Nat} {N' : Net S}
+    (hs : Steps (Step xs.sys) n X.toNet N') (hn : Normal (Step xs.sys) N') (σ : Nat → Nat) :
+    ∀ i, (ZMach.init X nt).ftime xs σ i ≤
+      (C + D + 5) * (XMach.init X nt).work xs σ i +
+        (max L 1 + 6) * (3 * lg (X.agents.length + C * n + (X.wires.length + D * n))) *
+          (XMach.init X nt).tally XThread.ops xs σ i := by
+  obtain ⟨Φ, -, hΦ⟩ := XMach.work_measure hX hnd hnt hb hs hn σ
+  have htodo := TMach.todo_le (xs := xs) hX hnd hnt hb hs hn σ
+  intro i
+  induction i with
+  | zero => exact Nat.zero_le _
+  | succ i ih =>
+    obtain ⟨a, -, H, hA, hk⟩ := ZMach.trace_sim (xs := xs) hX hnd hnt σ i
+    obtain ⟨g, hr, -⟩ := YMach.trace_rel (xs := xs) hX hnt σ i
+    obtain ⟨tsim, -, -⟩ := TMach.init_sim (xs := xs) hX hnd hnt σ i
+    obtain ⟨hAg, -, -⟩ := hΦ i
+    have hW := XMach.wires_le (xs := xs) hX hnt hb hs hn σ i
+    have hNm := ZMach.names_le (xs := xs) hX hnd hnt hL σ i
+    have sz := ZMach.trace_sized xs σ (M := ZMach.init X nt) (OMem.ofX_sized X) i
+    have hXtodo : ∀ T ∈ ((XMach.init X nt).trace xs σ i).1.ths,
+        T.todo.length ≤ X.agents.length + C * n := by
+      intro T hT
+      rw [← tsim] at hT
+      have hT' : T ∈ ((TMach.init X nt).trace xs σ i).1.ths.map TThread.toX := hT
+      obtain ⟨T', hT'', rfl⟩ := List.mem_map.1 hT'
+      have h := htodo i T' hT''
+      show (treeList T'.todo).length ≤ _
+      rw [treeList_length]
+      exact h
+    have hM : ((XMach.init X nt).trace xs σ i).1 =
+        ((ZMach.init X nt).trace xs σ i).1.toY.toX.map g := by
+      rw [a]
+      exact hr.eq
+    have hstep := ZMach.stepFcost_ops (xs := xs) hb hA hk sz hM hNm hAg hW hXtodo (σ i)
+    show (ZMach.init X nt).ftime xs σ i +
+        ((ZMach.init X nt).trace xs σ i).1.stepFcost xs (σ i) ≤
+      (C + D + 5) * ((XMach.init X nt).work xs σ i +
+          ((XMach.init X nt).trace xs σ i).1.stepTally XThread.busy (σ i)) +
+        (max L 1 + 6) * (3 * lg (X.agents.length + C * n + (X.wires.length + D * n))) *
+          ((XMach.init X nt).tally XThread.ops xs σ i +
+            ((XMach.init X nt).trace xs σ i).1.stepTally XThread.ops (σ i))
+    rw [Nat.mul_add, Nat.mul_add]
+    omega
+
+/-- Every action that is not a rest costs at least one. -/
+theorem ZMach.busy_le_fcost (xs : XSys S) (O : OMem S) (cnt : Nat) (T : TThread S) :
+    T.toX.busy ≤ ZMach.fcost xs O cnt T := by
+  obtain ⟨todo, st⟩ := T
+  cases st with
+  | idle =>
+    cases hmax : (tmaxC todo).1 with
+    | none =>
+      have hl : treeList todo = [] := by
+        unfold treeList
+        rw [tmax_none todo (by rw [← tmaxC_fst, hmax])]
+        rfl
+      have eb : (TThread.toX (⟨todo, .idle⟩ : TThread S)).busy = 0 := by
+        show XThread.busy ⟨treeList todo, .idle⟩ = 0
+        rw [hl]
+        rfl
+      rw [eb]
+      exact Nat.zero_le _
+    | some s =>
+      have hb := XThread.busy_le (TThread.toX (⟨todo, .idle⟩ : TThread S))
+      have e : ZMach.fcost xs O cnt ⟨todo, .idle⟩ =
+          match todo[s]? with
+          | some e =>
+            1 + ((tmaxC todo).2 + (tgetF todo s).2 + (teraseF todo s).2) + O.symF e.1
+          | none => 1 + ((tmaxC todo).2 + (tgetF todo s).2) := by
+        show OMach.fcost xs O ⟨todo, .idle⟩ = _
+        unfold OMach.fcost
+        dsimp only
+        rw [hmax] <;> rfl
+      rw [e]
+      cases todo[s]? with
+      | none =>
+        show _ ≤ 1 + ((tmaxC todo).2 + (tgetF todo s).2)
+        omega
+      | some e =>
+        show _ ≤ 1 + ((tmaxC todo).2 + (tgetF todo s).2 + (teraseF todo s).2) + O.symF e.1
+        omega
+  | look a α =>
+    show 1 ≤ 2 + O.nbF (a, 0)
+    omega
+  | seek a α p c =>
+    show 1 ≤ (if c.2 = 0 then
+        1 + O.symF c.1 + (if (O.sym c.1).isSome then 0 else O.nbF c + findCells p (O.nb c))
+      else 1 + O.nbF c + findCells p (O.nb c))
+    split <;> omega
+  | ready a b α β =>
+    show 1 ≤ 1 + O.symF a + _
+    omega
+  | half a b α β =>
+    show 1 ≤ 1 + O.symF b + _
+    omega
+  | write as ls =>
+    cases as with
+    | cons e as =>
+      obtain ⟨i, γ⟩ := e
+      show 1 ≤ 1 + O.putF i γ
+      omega
+    | nil =>
+      cases ls with
+      | cons e ls =>
+        obtain ⟨p, q⟩ := e
+        show 1 ≤ 4 + O.linkF p q
+        omega
+      | nil => exact Nat.le_refl 1
+
+theorem ZMach.stepTally_le_fcost (xs : XSys S) (Z : ZMach S) (g : Id → Id) (t : Nat) :
+    (Z.toY.toX.map g).stepTally XThread.busy t ≤ Z.stepFcost xs t := by
+  have hm : (Z.toY.toX.map g).ths[t]? = (Z.ths[t]?).map fun T => T.toX.map g := by
+    show ((Z.ths.map TThread.toX).map (XThread.map g))[t]? = _
+    rw [List.getElem?_map, List.getElem?_map]
+    cases Z.ths[t]? <;> rfl
+  unfold ZMach.stepFcost XMach.stepTally
+  rw [hm]
+  cases hT : Z.ths[t]? with
+  | none => exact Nat.le_refl _
+  | some T =>
+    show (T.toX.map g).busy ≤ ZMach.fcost xs Z.mem Z.cnt T
+    rw [XThread.busy_map]
+    exact ZMach.busy_le_fcost xs Z.mem Z.cnt T
+
+/-- **The count is at least the work.**  Under any schedule, with
+everything counted, the numbered program has taken at least one for each
+action that is not a rest. -/
+theorem ZMach.work_le_ftime {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
+    (hnd : (X.agents.map Prod.fst).Nodup) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) :
+    ∀ i, (XMach.init X nt).work xs σ i ≤ (ZMach.init X nt).ftime xs σ i
+  | 0 => Nat.le_refl _
+  | i + 1 => by
+    have ih := ZMach.work_le_ftime hX hnd hnt σ i
+    obtain ⟨a, -, -⟩ := ZMach.trace_sim (xs := xs) hX hnd hnt σ i
+    obtain ⟨g, hr, -⟩ := YMach.trace_rel (xs := xs) hX hnt σ i
+    have hM : ((XMach.init X nt).trace xs σ i).1 =
+        ((ZMach.init X nt).trace xs σ i).1.toY.toX.map g := by
+      rw [a]
+      exact hr.eq
+    have hstep := ZMach.stepTally_le_fcost xs ((ZMach.init X nt).trace xs σ i).1 g (σ i)
+    rw [← hM] at hstep
+    show (XMach.init X nt).work xs σ i +
+        ((XMach.init X nt).trace xs σ i).1.stepTally XThread.busy (σ i) ≤
+      (ZMach.init X nt).ftime xs σ i + ((ZMach.init X nt).trace xs σ i).1.stepFcost xs (σ i)
+    omega
+
+end OpsCount
+
 /-! ### Systems as data
 
 A right-hand side given as two finite tables, and a system given as a
@@ -38300,6 +39035,7 @@ example : ∀ i : Nat,
       (ZMach.init (sum 12 12) 1).btime xsys (fun _ => 0) i ≤ 72435600 :=
   fun i => ⟨solo_work_le 12 12 i, solo_ztime_le 12 12 i, solo_btime_le 12 12 i⟩
 
+
 local macro "ports_differ" : tactic =>
   `(tactic| first | (intro e; simp at e; done) | (intro e; simp at e; omega))
 
@@ -38326,10 +39062,11 @@ theorem newLinks_zero (a z : Id) : addZero.toX.newLinks ar a z .add .zero =
 
 theorem newAgents_zero (a z : Id) : addZero.toX.newAgents a z = [] := rfl
 
-/-- **The first round, with the memory it leaves.** -/
+/-- **The first round, with the memory it leaves**: sixteen actions,
+charged thirty-three operations. -/
 theorem Start.round_exact {n : Nat} {X : XNet Arith} {hi : Nat} (st : Start n X hi) :
-    Works xsys X ⟨X.agents, .idle⟩ (stepS X [hi + 1] [1])
-        ⟨(stepS X [hi + 1] [1]).agents, .idle⟩ 1 16 ∧
+    Opers xsys X ⟨X.agents, .idle⟩ (stepS X [hi + 1] [1])
+        ⟨(stepS X [hi + 1] [1]).agents, .idle⟩ 1 16 33 ∧
       Steady n (stepS X [hi + 1] [1]) hi := by
   obtain ⟨rest, hA⟩ := st.head
   have ht := st.top
@@ -38348,14 +39085,18 @@ theorem Start.round_exact {n : Nat} {X : XNet Arith} {hi : Nat} (st : Start n X 
     rw [assoc_filter_ne, ite_neg' hne]
     exact st.adder
   have hR : xsys.rule .succ .add = some addSucc.swap.toX := rfl
-  have w := Works.claim_direct (xs := xsys) rest h₁ h₂ st.adder hne h₄ hR
+  have w := Opers.claim_direct (xs := xsys) rest h₁ h₂ st.adder hne h₄ hR
   rw [← hA] at w
   have eA := newAgents_swap (a := [1]) (s := [hi + 1]) hne'
   have eK : 5 + ((addSucc.swap.toX.newAgents [hi + 1] [1]).length +
       (addSucc.swap.toX.newLinks xsys.sys.ar [hi + 1] [1] .succ .add).length + 1) = 16 := by
     rw [eA]
     rfl
-  rw [eK] at w
+  have eW : 13 + 2 * ((addSucc.swap.toX.newAgents [hi + 1] [1]).length +
+      (addSucc.swap.toX.newLinks xsys.sys.ar [hi + 1] [1] .succ .add).length) = 33 := by
+    rw [eA]
+    rfl
+  rw [eK, eW] at w
   refine ⟨w, ?_⟩
   unfold stepS
   have SL := stepLinks_swap (a := [1]) (s := [hi + 1]) hne'
@@ -38382,11 +39123,12 @@ theorem Start.round_exact {n : Nat} {X : XNet Arith} {hi : Nat} (st : Start n X 
     injection e with _ e2
     cases e2
 
-/-- **A later round, with the memory it leaves.** -/
+/-- **A later round, with the memory it leaves**: seventeen actions,
+charged thirty-five operations. -/
 theorem Steady.round_exact {n : Nat} {X : XNet Arith} {h : Nat} (st : Steady n X (h + 1))
     (hn : n + 4 ≤ h + 1) :
-    Works xsys X ⟨X.agents, .idle⟩ (stepA X [0, h + 1 + 1] [h + 1])
-        ⟨(stepA X [0, h + 1 + 1] [h + 1]).agents, .idle⟩ 1 17 ∧
+    Opers xsys X ⟨X.agents, .idle⟩ (stepA X [0, h + 1 + 1] [h + 1])
+        ⟨(stepA X [0, h + 1 + 1] [h + 1]).agents, .idle⟩ 1 17 35 ∧
       Steady n (stepA X [0, h + 1 + 1] [h + 1]) h := by
   obtain ⟨rest, hA⟩ := st.head
   have hb : below n (h + 1) = [h + 1] := below_pos hn
@@ -38414,7 +39156,7 @@ theorem Steady.round_exact {n : Nat} {X : XNet Arith} {h : Nat} (st : Steady n X
     rw [assoc_filter_ne, ite_neg' hne]
     exact h₃
   have hR : xsys.rule .add .succ = some addSucc.toX := rfl
-  have w := Works.claim_via (xs := xsys) (c := ([h + 1 + 1], 1)) rest h₁ h₂ rfl h₂' h₃ hne h₄ hR
+  have w := Opers.claim_via (xs := xsys) (c := ([h + 1 + 1], 1)) rest h₁ h₂ rfl h₂' h₃ hne h₄ hR
   rw [← hA] at w
   have eA := newAgents_add (a := [0, h + 1 + 1]) (s := [h + 1]) hne
   have eK : 6 + ((addSucc.toX.newAgents [0, h + 1 + 1] [h + 1]).length +
@@ -38422,7 +39164,11 @@ theorem Steady.round_exact {n : Nat} {X : XNet Arith} {h : Nat} (st : Steady n X
       17 := by
     rw [eA]
     rfl
-  rw [eK] at w
+  have eW : 15 + 2 * ((addSucc.toX.newAgents [0, h + 1 + 1] [h + 1]).length +
+      (addSucc.toX.newLinks xsys.sys.ar [0, h + 1 + 1] [h + 1] .add .succ).length) = 35 := by
+    rw [eA]
+    rfl
+  rw [eK, eW] at w
   refine ⟨w, ?_⟩
   unfold stepA
   have SL := stepLinks_add (a := [0, h + 1 + 1]) (s := [h + 1]) hne
@@ -38451,11 +39197,12 @@ theorem Steady.round_exact {n : Nat} {X : XNet Arith} {h : Nat} (st : Steady n X
     omega
 
 /-- **The last round**: the adder fires with the zero at the end of the
-chain, in nine actions, and writes two segments. -/
+chain, in nine actions charged nineteen operations, and writes two
+segments. -/
 theorem Steady.zero_round {n : Nat} {X : XNet Arith} (st : Steady n X (n + 3))
     (hz : assoc [2] X.agents = some .zero) :
-    Works xsys X ⟨X.agents, .idle⟩ (stepZ X [0, n + 3 + 1] [2])
-      ⟨(stepZ X [0, n + 3 + 1] [2]).agents, .idle⟩ 1 9 := by
+    Opers xsys X ⟨X.agents, .idle⟩ (stepZ X [0, n + 3 + 1] [2])
+      ⟨(stepZ X [0, n + 3 + 1] [2]).agents, .idle⟩ 1 9 19 := by
   obtain ⟨rest, hA⟩ := st.head
   have hb : below n (n + 3) = [2] := by
     unfold below
@@ -38483,7 +39230,7 @@ theorem Steady.zero_round {n : Nat} {X : XNet Arith} (st : Steady n X (n + 3))
     rw [assoc_filter_ne, ite_neg' hne]
     exact hz
   have hR : xsys.rule .add .zero = some addZero.toX := rfl
-  have w := Works.claim_via (xs := xsys) (c := ([n + 3 + 1], 1)) rest h₁ h₂ rfl h₂' hz hne h₄ hR
+  have w := Opers.claim_via (xs := xsys) (c := ([n + 3 + 1], 1)) rest h₁ h₂ rfl h₂' hz hne h₄ hR
   rw [← hA] at w
   exact w
 
@@ -38939,7 +39686,7 @@ theorem Hist.final {n : Nat} {X0 X : XNet Arith} {T d : Nat} (H : Hist n X0 X T 
 /-- The later rounds, with the description carried along. -/
 theorem Steady.rounds_hist {n : Nat} {X0 : XNet Arith} {T : Nat} :
     ∀ (r : Nat) {X : XNet Arith} {d : Nat}, Steady n X (n + 3 + r) → Hist n X0 X T r d →
-      ∃ X', Works xsys X ⟨X.agents, .idle⟩ X' ⟨X'.agents, .idle⟩ r (17 * r) ∧
+      ∃ X', Opers xsys X ⟨X.agents, .idle⟩ X' ⟨X'.agents, .idle⟩ r (17 * r) (35 * r) ∧
         Steady n X' (n + 3) ∧ Hist n X0 X' T 0 (d + r)
   | 0, X, d, st, H => ⟨X, .refl _ _, st, H⟩
   | r + 1, X, d, st, H => by
@@ -38950,17 +39697,20 @@ theorem Steady.rounds_hist {n : Nat} {X0 : XNet Arith} {T : Nat} :
     · have w2 := w.trans w'
       have e1 : 1 + r = r + 1 := by omega
       have e2 : 17 + 17 * r = 17 * (r + 1) := by omega
-      rw [e1, e2] at w2
+      have e3 : 35 + 35 * r = 35 * (r + 1) := by omega
+      rw [e1, e2, e3] at w2
       exact w2
     · have e : d + 1 + r = d + (r + 1) := by omega
       rw [← e]
       exact H2
 
 /-- **All the rounds of one thread on the net for `(m + 1) + n`**: `m + 2`
-claims in `17 * m + 25` actions, and the memory they leave. -/
+claims in `17 * m + 25` actions, charged `35 * m + 52` operations, and
+the memory they leave. -/
 theorem solo_rounds (m n : Nat) : ∃ Xf,
-    Works xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ Xf ⟨Xf.agents, .idle⟩
-      (m + 2) (17 * m + 25) ∧ Final n (sum (m + 1) n) Xf (n + 3 + m + 1) m := by
+    Opers xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ Xf ⟨Xf.agents, .idle⟩
+      (m + 2) (17 * m + 25) (35 * m + 52) ∧
+      Final n (sum (m + 1) n) Xf (n + 3 + m + 1) m := by
   have st0 : Start n (sum (m + 1) n) (n + 3 + m) := by
     have h := start_sum m n
     have e : m + n + 3 = n + 3 + m := by omega
@@ -38992,7 +39742,8 @@ theorem solo_rounds (m n : Nat) : ∃ Xf,
   have w := (w0.trans w1).trans w2
   have e1 : 1 + m + 1 = m + 2 := by omega
   have e2 : 16 + 17 * m + 9 = 17 * m + 25 := by omega
-  rw [e1, e2] at w
+  have e3 : 33 + 35 * m + 19 = 35 * m + 52 := by omega
+  rw [e1, e2, e3] at w
   exact w
 
 theorem linksS_single (T j k : Nat) (q : Port) : ((([j], k), q) : Port × Port) ∈ linksS T ↔
@@ -39462,13 +40213,14 @@ theorem Final.dead_top (F : Final n X0 X T d) (S : Snd n X0)
   rw [ite_pos' e, e] at hd
   exact .step rfl hn hd
 
-/-- The pass over the successors of the result: four actions each. -/
+/-- The pass over the successors of the result: four actions each,
+charged nine operations. -/
 theorem Final.pass_res (F : Final n X0 X T d) (S : Snd n X0)
     (hfr : ∀ (i : Id) (k : Nat) (q : Port), (((i, k), q) : Port × Port) ∈ X0.wires →
       ∃ j, i = [j])
     (rest : List (Id × Arith)) : ∀ (d' h : Nat), n + 3 ≤ h → h + d' + 1 = T →
       (∀ e ∈ resL h d', e ∈ X.agents) →
-      Stays xsys X ⟨resL h d' ++ rest, .idle⟩ ⟨rest, .idle⟩ (4 * (d' + 1))
+      Opers xsys X ⟨resL h d' ++ rest, .idle⟩ X ⟨rest, .idle⟩ 0 (4 * (d' + 1)) (9 * (d' + 1))
   | 0, h, _, _, hm => by
     have h₁ : assoc [0, 1] X.agents = some Arith.succ := F.agent (hm _ List.mem_cons_self)
     have h₂ : assoc (([0, 1], 0) : Port) X.wires = some ([1], 2) :=
@@ -39483,7 +40235,7 @@ theorem Final.pass_res (F : Final n X0 X T d) (S : Snd n X0)
       nextSeg_none fun q hq => (F.out S q).1 hq
     have hd : X.Dead ([0, 1], 0) ([1], 2) 2 :=
       .step rfl hn (.stop ((ite_pos' rfl).trans F.no_zero) hs)
-    exact Stays.dead (xs := xsys) (e := ([0, 1], Arith.succ)) (k := 2) rest h₁ h₂ hd
+    exact Opers.dead (xs := xsys) (e := ([0, 1], Arith.succ)) (k := 2) rest h₁ h₂ hd
   | d' + 1, h, hh, hT', hm => by
     have hx1 : n + 3 < h + 1 := by omega
     have hx2 : h + 1 < T := by omega
@@ -39494,14 +40246,15 @@ theorem Final.pass_res (F : Final n X0 X T d) (S : Snd n X0)
         (fun q' hq => (F.res_zero hfr hx1 hx2 q').1 hq)
     have hd : X.Dead ([0, 0, h + 2], 0) ([0, h + 2], 2) 2 :=
       F.dead_two hfr (x := h + 2) (by omega) (by omega) (.inl ⟨rfl, by omega⟩)
-    have w₁ : Stays xsys X ⟨([0, 0, h + 2], Arith.succ) :: (resL (h + 1) d' ++ rest), .idle⟩
-        ⟨resL (h + 1) d' ++ rest, .idle⟩ 4 :=
-      Stays.dead (xs := xsys) (e := ([0, 0, h + 2], Arith.succ)) (k := 2) _ h₁ h₂ hd
+    have w₁ : Opers xsys X ⟨([0, 0, h + 2], Arith.succ) :: (resL (h + 1) d' ++ rest), .idle⟩ X
+        ⟨resL (h + 1) d' ++ rest, .idle⟩ 0 4 9 :=
+      Opers.dead (xs := xsys) (e := ([0, 0, h + 2], Arith.succ)) (k := 2) _ h₁ h₂ hd
     have w₂ := Final.pass_res F S hfr rest d' (h + 1) (by omega) (by omega)
       (fun e he => hm e (List.mem_cons_of_mem _ he))
     have w := w₁.trans w₂
     have e1 : 4 + 4 * (d' + 1) = 4 * (d' + 1 + 1) := by omega
-    rw [e1] at w
+    have e2 : 9 + 9 * (d' + 1) = 9 * (d' + 1 + 1) := by omega
+    rw [e1, e2] at w
     exact w
 
 theorem sndL_length : ∀ n, (sndL n).length = n
@@ -39537,11 +40290,13 @@ theorem Final.inert (F : Final n X0 X T d) (S : Snd n X0) {e : Id × Arith}
 
 /-- **The last pass, entry by entry.**  Four actions for each successor
 of the result, `d + 6` for the top of the second argument, three for each
-entry below it; nothing is written. -/
+entry below it; nothing is written.  The pass is charged
+`11 * d + 7 * n + 22` operations. -/
 theorem Final.pass (F : Final n X0 X T d) (S : Snd n X0)
     (hfr : ∀ (i : Id) (k : Nat) (q : Port), (((i, k), q) : Port × Port) ∈ X0.wires →
       ∃ j, i = [j]) :
-    Stays xsys X ⟨X.agents, .idle⟩ ⟨[], .idle⟩ (5 * d + 3 * n + 10) := by
+    Opers xsys X ⟨X.agents, .idle⟩ X ⟨[], .idle⟩ 0 (5 * d + 3 * n + 10)
+      (11 * d + 7 * n + 22) := by
   have hT := F.top
   obtain ⟨γ, low, hsplit, hlen, hlow⟩ := snd_split n
   have hA : X.agents = resL (n + 3) d ++ (([n + 3], γ) :: low) := by
@@ -39556,15 +40311,17 @@ theorem Final.pass (F : Final n X0 X T d) (S : Snd n X0)
   have h₁ : assoc [n + 3] X.agents = some γ := F.agent (hmem _ List.mem_cons_self)
   have h₂ : assoc (([n + 3], 0) : Port) X.wires = some ([1], 1) :=
     assoc_eq_of_unique ((F.top_snd S _).2 rfl) (fun q' hq => (F.top_snd S q').1 hq)
-  have w₂ : Stays xsys X ⟨([n + 3], γ) :: low, .idle⟩ ⟨low, .idle⟩ (d + 3 + 1 + 2) :=
-    Stays.dead (xs := xsys) (e := ([n + 3], γ)) _ h₁ h₂ (F.dead_top S hfr)
-  have w₃ := Stays.inert_pass (xs := xsys) (X := X) [] low (fun e he => by
+  have w₂ : Opers xsys X ⟨([n + 3], γ) :: low, .idle⟩ X ⟨low, .idle⟩ 0 (d + 3 + 1 + 2)
+      (2 * (d + 3 + 1) + 5) :=
+    Opers.dead (xs := xsys) (e := ([n + 3], γ)) _ h₁ h₂ (F.dead_top S hfr)
+  have w₃ := Opers.inert_pass (xs := xsys) (X := X) [] low (fun e he => by
     obtain ⟨j, h1, h2, h3⟩ := hlow e he
     exact F.inert S (hmem e (List.mem_cons_of_mem _ he)) h1 h2 h3)
   rw [List.append_nil, hlen] at w₃
   have w := (w₁.trans w₂).trans w₃
   have e : 4 * (d + 1) + (d + 3 + 1 + 2) + 3 * n = 5 * d + 3 * n + 10 := by omega
-  rw [e] at w
+  have e' : 9 * (d + 1) + (2 * (d + 3 + 1) + 5) + 7 * n = 11 * d + 7 * n + 22 := by omega
+  rw [e, e'] at w
   rw [hA]
   exact w
 
@@ -39577,15 +40334,16 @@ theorem sum_fresh (m n : Nat) (i : Id) (k : Nat) (q : Port)
 
 /-- **The whole run of one thread on the net for `(m + 1) + n`**, action
 by action: `m + 2` claims, and `22 * (m + 1) + 3 * n + 13` actions to the
-empty list. -/
+empty list, charged `46 * (m + 1) + 7 * n + 28` operations. -/
 theorem solo_run_succ (m n : Nat) : ∃ Xf,
-    Works xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ Xf ⟨[], .idle⟩ (m + 2)
-      (22 * (m + 1) + 3 * n + 13) := by
+    Opers xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ Xf ⟨[], .idle⟩ (m + 2)
+      (22 * (m + 1) + 3 * n + 13) (46 * (m + 1) + 7 * n + 28) := by
   obtain ⟨Xf, w, F⟩ := solo_rounds m n
-  have p := (F.pass (snd_sum (m + 1) n) (sum_fresh (m + 1) n)).works
+  have p := F.pass (snd_sum (m + 1) n) (sum_fresh (m + 1) n)
   have w' := w.trans p
   have e : 17 * m + 25 + (5 * m + 3 * n + 10) = 22 * (m + 1) + 3 * n + 13 := by omega
-  rw [e, Nat.add_zero] at w'
+  have e' : 35 * m + 52 + (11 * m + 7 * n + 22) = 46 * (m + 1) + 7 * n + 28 := by omega
+  rw [e, e', Nat.add_zero] at w'
   exact ⟨Xf, w'⟩
 
 theorem zero0_single (j k : Nat) (q : Port) :
@@ -39686,7 +40444,7 @@ theorem Final0.no_zero (F : Final0 n X0 X) : assoc [0] X.agents = none := by
 argument, which a thread follows round the adder that is gone and out to
 the result, and three for each entry below it. -/
 theorem Final0.pass (F : Final0 n X0 X) (S : Snd n X0) :
-    Stays xsys X ⟨X.agents, .idle⟩ ⟨[], .idle⟩ (3 * n + 5) := by
+    Opers xsys X ⟨X.agents, .idle⟩ X ⟨[], .idle⟩ 0 (3 * n + 5) (7 * n + 11) := by
   obtain ⟨γ, low, hsplit, hlen, hlow⟩ := snd_split n
   have hA : X.agents = ([n + 3], γ) :: low := by
     rw [F.agents, hsplit]
@@ -39718,9 +40476,9 @@ theorem Final0.pass (F : Final0 n X0 X) (S : Snd n X0) :
       exact (S.out q).1 hq
   have hd : X.Dead ([n + 3], 0) ([1], 1) 3 :=
     .step rfl hn1 (.step rfl hn2 (.stop ((ite_pos' rfl).trans F.no_zero) hs))
-  have w₂ : Stays xsys X ⟨([n + 3], γ) :: low, .idle⟩ ⟨low, .idle⟩ 5 :=
-    Stays.dead (xs := xsys) (e := ([n + 3], γ)) (k := 3) _ h₁ h₂ hd
-  have w₃ := Stays.inert_pass (xs := xsys) (X := X) [] low (fun e he => by
+  have w₂ : Opers xsys X ⟨([n + 3], γ) :: low, .idle⟩ X ⟨low, .idle⟩ 0 5 11 :=
+    Opers.dead (xs := xsys) (e := ([n + 3], γ)) (k := 3) _ h₁ h₂ hd
+  have w₃ := Opers.inert_pass (xs := xsys) (X := X) [] low (fun e he => by
     obtain ⟨j, h1, h2, h3⟩ := hlow e he
     refine ⟨F.agent (hmem e (List.mem_cons_of_mem _ he)), ([j + 1], 1), ?_, rfl, ?_⟩
     · rw [h3]
@@ -39736,7 +40494,8 @@ theorem Final0.pass (F : Final0 n X0 X) (S : Snd n X0) :
   rw [List.append_nil, hlen] at w₃
   have w := w₂.trans w₃
   have e : 5 + 3 * n = 3 * n + 5 := by omega
-  rw [e] at w
+  have e' : 11 + 7 * n = 7 * n + 11 := by omega
+  rw [e, e'] at w
   rw [hA]
   exact w
 
@@ -39766,16 +40525,18 @@ theorem sumSnd_inert (n : Nat) {e : Id × Arith} (he : e ∈ sndL n) : (sumSnd n
 
 /-- **The whole run of one thread on the net for `0 + n`**: a pass over
 the second argument, the one claim, and the last pass, `6 * n + 13`
-actions in all. -/
+actions in all, charged `14 * n + 28` operations. -/
 theorem solo_run_zero (n : Nat) : ∃ Xf,
-    Works xsys (sum 0 n) ⟨(sum 0 n).agents, .idle⟩ Xf ⟨[], .idle⟩ 1 (6 * n + 13) := by
-  show ∃ Xf, Works xsys (sumSnd n) ⟨(sumSnd n).agents, .idle⟩ Xf ⟨[], .idle⟩ 1 (6 * n + 13)
+    Opers xsys (sum 0 n) ⟨(sum 0 n).agents, .idle⟩ Xf ⟨[], .idle⟩ 1 (6 * n + 13)
+      (14 * n + 28) := by
+  show ∃ Xf, Opers xsys (sumSnd n) ⟨(sumSnd n).agents, .idle⟩ Xf ⟨[], .idle⟩ 1 (6 * n + 13)
+    (14 * n + 28)
   have S := snd_sumSnd n
   obtain ⟨ad, pr⟩ := sumSnd_facts n
   have hA := sumSnd_agents n
-  have w₁ : Stays xsys (sumSnd n) ⟨sndL n ++ base.agents, .idle⟩ ⟨base.agents, .idle⟩
-      (3 * (sndL n).length) :=
-    Stays.inert_pass (xs := xsys) base.agents (sndL n) (fun e he => sumSnd_inert n he)
+  have w₁ : Opers xsys (sumSnd n) ⟨sndL n ++ base.agents, .idle⟩ (sumSnd n)
+      ⟨base.agents, .idle⟩ 0 (3 * (sndL n).length) (7 * (sndL n).length) :=
+    Opers.inert_pass (xs := xsys) base.agents (sndL n) (fun e he => sumSnd_inert n he)
   rw [sndL_length] at w₁
   have h₂ : assoc (([1], 0) : Port) (sumSnd n).wires = some ([2], 0) :=
     assoc_eq_of_unique ((pr _).2 rfl) (fun q' hq => (pr q').1 hq)
@@ -39789,20 +40550,26 @@ theorem solo_run_zero (n : Nat) : ∃ Xf,
     rw [assoc_filter_ne, ite_neg' hne]
     exact h₃
   have hR : xsys.rule .add .zero = some addZero.toX := rfl
-  have w₂ : Works xsys (sumSnd n) ⟨base.agents, .idle⟩ (stepZ (sumSnd n) [1] [2])
-      ⟨(stepZ (sumSnd n) [1] [2]).agents, .idle⟩ 1 8 :=
-    Works.claim_direct (xs := xsys) [([2], Arith.zero), ([3], Arith.zero)] ad h₂ h₃ hne h₄ hR
-  have w₃ := ((final0_sumSnd n).pass S).works
-  have w := (w₁.works.trans w₂).trans w₃
+  have w₂ : Opers xsys (sumSnd n) ⟨base.agents, .idle⟩ (stepZ (sumSnd n) [1] [2])
+      ⟨(stepZ (sumSnd n) [1] [2]).agents, .idle⟩ 1 8 17 :=
+    Opers.claim_direct (xs := xsys) [([2], Arith.zero), ([3], Arith.zero)] ad h₂ h₃ hne h₄ hR
+  have w₃ := (final0_sumSnd n).pass S
+  have w := (w₁.trans w₂).trans w₃
   have e : 3 * n + 8 + (3 * n + 5) = 6 * n + 13 := by omega
-  rw [e] at w
+  have e' : 7 * n + 17 + (7 * n + 11) = 14 * n + 28 := by omega
+  rw [e, e'] at w
   rw [hA]
   exact ⟨_, w⟩
 
+/-- The operations on maps that one thread is charged to add `m` and
+`n`. -/
+def soloOps (m n : Nat) : Nat := if m = 0 then 14 * n + 28 else 46 * m + 7 * n + 28
+
 /-- **The whole run of one thread on the net for `m + n`**, action by
-action, to the empty list. -/
+action, to the empty list, with the operations it is charged. -/
 theorem solo_run (m n : Nat) : ∃ Xf c,
-    Works xsys (sum m n) ⟨(sum m n).agents, .idle⟩ Xf ⟨[], .idle⟩ c (soloWork m n) := by
+    Opers xsys (sum m n) ⟨(sum m n).agents, .idle⟩ Xf ⟨[], .idle⟩ c (soloWork m n)
+      (soloOps m n) := by
   cases m with
   | zero =>
     obtain ⟨Xf, w⟩ := solo_run_zero n
@@ -39812,7 +40579,10 @@ theorem solo_run (m n : Nat) : ∃ Xf c,
     have e : soloWork (m + 1) n = 22 * (m + 1) + 3 * n + 13 := by
       unfold soloWork
       rw [ite_neg' (Nat.succ_ne_zero m)]
-    rw [e]
+    have e' : soloOps (m + 1) n = 46 * (m + 1) + 7 * n + 28 := by
+      unfold soloOps
+      rw [ite_neg' (Nat.succ_ne_zero m)]
+    rw [e, e']
     exact ⟨Xf, m + 2, w⟩
 
 /-- **One thread adds in exactly `22 * m + 3 * n + 13` actions, for every
@@ -39824,7 +40594,8 @@ theorem solo_work (m n : Nat) :
       (XMach.init (sum m n) 1).work xsys (fun _ => 0) (soloWork m n) = soloWork m n ∧
       ∀ i, i < soloWork m n →
         ¬ ((XMach.init (sum m n) 1).trace xsys (fun _ => 0) i).1.resting = true := by
-  obtain ⟨Xf, c, w⟩ := solo_run m n
+  obtain ⟨Xf, c, r⟩ := solo_run m n
+  have w := r.works
   obtain ⟨t1, t2⟩ := w.trace
   have h := w.work 0
   rw [XMach.init_one]
@@ -39832,40 +40603,145 @@ theorem solo_work (m n : Nat) :
   rw [t1]
   rfl
 
-/-- **One thread adds, numbered, within the exact law times the cost of
-an action, for every size.** -/
-theorem solo_ztime_all (m n : Nat) (i : Nat) :
+/-- The work of one thread on an addition never passes the law. -/
+theorem solo_work_all (m n : Nat) (i : Nat) :
+    (XMach.init (sum m n) 1).work xsys (fun _ => 0) i ≤ soloWork m n := by
+  obtain ⟨hr, hw, -⟩ := solo_work m n
+  by_cases h : i ≤ soloWork m n
+  · have h' := XMach.work_mono (xs := xsys) (fun _ => 0) (XMach.init (sum m n) 1) h
+    rw [hw] at h'
+    exact h'
+  · obtain ⟨d, rfl⟩ : ∃ d, i = soloWork m n + d := ⟨i - soloWork m n, by omega⟩
+    rw [XMach.work_rest (fun _ => 0) hr d, hw]
+    exact Nat.le_refl _
+
+/-- **One thread adds `m` and `n` charged `46 * m + 7 * n + 28`
+operations on maps, for every size** (`14 * n + 28` when `m` is zero):
+that many when it comes to rest, and never more. -/
+theorem solo_ops (m n : Nat) :
+    (XMach.init (sum m n) 1).tally XThread.ops xsys (fun _ => 0) (soloWork m n) =
+        soloOps m n ∧
+      ∀ i, (XMach.init (sum m n) 1).tally XThread.ops xsys (fun _ => 0) i ≤ soloOps m n := by
+  obtain ⟨Xf, c, r⟩ := solo_run m n
+  rw [XMach.init_one]
+  exact r.total
+
+/-- **One thread adds, numbered, in fifteen for each action and the depth
+of the trees for each operation, for every size.** -/
+theorem solo_ztime_ops (m n : Nat) (i : Nat) :
     (ZMach.init (sum m n) 1).ftime xsys (fun _ => 0) i ≤
-      soloWork m n * (15 + 84 * lg (15 * m + 5 * n + 19)) :=
-  ztime_of_work m n (solo_work m n).1 (solo_work m n).2.1 i
+      15 * soloWork m n + 21 * lg (15 * m + 5 * n + 19) * soloOps m n := by
+  have g := good_sum m n
+  obtain ⟨N', hs, hn', -⟩ := add_correct g.config
+  obtain ⟨hL, -⟩ := Below.sizes g.below g.ok.1.symm
+  have h := ZMach.ftime_le_ops (xs := xsys) g.ok.1 (sum_nodup m n) Nat.zero_lt_one
+    xsys_bounded hL hs hn' (fun _ => 0) i
+  have hwi := solo_work_all m n i
+  have hoi := (solo_ops m n).2 i
+  have ha := sum_agents_length_le m n
+  have hwl := sum_wires_length_le m n
+  have hl := lg_mono (show (sum m n).agents.length + 2 * (m + 1) +
+    ((sum m n).wires.length + 8 * (m + 1)) ≤ 15 * m + 5 * n + 19 by omega)
+  have hc : (max 1 1 + 6) * (3 * lg ((sum m n).agents.length + 2 * (m + 1) +
+      ((sum m n).wires.length + 8 * (m + 1)))) ≤ 21 * lg (15 * m + 5 * n + 19) := by
+    rw [Nat.max_self]
+    omega
+  exact Nat.le_trans h (Nat.add_le_add (Nat.mul_le_mul_left _ hwi) (Nat.mul_le_mul hc hoi))
+
+/-- **The count is at least the work**: once one thread has added `m` and
+`n`, the numbered program has taken at least `22 * m + 3 * n + 13`. -/
+theorem solo_ztime_ge (m n : Nat) {i : Nat} (hi : soloWork m n ≤ i) :
+    soloWork m n ≤ (ZMach.init (sum m n) 1).ftime xsys (fun _ => 0) i := by
+  obtain ⟨hr, hw, -⟩ := solo_work m n
+  obtain ⟨d, rfl⟩ : ∃ d, i = soloWork m n + d := ⟨i - soloWork m n, by omega⟩
+  have h := ZMach.work_le_ftime (xs := xsys) (good_sum m n).ok.1 (sum_nodup m n)
+    Nat.zero_lt_one (fun _ => 0) (soloWork m n + d)
+  rw [XMach.work_rest (fun _ => 0) hr d, hw] at h
+  exact h
+
+/-- **A run whose count is bounded has its bits bounded**: at most three
+times the bits of a key for each unit counted. -/
+theorem btime_of_ftime (m n : Nat) {F : Nat}
+    (hF : ∀ i, (ZMach.init (sum m n) 1).ftime xsys (fun _ => 0) i ≤ F) (i : Nat) :
+    (ZMach.init (sum m n) 1).btime xsys (fun _ => 0) i ≤
+      3 * ((lg (5 * m + 2 * n + 13 + sumWork m n 1) + 5) * F) := by
+  have g := good_sum m n
+  obtain ⟨N', hs, hn', -⟩ := add_correct g.config
+  obtain ⟨hL, htop⟩ := Below.sizes g.below g.ok.1.symm
+  have ha := sum_agents_length_le m n
+  have h₁ := Nat.mul_le_mul_left (1 + m + 1) (sum_passBound_le m n)
+  have hwork : (1 + (m + 1)) * (sum m n).passBound (m + 1) 2 8 + (m + 1) * (2 + 8 + 1) ≤
+      sumWork m n 1 := by
+    show (1 + m + 1) * (sum m n).passBound (m + 1) 2 8 + (m + 1) * (2 + 8 + 1) ≤
+      (1 + m + 1) * (33 * m + 11 * n + 49) + 11 * (m + 1)
+    omega
+  have hpow := lt_pow_lg (5 * m + 2 * n + 13 + sumWork m n 1)
+  have hW : (sum m n).top + 3 * (m + 1 + 1) <
+      2 ^ lg (5 * m + 2 * n + 13 + sumWork m n 1) := by omega
+  have hW' : (sum m n).agents.length + ((1 + (m + 1)) * (sum m n).passBound (m + 1) 2 8 +
+      (m + 1) * (2 + 8 + 1)) < 2 ^ lg (5 * m + 2 * n + 13 + sumWork m n 1) := by omega
+  have h := ZMach.btime_le_ftime (xs := xsys) g.ok.1 (sum_nodup m n) xsys_span xsys_ports
+    (sum_ports m n) (Nat.succ_pos 0) xsys_bounded hL hs hn' (fun _ => 0) hW hW' i
+  refine Nat.le_trans h (Nat.mul_le_mul_left 3 (Nat.mul_le_mul ?_ (hF i)))
+  have e1 : lg 2 = 3 := by decide
+  rw [Nat.max_self, Nat.one_mul, e1]
+  omega
 
 /-- The same in bits. -/
-theorem solo_btime_all (m n : Nat) (i : Nat) :
+theorem solo_btime_ops (m n : Nat) (i : Nat) :
     (ZMach.init (sum m n) 1).btime xsys (fun _ => 0) i ≤
       3 * ((lg (5 * m + 2 * n + 13 + sumWork m n 1) + 5) *
-        (soloWork m n * (15 + 84 * lg (15 * m + 5 * n + 19)))) :=
-  btime_of_work m n (solo_work m n).1 (solo_work m n).2.1 i
+        (15 * soloWork m n + 21 * lg (15 * m + 5 * n + 19) * soloOps m n)) :=
+  btime_of_ftime m n (solo_ztime_ops m n) i
 
-/-- `1000 + 1000` on one thread: exactly 25,013 actions, so at most
-33,992,667 counted and 3,161,318,031 bits. -/
+/-- `1000 + 1000` on one thread: exactly 25,013 actions, charged 53,028
+operations; so at least 25,013 counted once it rests, and at most
+18,192,603, and at most 1,746,489,888 bits. -/
 example : (XMach.init (sum 1000 1000) 1).work xsys (fun _ => 0) 25013 = 25013 ∧
-    ∀ i, (ZMach.init (sum 1000 1000) 1).ftime xsys (fun _ => 0) i ≤ 33992667 ∧
-      (ZMach.init (sum 1000 1000) 1).btime xsys (fun _ => 0) i ≤ 3263296032 := by
+    (XMach.init (sum 1000 1000) 1).tally XThread.ops xsys (fun _ => 0) 25013 = 53028 ∧
+    ∀ i, (25013 ≤ i → 25013 ≤ (ZMach.init (sum 1000 1000) 1).ftime xsys (fun _ => 0) i) ∧
+      (ZMach.init (sum 1000 1000) 1).ftime xsys (fun _ => 0) i ≤ 18192603 ∧
+      (ZMach.init (sum 1000 1000) 1).btime xsys (fun _ => 0) i ≤ 1746489888 := by
   have e : soloWork 1000 1000 = 25013 := by decide
+  have eo : soloOps 1000 1000 = 53028 := by decide
   have h := (solo_work 1000 1000).2.1
-  rw [e] at h
-  refine ⟨h, fun i => ⟨?_, ?_⟩⟩
-  · have h1 := solo_ztime_all 1000 1000 i
-    have e1 : soloWork 1000 1000 * (15 + 84 * lg (15 * 1000 + 5 * 1000 + 19)) = 33992667 := by
+  have ho := (solo_ops 1000 1000).1
+  rw [e] at h ho
+  rw [eo] at ho
+  refine ⟨h, ho, fun i => ⟨fun hi => ?_, ?_, ?_⟩⟩
+  · have h0 := solo_ztime_ge 1000 1000 (i := i) (by rw [e]; exact hi)
+    rw [e] at h0
+    exact h0
+  · have h1 := solo_ztime_ops 1000 1000 i
+    have e1 : 15 * soloWork 1000 1000 +
+        21 * lg (15 * 1000 + 5 * 1000 + 19) * soloOps 1000 1000 = 18192603 := by
       decide +kernel
     rw [e1] at h1
     exact h1
-  · have h2 := solo_btime_all 1000 1000 i
+  · have h2 := solo_btime_ops 1000 1000 i
     have e2 : 3 * ((lg (5 * 1000 + 2 * 1000 + 13 + sumWork 1000 1000 1) + 5) *
-        (soloWork 1000 1000 * (15 + 84 * lg (15 * 1000 + 5 * 1000 + 19)))) = 3263296032 := by
+        (15 * soloWork 1000 1000 +
+          21 * lg (15 * 1000 + 5 * 1000 + 19) * soloOps 1000 1000)) = 1746489888 := by
       decide +kernel
     rw [e2] at h2
     exact h2
+
+/-- `12 + 12` on one thread: 313 actions charged 664 operations, so at
+most 144,135 counted and 8,648,100 bits, where four operations for every
+action gave 267,615 and 16,056,900.  The run takes 10,999 and 28,984. -/
+example : ∀ i, (ZMach.init (sum 12 12) 1).ftime xsys (fun _ => 0) i ≤ 144135 ∧
+    (ZMach.init (sum 12 12) 1).btime xsys (fun _ => 0) i ≤ 8648100 := by
+  intro i
+  have h1 := solo_ztime_ops 12 12 i
+  have h2 := solo_btime_ops 12 12 i
+  have e1 : 15 * soloWork 12 12 + 21 * lg (15 * 12 + 5 * 12 + 19) * soloOps 12 12 =
+      144135 := by decide +kernel
+  have e2 : 3 * ((lg (5 * 12 + 2 * 12 + 13 + sumWork 12 12 1) + 5) *
+      (15 * soloWork 12 12 + 21 * lg (15 * 12 + 5 * 12 + 19) * soloOps 12 12)) =
+      8648100 := by decide +kernel
+  rw [e1] at h1
+  rw [e2] at h2
+  exact ⟨h1, h2⟩
 
 end Arith
 
