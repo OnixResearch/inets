@@ -1179,11 +1179,19 @@ Two threads.  A second thread can make the program slower.
                                 a time: the work after any number of
                                 pairs, and the work of two threads that
                                 only read in a memory that stays as it is
+* `INet.XMach.work_full`, `INet.XMach.Total`, `INet.XMach.total_two_stays`,
+  `INet.XMach.Total.after`, `INet.XMach.Ends`, `INet.XMach.ends_sweeps`
+                                work to the action: while no thread is at
+                                rest every action is work, two threads
+                                that only read do exactly the work of
+                                each, and so a run followed to its end
+                                comes to a work that is known exactly
 * `INet.Arith.RaceBase`, `INet.Arith.race_write`,
   `INet.Arith.RaceBase.states`, `INet.Arith.race_reader_wins`,
   `INet.Arith.race_d0` to `INet.Arith.race_d9`
                                 the race for the last pair, one case for
-                                each of the ten moments: in nine the
+                                each of the ten moments, with the exact
+                                work from there on: in nine the
                                 second thread takes the zero and the
                                 adder, writes the two segments and starts
                                 over, while the first writes the end of
@@ -1191,10 +1199,20 @@ Two threads.  A second thread can make the program slower.
                                 finds it gone; in one the first thread
                                 takes the adder first, the second puts the
                                 zero back and the first takes it
-* `INet.Arith.two_threads_race` so two threads in turn add `m + 1` and `n`
-                                in at most `44 * m + 6 * n + 70` actions
-                                that are not rests, for `m` from four on
-                                and every `n`
+* `INet.Arith.raceWork`, `INet.Arith.two_threads_exact`
+                                so with two threads in turn, `m` from four
+                                on and every `n`, either the second only
+                                reads, or it is ready to take the zero
+                                after `17 * m + 11 + d` actions of each,
+                                `d` up to nine, and the work of the whole
+                                run is exactly `44 * m + 6 * n + c`, with
+                                `c` one of 52, 53, 54, 56, 61, 62, 63, 64
+                                and 68 as `d` goes up, or
+                                `39 * m + 3 * n + 60` for `d = 8`, where
+                                the first thread keeps the pair
+* `INet.Arith.two_threads_race` in every case at most
+                                `44 * m + 6 * n + 68` actions that are not
+                                rests
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -2005,17 +2023,26 @@ holds up to equality rather than up to renaming.
   the agents again, and the work exceeds that expression by about one such
   pass (two threads on `21 + 94`: 1,496 against 1,134; on `21 + 93` and
   `21 + 98` the bound holds and is proved).  For two threads the race is
-  followed to its end (`Arith.two_threads_race`): until the second thread
-  is ready to take the zero, which is when each thread has made between
-  `17 * m + 11` and `17 * m + 20` actions, the run is that of one thread
-  alone with a reader beside it (`Arith.two_threads_entry`); from each of
-  the ten moments one thread takes the pair within six actions of each,
-  the second thread in nine of them, and both then pass over the agents
-  that are left, in a memory that stays as it is.  That gives at most
-  `44 * m + 6 * n + 70` actions that are not rests for every second
-  argument, `m` from four on (1,514 on `21 + 94`).  For three threads or
-  more and these sizes only the bound with the large constants is
-  proved.  The
+  followed to its end, to the action (`Arith.two_threads_exact`): until
+  the second thread is ready to take the zero, which is when each thread
+  has made `17 * m + 11 + d` actions with `d` up to nine, the run is that
+  of one thread alone with a reader beside it
+  (`Arith.two_threads_entry`); from each of the ten moments one thread
+  takes the pair within six actions of each, the second thread in nine of
+  them, and both then pass over the agents that are left, in a memory
+  that stays as it is.  No thread is at rest before that last pass, so
+  every action counts, and the work of the whole run is exactly
+  `Arith.raceWork m n d`: from `44 * m + 6 * n + 52` for `d = 0` to
+  `44 * m + 6 * n + 68` for `d = 9`, and `39 * m + 3 * n + 60` for
+  `d = 8`, where the first thread keeps the pair and the second has two
+  entries left to pass.  These are the numbers of the runs computed
+  (1,496, 1,506, 1,519 and 1,530 on `21 + 94` to `21 + 97`, where `d` is
+  0, 3, 6 and 9; 285 on `5 + 23`, where `d` is 8).  The theorem does not
+  say which `d` a given size has: the actions of the second thread before
+  that moment are counted up to one only.  In every case at most
+  `44 * m + 6 * n + 68` actions are not rests (`Arith.two_threads_race`).
+  For three threads or more and these sizes only the bound with the large
+  constants is proved.  The
   condition on the number of threads is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
   to each after the round that takes it.  The agents the first thread has
@@ -37426,6 +37453,222 @@ theorem least_of_exists {P : Nat → Prop} : ∀ N, (∃ a, a ≤ N ∧ P a) →
     · exact least_of_exists N h
     · exact ⟨a, hp, fun b hb hpb => h ⟨b, by omega, hpb⟩⟩
 
+section Exact
+
+variable [DecidableEq S] {xs : XSys S}
+
+/-- A thread at rest stays at rest through a run. -/
+theorem XMach.trace_rest {M : XMach S} {σ : Nat → Nat} {t i : Nat}
+    (h : (M.trace xs σ i).1.ths[t]? = some ⟨[], .idle⟩) :
+    ∀ k, (M.trace xs σ (i + k)).1.ths[t]? = some ⟨[], .idle⟩
+  | 0 => h
+  | k + 1 => XMach.step_rest _ (σ (i + k)) (XMach.trace_rest h k)
+
+/-- If no thread is at rest at some moment of a run, none was at the
+start. -/
+theorem XMach.busy_of_later {M M' : XMach S} {σ : Nat → Nat} {i : Nat}
+    (h : (M.trace xs σ i).1 = M')
+    (hb : ∀ (t : Nat) (T : XThread S), M'.ths[t]? = some T → T ≠ ⟨[], .idle⟩) :
+    ∀ (t : Nat) (T : XThread S), M.ths[t]? = some T → T ≠ ⟨[], .idle⟩ := by
+  subst h
+  intro t T hT e
+  subst e
+  have h1 := XMach.trace_rest (xs := xs) (M := M) (σ := σ) (i := 0) hT i
+  rw [Nat.zero_add] at h1
+  exact hb t _ h1 rfl
+
+/-- **While no thread is at rest every action is work**: if no thread is
+at rest after `N` actions, the work of the first `i` of them is `i`. -/
+theorem XMach.work_full {M : XMach S} {σ : Nat → Nat} {N : Nat}
+    (hb : ∀ (t : Nat) (T : XThread S), (M.trace xs σ N).1.ths[t]? = some T → T ≠ ⟨[], .idle⟩)
+    (hσ : ∀ i, σ i < M.ths.length) : ∀ i, i ≤ N → M.work xs σ i = i
+  | 0, _ => rfl
+  | i + 1, hi => by
+    have ih := XMach.work_full hb hσ i (by omega)
+    have hlt : σ i < (M.trace xs σ i).1.ths.length := by
+      rw [XMach.trace_length]
+      exact hσ i
+    obtain ⟨T, hT⟩ : ∃ T, (M.trace xs σ i).1.ths[σ i]? = some T :=
+      ⟨_, List.getElem?_eq_getElem hlt⟩
+    have hne : T ≠ ⟨[], .idle⟩ := fun e => by
+      subst e
+      have h := XMach.trace_rest hT (N - i)
+      have e' : i + (N - i) = N := by omega
+      rw [e'] at h
+      exact hb _ _ h rfl
+    show M.work xs σ i + (M.trace xs σ i).1.stepTally XThread.busy (σ i) = i + 1
+    rw [ih]
+    unfold XMach.stepTally
+    rw [hT]
+    show i + T.busy = i + 1
+    rw [XThread.busy_of_ne_rest hne]
+
+/-- A thread that comes to rest in `k` actions without writing is at work
+exactly `k` times once it has had `k` actions. -/
+theorem Stays.tally_eq {X : XNet S} {T T' : XThread S} {k : Nat} (st : Stays xs X T T' k)
+    (hT' : T' = ⟨[], .idle⟩) : ∀ h, k ≤ h → T.tally XThread.busy xs X h = k := by
+  induction st with
+  | refl T =>
+    subst hT'
+    intro h _
+    exact XThread.tally_busy_rest xs X h
+  | @step T T₁ T' k hT ha _ ih =>
+    intro h hh
+    cases h with
+    | zero => exact absurd hh (by omega)
+    | succ h =>
+      have h1 := ih hT' h (by omega)
+      show XThread.busy T + XThread.tally XThread.busy xs X (XMach.act xs X T).2.1 h = k + 1
+      rw [ha]
+      show XThread.busy T + XThread.tally XThread.busy xs X T₁ h = k + 1
+      rw [h1, XThread.busy_of_ne_rest hT]
+      omega
+
+/-- A thread that still has actions to make before it rests is not at
+rest. -/
+theorem Stays.ne_rest {X : XNet S} {T T' : XThread S} {k : Nat} (st : Stays xs X T T' k)
+    (hk : 1 ≤ k) : T ≠ ⟨[], .idle⟩ := by
+  cases st with
+  | refl => exact absurd hk (by omega)
+  | step hT _ _ => exact hT
+
+/-- When two threads act in turn, each has had `w` actions after `2 * w`. -/
+theorem hits_alt : ∀ w, hits (fun i => i % 2) 0 (2 * w) = w ∧
+    hits (fun i => i % 2) 1 (2 * w) = w
+  | 0 => ⟨rfl, rfl⟩
+  | w + 1 => by
+    obtain ⟨h0, h1⟩ := hits_alt w
+    rw [Nat.mul_succ]
+    constructor
+    · show hits (fun i => i % 2) 0 (2 * w) + (if (2 * w) % 2 = 0 then 1 else 0) +
+        (if (2 * w + 1) % 2 = 0 then 1 else 0) = w + 1
+      rw [h0, ite_pos' (by omega), ite_neg' (by omega)]
+    · show hits (fun i => i % 2) 1 (2 * w) + (if (2 * w) % 2 = 1 then 1 else 0) +
+        (if (2 * w + 1) % 2 = 1 then 1 else 0) = w + 1
+      rw [h1, ite_neg' (by omega), ite_pos' (by omega)]
+
+/-- `M.Total xs σ W`: the work of the run of `M` under the schedule `σ`
+comes to exactly `W`: it is `W` from some action on. -/
+def XMach.Total (xs : XSys S) (σ : Nat → Nat) (M : XMach S) (W : Nat) : Prop :=
+  ∃ N, ∀ i, N ≤ i → M.work xs σ i = W
+
+/-- The work never exceeds what it comes to. -/
+theorem XMach.Total.le {M : XMach S} {σ : Nat → Nat} {W : Nat} (t : M.Total xs σ W)
+    (i : Nat) : M.work xs σ i ≤ W := by
+  obtain ⟨N, h⟩ := t
+  have h1 := h (i + N) (by omega)
+  have h2 := XMach.work_mono (xs := xs) σ M (show i ≤ i + N by omega)
+  omega
+
+/-- A run comes to one amount of work only. -/
+theorem XMach.Total.unique {M : XMach S} {σ : Nat → Nat} {W W' : Nat}
+    (t : M.Total xs σ W) (t' : M.Total xs σ W') : W = W' := by
+  obtain ⟨N, h⟩ := t
+  obtain ⟨N', h'⟩ := t'
+  have h1 := h (N + N') (by omega)
+  have h2 := h' (N + N') (by omega)
+  omega
+
+theorem XMach.Total.cast {M : XMach S} {σ : Nat → Nat} {W W' : Nat}
+    (t : M.Total xs σ W) (h : W = W') : M.Total xs σ W' := by
+  subst h
+  exact t
+
+/-- **Two threads that only read, in turn, do exactly the work of each**:
+`kP + kQ` if they come to rest in `kP` and `kQ` actions. -/
+theorem XMach.total_two_stays {X : XNet S} {P Q : XThread S} {kP kQ : Nat}
+    (sP : Stays xs X P ⟨[], .idle⟩ kP) (sQ : Stays xs X Q ⟨[], .idle⟩ kQ) :
+    (⟨X, [P, Q]⟩ : XMach S).Total xs (fun i => i % 2) (kP + kQ) := by
+  have hR : ∀ T, T ∈ (⟨X, [P, Q]⟩ : XMach S).ths →
+      T.Reads xs (⟨X, [P, Q]⟩ : XMach S).mem := by
+    intro T hT
+    rcases List.mem_cons.1 hT with rfl | hT
+    · exact (sP.after rfl).1
+    · rcases List.mem_cons.1 hT with rfl | hT
+      · exact (sQ.after rfl).1
+      · cases hT
+  have e := XMach.tally_reads XThread.busy (fun i => i % 2) hR (2 * (kP + kQ))
+  obtain ⟨h0, h1⟩ := hits_alt (kP + kQ)
+  have t1 := sP.tally_eq rfl (kP + kQ) (by omega)
+  have t2 := sQ.tally_eq rfl (kP + kQ) (by omega)
+  have at0 : (⟨X, [P, Q]⟩ : XMach S).work xs (fun i => i % 2) (2 * (kP + kQ)) = kP + kQ := by
+    show (⟨X, [P, Q]⟩ : XMach S).tally XThread.busy xs (fun i => i % 2) (2 * (kP + kQ)) =
+      kP + kQ
+    rw [e]
+    show 0 + P.tally XThread.busy xs X (hits (fun i => i % 2) 0 (2 * (kP + kQ))) +
+      Q.tally XThread.busy xs X (hits (fun i => i % 2) 1 (2 * (kP + kQ))) = kP + kQ
+    rw [h0, h1, t1, t2, Nat.zero_add]
+  refine ⟨2 * (kP + kQ), fun i hi => ?_⟩
+  have up := XMach.work_two_stays sP sQ (fun i => i % 2) i
+  have lo := XMach.work_mono (xs := xs) (fun i => i % 2) (⟨X, [P, Q]⟩ : XMach S) hi
+  omega
+
+/-- **The work of a run of two threads in turn, from a later state on**:
+if neither thread is at rest when each has made `a` actions, the run has
+done `2 * a` work by then, and comes in all to that and what the run from
+there comes to. -/
+theorem XMach.Total.after {M M' : XMach S} {a W : Nat}
+    (h : (M.trace xs (fun i => i % 2) (2 * a)).1 = M') (hlen : M.ths.length = 2)
+    (hb : ∀ (t : Nat) (T : XThread S), M'.ths[t]? = some T → T ≠ ⟨[], .idle⟩)
+    (tot : M'.Total xs (fun i => i % 2) W) : M.Total xs (fun i => i % 2) (2 * a + W) := by
+  subst h
+  obtain ⟨N, hN⟩ := tot
+  have full := XMach.work_full (xs := xs) (M := M) (σ := fun i => i % 2) (N := 2 * a) hb
+    (fun i => by
+      show i % 2 < M.ths.length
+      rw [hlen]
+      exact Nat.mod_lt _ (by omega)) (2 * a) (Nat.le_refl _)
+  refine ⟨2 * a + N, fun i hi => ?_⟩
+  obtain ⟨k, rfl⟩ : ∃ k, i = 2 * a + k := ⟨i - 2 * a, by omega⟩
+  have e : (M.trace xs (fun i => i % 2) (2 * a)).1.work xs (fun j => (2 * a + j) % 2) k =
+      (M.trace xs (fun i => i % 2) (2 * a)).1.work xs (fun i => i % 2) k :=
+    XMach.tally_congr XThread.busy xs _ k fun j _ => by
+      show (2 * a + j) % 2 = j % 2
+      omega
+  have h0 : M.work xs (fun i => i % 2) (2 * a + k) = M.work xs (fun i => i % 2) (2 * a) +
+      (M.trace xs (fun i => i % 2) (2 * a)).1.work xs (fun j => (2 * a + j) % 2) k :=
+    XMach.work_add xs (fun i => i % 2) M (2 * a) k
+  have h2 := hN k (by omega)
+  omega
+
+/-- `M.Ends xs W`: neither thread of `M` is at rest, and the run of the two
+in turn comes to exactly `W` work. -/
+structure XMach.Ends (xs : XSys S) (M : XMach S) (W : Nat) : Prop where
+  total : M.Total xs (fun i => i % 2) W
+  busy : ∀ (t : Nat) (T : XThread S), M.ths[t]? = some T → T ≠ ⟨[], .idle⟩
+
+/-- **Two threads in turn, to the end of the run**: `w` pairs of actions,
+then each thread only reads, `kP` and `kQ` actions; the work is all of
+these. -/
+theorem XMach.ends_sweeps {M : XMach S} {X : XNet S} {P Q : XThread S} {w kP kQ W : Nat}
+    (s : Sweeps xs M ⟨X, [P, Q]⟩ w) (hlen : M.ths.length = 2)
+    (sP : Stays xs X P ⟨[], .idle⟩ kP) (sQ : Stays xs X Q ⟨[], .idle⟩ kQ)
+    (hP : 1 ≤ kP) (hQ : 1 ≤ kQ) (hW : W = 2 * w + (kP + kQ)) : M.Ends xs W := by
+  subst hW
+  have hb : ∀ (t : Nat) (T : XThread S), (⟨X, [P, Q]⟩ : XMach S).ths[t]? = some T → T ≠ ⟨[], .idle⟩ := by
+    intro t T hT
+    cases t with
+    | zero =>
+      have e : P = T := Option.some.inj hT
+      subst e
+      exact sP.ne_rest hP
+    | succ t =>
+      cases t with
+      | zero =>
+        have e : Q = T := Option.some.inj hT
+        subst e
+        exact sQ.ne_rest hQ
+      | succ t => exact absurd hT (by simp)
+  exact ⟨(XMach.total_two_stays sP sQ).after s.trace hlen hb, XMach.busy_of_later s.trace hb⟩
+
+/-- The same from an earlier state of the run. -/
+theorem XMach.Ends.after {M M' : XMach S} {a W : Nat}
+    (h : (M.trace xs (fun i => i % 2) (2 * a)).1 = M') (hlen : M.ths.length = 2)
+    (e : M'.Ends xs W) : M.Ends xs (2 * a + W) :=
+  ⟨e.total.after h hlen e.busy, XMach.busy_of_later h e.busy⟩
+
+end Exact
+
 /-! ### Systems as data
 
 A right-hand side given as two finite tables, and a system given as a
@@ -45821,10 +46064,9 @@ last adder**: when the first thread is about to pop the adder.  The second
 takes the zero, the first reads on to the zero and finds it gone, and both
 then pass over the agents the rounds leave. -/
 theorem race_d5 {m' n' : Nat} {X : XNet Arith} {rest : List (Id × Arith)}
-    (B : RaceBase (m' + 1) (n' + 1) X rest) (l : List (Id × Arith)) (i : Nat) :
+    (B : RaceBase (m' + 1) (n' + 1) X rest) (l : List (Id × Arith)) :
     (⟨X, [⟨X.agents, .idle⟩, ⟨l, .ready [2] [0, n' + 1 + 4] .zero .add⟩]⟩ :
-      XMach Arith).work xsys (fun i => i % 2) i ≤
-      2 * 5 + 2 * (5 * (m' + 1) + 3 * (n' + 1) + 10) := by
+      XMach Arith).Ends xsys (10 * (m' + 1) + 6 * (n' + 1) + 30) := by
   have hr := B.rest
   subst hr
   have F := B.final_read
@@ -45871,9 +46113,7 @@ theorem race_d5 {m' n' : Nat} {X : XNet Arith} {rest : List (Id × Arith)}
     injection h with _ h2
     cases h2) (XMach.act_look k2) sE2).trans B.pass_two
   have sR := F.pass_stays (snd_sum (m' + 1 + 1) (n' + 1)) (sum_fresh (m' + 1 + 1) (n' + 1))
-  have h := XMach.work_pair_after sw.trace
-    (fun i => XMach.work_two_stays sF sR (fun i => i % 2) i) i
-  omega
+  exact XMach.ends_sweeps sw rfl sF sR (by omega) (by omega) (by omega)
 
 /-- The last pass after the first successor of the result, over a list
 that still has the zero of the first argument, in any memory the rounds
@@ -45890,9 +46130,9 @@ theorem Final.pass_two_tail {m' n' : Nat} {Y : XNet Arith}
 /-- **The second thread takes the zero while the first reads the segment
 of the last adder.**  The first reads on to the zero and finds it gone. -/
 theorem race_d6 {m' n' : Nat} {X : XNet Arith} {rest : List (Id × Arith)}
-    (B : RaceBase (m' + 1) (n' + 1) X rest) (l : List (Id × Arith)) (i : Nat) :
+    (B : RaceBase (m' + 1) (n' + 1) X rest) (l : List (Id × Arith)) :
     (⟨X, [⟨rest, .look [0, n' + 1 + 4] .add⟩, ⟨l, .ready [2] [0, n' + 1 + 4] .zero .add⟩]⟩ :
-      XMach Arith).work xsys (fun i => i % 2) i ≤ 2 * 5 + 2 * (5 * (m' + 1) + 3 * (n' + 1) + 10) := by
+      XMach Arith).Ends xsys (10 * (m' + 1) + 6 * (n' + 1) + 29) := by
   have hr := B.rest
   subst hr
   have F := B.final_read
@@ -45915,17 +46155,15 @@ theorem race_d6 {m' n' : Nat} {X : XNet Arith} {rest : List (Id × Arith)}
   have sw := race_reader_wins (l := l) f0 B.zero f1 B.adder1 f2 f3 f4
   have sF := sE2.trans F.pass_two_tail
   have sR := F.pass_stays (snd_sum (m' + 1 + 1) (n' + 1)) (sum_fresh (m' + 1 + 1) (n' + 1))
-  have h := XMach.work_pair_after sw.trace
-    (fun i => XMach.work_two_stays sF sR (fun i => i % 2) i) i
-  omega
+  exact XMach.ends_sweeps sw rfl sF sR (by omega) (by omega) (by omega)
 
 /-- **The second thread takes the zero while the first is on its way from
 the last adder to it.**  The first finds the zero gone at once. -/
 theorem race_d7 {m' n' : Nat} {X : XNet Arith} {rest : List (Id × Arith)}
-    (B : RaceBase (m' + 1) (n' + 1) X rest) (l : List (Id × Arith)) (i : Nat) :
+    (B : RaceBase (m' + 1) (n' + 1) X rest) (l : List (Id × Arith)) :
     (⟨X, [⟨rest, .seek [0, n' + 1 + 4] .add ([0, n' + 1 + 4], 0) ([n' + 1 + 4], 1)⟩,
       ⟨l, .ready [2] [0, n' + 1 + 4] .zero .add⟩]⟩ :
-      XMach Arith).work xsys (fun i => i % 2) i ≤ 2 * 5 + 2 * (5 * (m' + 1) + 3 * (n' + 1) + 10) := by
+      XMach Arith).Ends xsys (10 * (m' + 1) + 6 * (n' + 1) + 28) := by
   have hr := B.rest
   subst hr
   have F := B.final_read
@@ -45948,9 +46186,7 @@ theorem race_d7 {m' n' : Nat} {X : XNet Arith} {rest : List (Id × Arith)}
   have sw := race_reader_wins (l := l) f0 B.zero f1 B.adder1 f2 f3 k3
   have sF := sE3.trans F.pass_two_tail
   have sR := F.pass_stays (snd_sum (m' + 1 + 1) (n' + 1)) (sum_fresh (m' + 1 + 1) (n' + 1))
-  have h := XMach.work_pair_after sw.trace
-    (fun i => XMach.work_two_stays sF sR (fun i => i % 2) i) i
-  omega
+  exact XMach.ends_sweeps sw rfl sF sR (by omega) (by omega) (by omega)
 
 theorem filter_ne_idem (l : List (Id × Arith)) (a : Id) :
     (l.filter fun e => decide (e.1 ≠ a)).filter (fun e => decide (e.1 ≠ a)) =
@@ -45965,10 +46201,10 @@ first thread the adder, then the second the zero.  The first does not find
 the zero and puts the adder back; the second finds the adder and takes
 it. -/
 theorem race_d9 {m' n' : Nat} {X : XNet Arith} {rest : List (Id × Arith)}
-    (B : RaceBase (m' + 1) (n' + 1) X rest) (l : List (Id × Arith)) (i : Nat) :
+    (B : RaceBase (m' + 1) (n' + 1) X rest) (l : List (Id × Arith)) :
     (⟨X, [⟨rest, .ready [0, n' + 1 + 4] [2] .add .zero⟩,
       ⟨l, .ready [2] [0, n' + 1 + 4] .zero .add⟩]⟩ :
-      XMach Arith).work xsys (fun i => i % 2) i ≤ 2 * 5 + 2 * (5 * (m' + 1) + 3 * (n' + 1) + 10) := by
+      XMach Arith).Ends xsys (10 * (m' + 1) + 6 * (n' + 1) + 28) := by
   have hr := B.rest
   subst hr
   have hA9 : ((((((X.takeAgent [0, n' + 1 + 4]).takeAgent [2]).putAgent [0, n' + 1 + 4] .add).takeAgent [0, n' + 1 + 4]).putLink ([0, n' + 1 + 4], 1) ([0, n' + 1 + 4], 2)).putLink ([0, n' + 1 + 4], 2) ([0, n' + 1 + 4], 1)).agents = (X.agents.filter fun e => decide (e.1 ≠ [2])).filter
@@ -46017,9 +46253,7 @@ theorem race_d9 {m' n' : Nat} {X : XNet Arith} {rest : List (Id × Arith)}
   have sw := race_reader_wins (l := l) f0 hZ f1 hA f2 f3 k3
   have sF := sE3.trans F.pass_two_tail
   have sR := F.pass_stays (snd_sum (m' + 1 + 1) (n' + 1)) (sum_fresh (m' + 1 + 1) (n' + 1))
-  have h := XMach.work_pair_after sw.trace
-    (fun i => XMach.work_two_stays sF sR (fun i => i % 2) i) i
-  omega
+  exact XMach.ends_sweeps sw rfl sF sR (by omega) (by omega) (by omega)
 
 /-- Without the zero of the first argument, the list of agents after the
 last adder is the list the rounds leave. -/
@@ -46053,9 +46287,9 @@ theorem Final.pass_fin_tail {m' n' : Nat} {Y : XNet Arith}
 round on the lowest successor.**  The first pops the last adder, reads on
 to the zero and finds it gone. -/
 theorem race_d4 {m' n' : Nat} {X : XNet Arith} {rest : List (Id × Arith)}
-    (B : RaceBase (m' + 1) (n' + 1) X rest) (todo l : List (Id × Arith)) (i : Nat) :
+    (B : RaceBase (m' + 1) (n' + 1) X rest) (todo l : List (Id × Arith)) :
     (⟨X, [⟨todo, .write [] []⟩, ⟨l, .ready [2] [0, n' + 1 + 4] .zero .add⟩]⟩ :
-      XMach Arith).work xsys (fun i => i % 2) i ≤ 2 * 5 + 2 * (5 * (m' + 1) + 3 * (n' + 1) + 10) + 1 := by
+      XMach Arith).Ends xsys (10 * (m' + 1) + 6 * (n' + 1) + 31) := by
   have hr := B.rest
   subst hr
   have F := B.final_read
@@ -46090,17 +46324,15 @@ theorem race_d4 {m' n' : Nat} {X : XNet Arith} {rest : List (Id × Arith)}
       injection h with _ h2
       cases h2) (XMach.act_look k2) sE2)).trans F.pass_two_tail
   have sR := F.pass_stays (snd_sum (m' + 1 + 1) (n' + 1)) (sum_fresh (m' + 1 + 1) (n' + 1))
-  have h := XMach.work_pair_after sw.trace
-    (fun i => XMach.work_two_stays sF sR (fun i => i % 2) i) i
-  omega
+  exact XMach.ends_sweeps sw rfl sF sR (by omega) (by omega) (by omega)
 
 /-- **The second thread takes the zero as the first writes the last segment
 of its round.**  The first starts over with the last adder in its list,
 which the second has taken by then. -/
 theorem race_d3 {m' n' : Nat} {V : XNet Arith} {p8 q8 : Port} {rest : List (Id × Arith)}
-    (B : RaceBase (m' + 1) (n' + 1) (V.putLink p8 q8) rest) (todo l : List (Id × Arith)) (i : Nat) :
+    (B : RaceBase (m' + 1) (n' + 1) (V.putLink p8 q8) rest) (todo l : List (Id × Arith)) :
     (⟨V, [⟨todo, .write [] [(p8, q8)]⟩, ⟨l, .ready [2] [0, n' + 1 + 4] .zero .add⟩]⟩ :
-      XMach Arith).work xsys (fun i => i % 2) i ≤ 2 * 5 + 2 * (5 * (m' + 1) + 3 * (n' + 1) + 10) + 1 := by
+      XMach Arith).Ends xsys (10 * (m' + 1) + 6 * (n' + 1) + 28) := by
   have hr := B.rest
   subst hr
   have F := B.final_read
@@ -46133,18 +46365,16 @@ theorem race_d3 {m' n' : Nat} {V : XNet Arith} {p8 q8 : Port} {rest : List (Id �
   have sw := race_reader_wins (l := l) f0 B.zero f1 B.adder1 f2 f3 f4
   have sF := sE2.trans F.pass_fin_tail
   have sR := F.pass_stays (snd_sum (m' + 1 + 1) (n' + 1)) (sum_fresh (m' + 1 + 1) (n' + 1))
-  have h := XMach.work_pair_after sw.trace
-    (fun i => XMach.work_two_stays sF sR (fun i => i % 2) i) i
-  omega
+  exact XMach.ends_sweeps sw rfl sF sR (by omega) (by omega) (by omega)
 
 /-- **The second thread takes the zero as the first writes the last
 segment but one of its round.**  When the first starts over, both agents
 of the pair are gone from its list. -/
 theorem race_d2 {m' n' : Nat} {V : XNet Arith} {p7 q7 p8 q8 : Port}
     {rest : List (Id × Arith)}
-    (B : RaceBase (m' + 1) (n' + 1) ((V.putLink p7 q7).putLink p8 q8) rest) (todo l : List (Id × Arith)) (i : Nat) :
+    (B : RaceBase (m' + 1) (n' + 1) ((V.putLink p7 q7).putLink p8 q8) rest) (todo l : List (Id × Arith)) :
     (⟨V, [⟨todo, .write [] [(p7, q7), (p8, q8)]⟩, ⟨l, .ready [2] [0, n' + 1 + 4] .zero .add⟩]⟩ :
-      XMach Arith).work xsys (fun i => i % 2) i ≤ 2 * 5 + 2 * (5 * (m' + 1) + 3 * (n' + 1) + 10) + 1 := by
+      XMach Arith).Ends xsys (10 * (m' + 1) + 6 * (n' + 1) + 28) := by
   have F : Final (n' + 1) (sum (m' + 1 + 1) (n' + 1)) ((((((V.putLink p7 q7).takeAgent [2]).putLink p8 q8).takeAgent [0, n' + 1 + 4]).putLink ([0, n' + 1 + 4], 1) ([0, n' + 1 + 4], 2)).putLink ([0, n' + 1 + 4], 2) ([0, n' + 1 + 4], 1))
       (n' + 1 + 3 + (m' + 1) + 1) (m' + 1) := B.final rfl rfl
   obtain ⟨-, k2, sE2, -⟩ := F.first_res (resL (n' + 1 + 3 + 1) m' ++ (sndL (n' + 1) ++ [([3], .zero)]))
@@ -46166,16 +46396,14 @@ theorem race_d2 {m' n' : Nat} {V : XNet Arith} {p7 q7 p8 q8 : Port}
   have sw := race_reader_wins (l := l) f0 B.zero f1 B.adder1 f2 f3 f4
   have sF := sE2.trans F.pass_fin_tail
   have sR := F.pass_stays (snd_sum (m' + 1 + 1) (n' + 1)) (sum_fresh (m' + 1 + 1) (n' + 1))
-  have h := XMach.work_pair_after sw.trace
-    (fun i => XMach.work_two_stays sF sR (fun i => i % 2) i) i
-  omega
+  exact XMach.ends_sweeps sw rfl sF sR (by omega) (by omega) (by omega)
 
 /-- **The second thread takes the zero two segments earlier still.** -/
 theorem race_d1 {m' n' : Nat} {V : XNet Arith} {p6 q6 p7 q7 p8 q8 : Port}
     {rest : List (Id × Arith)}
-    (B : RaceBase (m' + 1) (n' + 1) (((V.putLink p6 q6).putLink p7 q7).putLink p8 q8) rest) (todo l : List (Id × Arith)) (i : Nat) :
+    (B : RaceBase (m' + 1) (n' + 1) (((V.putLink p6 q6).putLink p7 q7).putLink p8 q8) rest) (todo l : List (Id × Arith)) :
     (⟨V, [⟨todo, .write [] [(p6, q6), (p7, q7), (p8, q8)]⟩, ⟨l, .ready [2] [0, n' + 1 + 4] .zero .add⟩]⟩ :
-      XMach Arith).work xsys (fun i => i % 2) i ≤ 2 * 5 + 2 * (5 * (m' + 1) + 3 * (n' + 1) + 10) + 1 := by
+      XMach Arith).Ends xsys (10 * (m' + 1) + 6 * (n' + 1) + 29) := by
   have F : Final (n' + 1) (sum (m' + 1 + 1) (n' + 1)) (((((((V.putLink p6 q6).takeAgent [2]).putLink p7 q7).takeAgent [0, n' + 1 + 4]).putLink p8 q8).putLink ([0, n' + 1 + 4], 1) ([0, n' + 1 + 4], 2)).putLink ([0, n' + 1 + 4], 2) ([0, n' + 1 + 4], 1))
       (n' + 1 + 3 + (m' + 1) + 1) (m' + 1) := B.final rfl rfl
   obtain ⟨k1, k2, sE2, -⟩ := F.first_res (resL (n' + 1 + 3 + 1) m' ++ (sndL (n' + 1) ++ [([3], .zero)]))
@@ -46198,9 +46426,7 @@ theorem race_d1 {m' n' : Nat} {V : XNet Arith} {p6 q6 p7 q7 p8 q8 : Port}
     injection h with _ h2
     cases h2) (XMach.act_look k2) sE2).trans F.pass_fin_tail
   have sR := F.pass_stays (snd_sum (m' + 1 + 1) (n' + 1)) (sum_fresh (m' + 1 + 1) (n' + 1))
-  have h := XMach.work_pair_after sw.trace
-    (fun i => XMach.work_two_stays sF sR (fun i => i % 2) i) i
-  omega
+  exact XMach.ends_sweeps sw rfl sF sR (by omega) (by omega) (by omega)
 
 /-- **The second thread takes the zero three segments earlier still**, at
 the first moment it can.  Its two segments and the last of the first
@@ -46208,9 +46434,9 @@ thread are written in turn, and both threads start over on the same list
 in the same memory. -/
 theorem race_d0 {m' n' : Nat} {V : XNet Arith} {p5 q5 p6 q6 p7 q7 p8 q8 : Port}
     {rest : List (Id × Arith)}
-    (B : RaceBase (m' + 1) (n' + 1) ((((V.putLink p5 q5).putLink p6 q6).putLink p7 q7).putLink p8 q8) rest) (todo l : List (Id × Arith)) (i : Nat) :
+    (B : RaceBase (m' + 1) (n' + 1) ((((V.putLink p5 q5).putLink p6 q6).putLink p7 q7).putLink p8 q8) rest) (todo l : List (Id × Arith)) :
     (⟨V, [⟨todo, .write [] [(p5, q5), (p6, q6), (p7, q7), (p8, q8)]⟩, ⟨l, .ready [2] [0, n' + 1 + 4] .zero .add⟩]⟩ :
-      XMach Arith).work xsys (fun i => i % 2) i ≤ 2 * 5 + 2 * (5 * (m' + 1) + 3 * (n' + 1) + 10) + 1 := by
+      XMach Arith).Ends xsys (10 * (m' + 1) + 6 * (n' + 1) + 30) := by
   have F : Final (n' + 1) (sum (m' + 1 + 1) (n' + 1)) ((((((((V.putLink p5 q5).takeAgent [2]).putLink p6 q6).takeAgent [0, n' + 1 + 4]).putLink p7 q7).putLink ([0, n' + 1 + 4], 1) ([0, n' + 1 + 4], 2)).putLink p8 q8).putLink ([0, n' + 1 + 4], 2) ([0, n' + 1 + 4], 1))
       (n' + 1 + 3 + (m' + 1) + 1) (m' + 1) := by
     refine final_of B.hist ?_ fun e => ?_
@@ -46252,9 +46478,7 @@ theorem race_d0 {m' n' : Nat} {V : XNet Arith} {p5 q5 p6 q6 p7 q7 p8 q8 : Port}
       (((((((((V.putLink p5 q5).takeAgent [2]).putLink p6 q6).takeAgent [0, n' + 1 + 4]).putLink p7 q7).putLink ([0, n' + 1 + 4], 1) ([0, n' + 1 + 4], 2)).putLink p8 q8).putLink ([0, n' + 1 + 4], 2) ([0, n' + 1 + 4], 1)), ⟨((((((((V.putLink p5 q5).takeAgent [2]).putLink p6 q6).takeAgent [0, n' + 1 + 4]).putLink p7 q7).putLink ([0, n' + 1 + 4], 1) ([0, n' + 1 + 4], 2)).putLink p8 q8).putLink ([0, n' + 1 + 4], 2) ([0, n' + 1 + 4], 1)).agents, .idle⟩, 0) := rfl
   have sw := race_reader_wins (l := l) f0 B.zero f1 B.adder1 f2 f3 f4
   have sR := F.pass_stays (snd_sum (m' + 1 + 1) (n' + 1)) (sum_fresh (m' + 1 + 1) (n' + 1))
-  have h := XMach.work_pair_after sw.trace
-    (fun i => XMach.work_two_stays sR sR (fun i => i % 2) i) i
-  omega
+  exact XMach.ends_sweeps sw rfl sR sR (by omega) (by omega) (by omega)
 
 /-- No agent of the first argument is in the memory the rounds leave. -/
 theorem Final.no_top {n : Nat} {X0 X : XNet Arith} {T d : Nat} (F : Final n X0 X T d)
@@ -46280,11 +46504,10 @@ does not find the adder and puts the zero back, and the first takes it.
 The second thread then passes the zero of the second argument and finds
 the top successor gone, while the first writes its two segments. -/
 theorem race_d8 {m' n' : Nat} {X : XNet Arith} {rest : List (Id × Arith)}
-    (B : RaceBase (m' + 1) (n' + 1) X rest) (t : Nat) (ht : n' + 1 + 3 < t) (i : Nat) :
+    (B : RaceBase (m' + 1) (n' + 1) X rest) (t : Nat) (ht : n' + 1 + 3 < t) :
     (⟨X, [⟨rest, .seek [0, n' + 1 + 4] .add ([n' + 1 + 4], 1) ([2], 0)⟩,
       ⟨[([3], .zero), ([t], .succ)], .ready [2] [0, n' + 1 + 4] .zero .add⟩]⟩ :
-      XMach Arith).work xsys (fun i => i % 2) i ≤
-      2 * 6 + (5 * (m' + 1) + 3 * (n' + 1) + 10) := by
+      XMach Arith).Ends xsys (5 * (m' + 1) + 3 * (n' + 1) + 22) := by
   have hA8 : ((((((X.takeAgent [2]).takeAgent [0, n' + 1 + 4]).putAgent [2] .zero).takeAgent [2]).putLink ([0, n' + 1 + 4], 1) ([0, n' + 1 + 4], 2)).putLink ([0, n' + 1 + 4], 2) ([0, n' + 1 + 4], 1)).agents =
       (X.agents.filter fun e => decide (e.1 ≠ [2])).filter
         (fun e => decide (e.1 ≠ [0, n' + 1 + 4])) := by
@@ -46351,12 +46574,14 @@ theorem race_d8 {m' n' : Nat} {X : XNet Arith} {rest : List (Id × Arith)}
       rw [F8.no_top ht]
       exact fun h => by cases h)
   have sw : Sweeps xsys ⟨X, [⟨rest, .seek [0, n' + 1 + 4] .add ([n' + 1 + 4], 1) ([2], 0)⟩, ⟨[([3], .zero), ([t], .succ)], .ready [2] [0, n' + 1 + 4] .zero .add⟩]⟩
-      ⟨((((((X.takeAgent [2]).takeAgent [0, n' + 1 + 4]).putAgent [2] .zero).takeAgent [2]).putLink ([0, n' + 1 + 4], 1) ([0, n' + 1 + 4], 2)).putLink ([0, n' + 1 + 4], 2) ([0, n' + 1 + 4], 1)), [⟨((((((X.takeAgent [2]).takeAgent [0, n' + 1 + 4]).putAgent [2] .zero).takeAgent [2]).putLink ([0, n' + 1 + 4], 1) ([0, n' + 1 + 4], 2)).putLink ([0, n' + 1 + 4], 2) ([0, n' + 1 + 4], 1)).agents, .idle⟩, ⟨[], .idle⟩]⟩ 6 :=
-    .step f0 r0 (.step f1 r1 (.step f2 r2 (.step f3 r3 (.step f4 r4 (.step f5 r5 (.refl _))))))
+      ⟨((((((X.takeAgent [2]).takeAgent [0, n' + 1 + 4]).putAgent [2] .zero).takeAgent [2]).putLink ([0, n' + 1 + 4], 1) ([0, n' + 1 + 4], 2)).putLink ([0, n' + 1 + 4], 2) ([0, n' + 1 + 4], 1)), [⟨rest, .write [] []⟩, ⟨[([t], .succ)], .idle⟩]⟩ 5 :=
+    .step f0 r0 (.step f1 r1 (.step f2 r2 (.step f3 r3 (.step f4 r4 (.refl _)))))
   have sF := F8.pass_stays S (sum_fresh (m' + 1 + 1) (n' + 1))
-  have h := XMach.work_pair_after sw.trace
-    (fun i => XMach.work_two_stays sF (Stays.refl _) (fun i => i % 2) i) i
-  omega
+  exact XMach.ends_sweeps sw rfl
+    (Stays.step (fun h => by
+      injection h with _ h2
+      cases h2) f5 sF)
+    (Stays.step (fun h => by cases h) r5 (Stays.refl _)) (by omega) (by omega) (by omega)
 
 /-- **The first thread alone through the last round**: from the moment it
 is about to pop the last adder to the moment it is ready to take it. -/
@@ -46440,67 +46665,126 @@ theorem race_write (m n : Nat) (hm : 1 ≤ m) :
   subst eX
   exact ⟨_, _, _, _, _, _, _, _, _, _, _, B, s11, s12, s13, s14, s15⟩
 
+/-- One thread alone, at a moment written in another way. -/
+theorem solo_at {m n k k' : Nat} {v : XNet Arith × XThread Arith}
+    (h : XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ k = v) (e : k' = k) :
+    XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ k' = v := by
+  subst e
+  exact h
+
 /-- From the entry to the race to the end of the run. -/
-theorem race_close {m n aE c B : Nat} {X : XNet Arith} {T R : XThread Arith} (i : Nat)
+theorem race_close {m n aE c W : Nat} {X : XNet Arith} {T R : XThread Arith}
     (htr : (XMach.init (sum (m + 1) n) 2).trace xsys (fun i => i % 2) (2 * aE) =
       (⟨(XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ aE).1, [(XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ aE).2, R]⟩, c))
     (hs : XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ aE = (X, T))
-    (hB : ∀ i, (⟨X, [T, R]⟩ : XMach Arith).work xsys (fun i => i % 2) i ≤ B) :
-    (XMach.init (sum (m + 1) n) 2).work xsys (fun i => i % 2) i ≤ 2 * aE + B := by
+    (hE : (⟨X, [T, R]⟩ : XMach Arith).Ends xsys W) :
+    (XMach.init (sum (m + 1) n) 2).Total xsys (fun i => i % 2) (2 * aE + W) := by
   rw [hs] at htr
-  exact XMach.work_pair_after (congrArg Prod.fst htr) hB i
+  exact (hE.after (congrArg Prod.fst htr) rfl).total
 
-/-- **Two threads in turn, every second argument.**  On the net for
-`(m + 1) + n`, with `m` from four on, two threads in turn do at most
-`44 * m + 6 * n + 70` busy actions: the second thread only reads, or it
-gets ready to take the last pair at one of ten moments, and from each of
-the ten the run goes to its end with one of the two threads taking the
-pair and both passing over the agents that are left. -/
-theorem two_threads_race (m n : Nat) (hm : 4 ≤ m) (i : Nat) :
-    (XMach.init (sum (m + 1) n) 2).work xsys (fun i => i % 2) i ≤ 44 * m + 6 * n + 70 := by
+/-- **What two threads in turn do in all on the net for `(m + 1) + n`** when
+the second is ready to take the zero of the first argument after
+`17 * m + 11 + d` actions of each.  For `d = 8` the first thread takes the
+last pair and the second has two entries left to pass; otherwise the second
+takes it and both pass over all the agents that are left. -/
+def raceWork (m n : Nat) : Nat → Nat
+  | 0 => 44 * m + 6 * n + 52
+  | 1 => 44 * m + 6 * n + 53
+  | 2 => 44 * m + 6 * n + 54
+  | 3 => 44 * m + 6 * n + 56
+  | 4 => 44 * m + 6 * n + 61
+  | 5 => 44 * m + 6 * n + 62
+  | 6 => 44 * m + 6 * n + 63
+  | 7 => 44 * m + 6 * n + 64
+  | 8 => 39 * m + 3 * n + 60
+  | _ => 44 * m + 6 * n + 68
+
+theorem raceWork_le (m n d : Nat) : raceWork m n d ≤ 44 * m + 6 * n + 68 := by
+  unfold raceWork
+  split <;> omega
+
+/-- **Two threads in turn, every second argument, to the action.**  On the
+net for `(m + 1) + n`, with `m` from four on: either the second thread only
+reads, and the work is that of one thread and at most `4 * m + 3 * n + 15`
+more; or it is ready to take the zero of the first argument when each
+thread has made `17 * m + 11 + d` actions, for some `d` up to nine, and
+then the work of the whole run is exactly `raceWork m n d`. -/
+theorem two_threads_exact (m n : Nat) (hm : 4 ≤ m) :
+    (∀ i, (XMach.init (sum (m + 1) n) 2).work xsys (fun i => i % 2) i ≤
+      soloWork (m + 1) n + (4 * m + 3 * n + 15)) ∨
+    ∃ d c, d ≤ 9 ∧
+      (XMach.init (sum (m + 1) n) 2).trace xsys (fun i => i % 2) (2 * (17 * m + 11 + d)) =
+        (⟨(XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ (17 * m + 11 + d)).1,
+          [(XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ (17 * m + 11 + d)).2,
+            ⟨[([3], .zero), ([n + 3 + m + 1], .succ)], .ready [2] [0, n + 4] .zero .add⟩]⟩, c) ∧
+      (XMach.init (sum (m + 1) n) 2).Total xsys (fun i => i % 2) (raceWork m n d) := by
   cases n with
   | zero =>
+    refine .inl fun i => ?_
     have h := two_threads_narrow m 0 hm (.inl (by omega)) i
+    rw [soloWork_succ]
     omega
   | succ n' =>
     obtain ⟨m', rfl⟩ : ∃ m', m = m' + 1 := ⟨m - 1, by omega⟩
     rcases two_threads_entry (m' + 1) (n' + 1) hm with h | ⟨aE, c, h1, h2, htr⟩
-    · have h' := h i
-      rw [soloWork_succ] at h'
-      omega
+    · exact .inl h
     · obtain ⟨V, todo, rest, p5, q5, p6, q6, p7, q7, p8, q8, B, s11, s12, s13, s14, s15⟩ :=
         race_write (m' + 1) (n' + 1) (by omega)
       obtain ⟨s16, s17, s18, s19, s20⟩ := B.states
-      have hd : aE = 17 * (m' + 1) + 11 ∨ aE = 17 * (m' + 1) + 12 ∨
-          aE = 17 * (m' + 1) + 13 ∨ aE = 17 * (m' + 1) + 14 ∨ aE = 17 * (m' + 1) + 15 ∨
-          aE = 17 * (m' + 1) + 16 ∨ aE = 17 * (m' + 1) + 17 ∨ aE = 17 * (m' + 1) + 18 ∨
-          aE = 17 * (m' + 1) + 19 ∨ aE = 17 * (m' + 1) + 20 := by omega
+      obtain ⟨d, rfl⟩ : ∃ d, aE = 17 * (m' + 1) + 11 + d :=
+        ⟨aE - (17 * (m' + 1) + 11), by omega⟩
+      refine .inr ⟨d, c, by omega, htr, ?_⟩
+      have hd : d = 0 ∨ d = 1 ∨ d = 2 ∨ d = 3 ∨ d = 4 ∨ d = 5 ∨ d = 6 ∨ d = 7 ∨ d = 8 ∨
+          d = 9 := by omega
       rcases hd with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-      · have h := race_close i htr s11 (fun i => race_d0 B todo _ i)
-        omega
-      · have h := race_close i htr s12 (fun i => race_d1 B todo _ i)
-        omega
-      · have h := race_close i htr s13 (fun i => race_d2 B todo _ i)
-        omega
-      · have h := race_close i htr s14 (fun i => race_d3 B todo _ i)
-        omega
-      · have h := race_close i htr s15 (fun i => race_d4 B todo _ i)
-        omega
-      · have h := race_close i htr s16 (fun i => race_d5 B _ i)
-        omega
-      · have h := race_close i htr s17 (fun i => race_d6 B _ i)
-        omega
-      · have h := race_close i htr s18 (fun i => race_d7 B _ i)
-        omega
-      · have h := race_close i htr s19 (fun i => race_d8 B _ (by omega) i)
-        omega
-      · have h := race_close i htr s20 (fun i => race_d9 B _ i)
-        omega
+      · exact (race_close htr (solo_at s11 (by omega)) (race_d0 B todo _)).cast (by
+          show _ = 44 * (m' + 1) + 6 * (n' + 1) + 52
+          omega)
+      · exact (race_close htr (solo_at s12 (by omega)) (race_d1 B todo _)).cast (by
+          show _ = 44 * (m' + 1) + 6 * (n' + 1) + 53
+          omega)
+      · exact (race_close htr (solo_at s13 (by omega)) (race_d2 B todo _)).cast (by
+          show _ = 44 * (m' + 1) + 6 * (n' + 1) + 54
+          omega)
+      · exact (race_close htr (solo_at s14 (by omega)) (race_d3 B todo _)).cast (by
+          show _ = 44 * (m' + 1) + 6 * (n' + 1) + 56
+          omega)
+      · exact (race_close htr (solo_at s15 (by omega)) (race_d4 B todo _)).cast (by
+          show _ = 44 * (m' + 1) + 6 * (n' + 1) + 61
+          omega)
+      · exact (race_close htr (solo_at s16 (by omega)) (race_d5 B _)).cast (by
+          show _ = 44 * (m' + 1) + 6 * (n' + 1) + 62
+          omega)
+      · exact (race_close htr (solo_at s17 (by omega)) (race_d6 B _)).cast (by
+          show _ = 44 * (m' + 1) + 6 * (n' + 1) + 63
+          omega)
+      · exact (race_close htr (solo_at s18 (by omega)) (race_d7 B _)).cast (by
+          show _ = 44 * (m' + 1) + 6 * (n' + 1) + 64
+          omega)
+      · exact (race_close htr (solo_at s19 (by omega)) (race_d8 B _ (by omega))).cast (by
+          show _ = 39 * (m' + 1) + 3 * (n' + 1) + 60
+          omega)
+      · exact (race_close htr (solo_at s20 (by omega)) (race_d9 B _)).cast (by
+          show _ = 44 * (m' + 1) + 6 * (n' + 1) + 68
+          omega)
 
-example (i : Nat) : (XMach.init (sum 21 94) 2).work xsys (fun i => i % 2) i ≤ 1514 :=
+/-- **Two threads in turn, every second argument**: at most
+`44 * m + 6 * n + 68` busy actions on the net for `(m + 1) + n`, with `m`
+from four on. -/
+theorem two_threads_race (m n : Nat) (hm : 4 ≤ m) (i : Nat) :
+    (XMach.init (sum (m + 1) n) 2).work xsys (fun i => i % 2) i ≤ 44 * m + 6 * n + 68 := by
+  rcases two_threads_exact m n hm with h | ⟨d, c, -, -, tot⟩
+  · have h' := h i
+    rw [soloWork_succ] at h'
+    omega
+  · have h1 := tot.le i
+    have h2 := raceWork_le m n d
+    omega
+
+example (i : Nat) : (XMach.init (sum 21 94) 2).work xsys (fun i => i % 2) i ≤ 1512 :=
   two_threads_race 20 94 (by decide) i
 
-example (i : Nat) : (XMach.init (sum 21 97) 2).work xsys (fun i => i % 2) i ≤ 1532 :=
+example (i : Nat) : (XMach.init (sum 21 97) 2).work xsys (fun i => i % 2) i ≤ 1530 :=
   two_threads_race 20 97 (by decide) i
 
 end Arith
