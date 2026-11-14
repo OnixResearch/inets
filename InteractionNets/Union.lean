@@ -244,6 +244,15 @@ theorem Steps.context {sys : System S} {n : Nat} (hA : A.WF sys.ar) (h : A.Apart
     Steps (Step sys) n ((A.union B).plug J) ((A'.union B).plug J) :=
   (Steps.union_left hA h st).1.plug J
 
+/-- **A part can be reduced first.**  If a well-formed net reduces to
+`A'`, and the larger net with `A'` in its place reduces to `N`, then the
+larger net reduces to `N`, in the steps of both. -/
+theorem Steps.part_first {sys : System S} {n m : Nat} {N : Net S} (hA : A.WF sys.ar)
+    (h : A.Apart B) (J : Port → Port → Prop) (sA : Steps (Step sys) n A A')
+    (sN : Steps (Step sys) m ((A'.union B).plug J) N) :
+    Steps (Step sys) (n + m) ((A.union B).plug J) N :=
+  (Steps.context hA h J sA).trans sN
+
 /-- **Normal nets side by side are a normal net.**  The wire of an active
 pair of the union starts at a name of one net and stays in it. -/
 theorem Net.Apart.normal {sys : System S} (hA : A.WF sys.ar) (hB : B.WF sys.ar)
@@ -328,6 +337,76 @@ theorem Net.Apart.reduce {sys : System S} (hA : A.WF sys.ar) (hB : B.WF sys.ar)
   obtain ⟨s2, h2⟩ := Steps.union_right hB h1 sB
   exact ⟨s1.trans s2, h2.normal (Steps.wf hA sA) (Steps.wf hB sB) nA nB⟩
 
+/-! ### Any number of nets -/
+
+/-- The net with nothing in it. -/
+def Net.empty : Net S := ⟨fun _ _ => False, fun _ _ => False, fun _ => False⟩
+
+theorem Net.empty_wf (ar : S → Nat) : (Net.empty : Net S).WF ar where
+  agent_fun := fun h => False.elim h
+  symm := fun h => False.elim h
+  irrefl := fun h => h
+  end_unique := fun _ h => False.elim h
+  end_conn := fun h => by
+    rcases h with h | ⟨γ, h, -⟩
+    · exact False.elim h
+    · exact False.elim h
+  deg := fun h => False.elim h
+  free_agent := fun h => False.elim h
+  fresh := fun _ h => False.elim h
+
+theorem Net.empty_normal (sys : System S) : Normal (Step sys) (Net.empty : Net S) := by
+  rintro N' ⟨a, b, α, β, R, r, -⟩
+  exact r.ha
+
+theorem Net.apart_empty (A : Net S) : A.Apart Net.empty := by
+  intro l l' i j _ hj
+  rcases hj with ⟨γ, h⟩ | ⟨k, q, h⟩ | ⟨k, h⟩
+  · exact False.elim h
+  · exact False.elim h
+  · exact False.elim h
+
+theorem Net.Apart.union_right {C : Net S} (h₁ : A.Apart B) (h₂ : A.Apart C) :
+    A.Apart (B.union C) := by
+  intro l l' i j hi hj
+  rcases Net.used_union hj with hj | hj
+  · exact h₁ l l' i j hi hj
+  · exact h₂ l l' i j hi hj
+
+/-- **Any number of nets side by side**, with their names as they are. -/
+def Net.unions : List (Net S) → Net S
+  | [] => Net.empty
+  | A :: L => A.union (Net.unions L)
+
+theorem Net.apart_unions : ∀ {L : List (Net S)}, (∀ B, B ∈ L → A.Apart B) →
+    A.Apart (Net.unions L)
+  | [], _ => Net.apart_empty A
+  | B :: _, h =>
+    (h B List.mem_cons_self).union_right
+      (Net.apart_unions fun C hC => h C (List.mem_cons_of_mem _ hC))
+
+/-- **What any number of nets side by side reduce to.**  Let nets be
+given by a list of items, with the names of any two of them apart, each
+net well formed and reducing to a normal form.  Side by side they are a
+well-formed net, which reduces, in as many steps as the nets together,
+to the normal forms side by side; and that is a normal form. -/
+theorem Net.unions_reduce {sys : System S} {ι : Type} (net nf : ι → Net S) (st : ι → Nat) :
+    ∀ (T : List ι), (T.map net).Pairwise Net.Apart →
+      (∀ t, t ∈ T → (net t).WF sys.ar ∧ Steps (Step sys) (st t) (net t) (nf t) ∧
+        Normal (Step sys) (nf t)) →
+      (Net.unions (T.map net)).WF sys.ar ∧
+        Steps (Step sys) (T.map st).sum (Net.unions (T.map net)) (Net.unions (T.map nf)) ∧
+        Normal (Step sys) (Net.unions (T.map nf))
+  | [], _, _ => ⟨Net.empty_wf _, .refl _, Net.empty_normal sys⟩
+  | t :: T, hp, h => by
+    obtain ⟨hpt, hpT⟩ := List.pairwise_cons.1 hp
+    obtain ⟨wT, sT, nT⟩ := Net.unions_reduce net nf st T hpT
+      (fun t' ht' => h t' (List.mem_cons_of_mem _ ht'))
+    obtain ⟨wt, s1, n1⟩ := h t List.mem_cons_self
+    have ap : (net t).Apart (Net.unions (T.map net)) := Net.apart_unions fun B hB => hpt B hB
+    obtain ⟨s, n⟩ := ap.reduce wt wT s1 n1 sT nT
+    exact ⟨wt.union wT ap, s, n⟩
+
 /-! ### In memory -/
 
 /-- Two memories side by side: the cells of the first, then those of the
@@ -390,6 +469,73 @@ theorem XMach.union_fair (xs : XSys S) {X Y : XNet S} (hX : X.toNet.WF xs.sys.ar
     exact hX.union hY h
   rw [← XNet.union_toNet] at s
   exact XMach.fair_complete (xs := xs) hU hnt s hn' σ hfair
+
+/-- Any number of memories side by side. -/
+def XNet.unions : List (XNet S) → XNet S
+  | [] => ⟨[], [], []⟩
+  | X :: L => X.union (XNet.unions L)
+
+omit [DecidableEq S] in
+theorem XNet.unions_toNet : ∀ L : List (XNet S),
+    (XNet.unions L).toNet = Net.unions (L.map XNet.toNet)
+  | [] => Net.ext' (fun _ _ => ⟨fun h => absurd h List.not_mem_nil, False.elim⟩)
+      (fun _ _ => ⟨fun h => absurd h List.not_mem_nil, False.elim⟩)
+      (fun _ => ⟨fun h => absurd h List.not_mem_nil, False.elim⟩)
+  | X :: L => by
+    show (X.union (XNet.unions L)).toNet = X.toNet.union (Net.unions (L.map XNet.toNet))
+    rw [XNet.union_toNet, XNet.unions_toNet L]
+
+/-- **Any number of nets side by side come out right, whatever the
+threads do, in any system.**  Let memories hold well-formed nets, the
+names of any two of them apart, each with a normal form.  Then, with any
+number of threads and any schedule, a run on all of them side by side
+that ends at rest has made as many claims as the reductions together
+have steps, and the memory holds the normal forms side by side. -/
+theorem XMach.unions_rest (xs : XSys S) {ι : Type} (mem : ι → XNet S) (nf : ι → Net S)
+    (st : ι → Nat) (T : List ι) (hp : (T.map fun t => (mem t).toNet).Pairwise Net.Apart)
+    (h : ∀ t, t ∈ T → (mem t).toNet.WF xs.sys.ar ∧
+      Steps (Step xs.sys) (st t) (mem t).toNet (nf t) ∧ Normal (Step xs.sys) (nf t))
+    {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+    (hr : ((XMach.init (XNet.unions (T.map mem)) nt).trace xs σ i).1.resting = true) :
+    ((XMach.init (XNet.unions (T.map mem)) nt).trace xs σ i).2 = (T.map st).sum ∧
+      ((XMach.init (XNet.unions (T.map mem)) nt).trace xs σ i).1.mem.toNet =
+        Net.unions (T.map nf) := by
+  obtain ⟨hU, s, hn'⟩ := Net.unions_reduce (fun t => (mem t).toNet) nf st T hp h
+  have e : (XNet.unions (T.map mem)).toNet = Net.unions (T.map fun t => (mem t).toNet) := by
+    rw [XNet.unions_toNet, List.map_map]
+    rfl
+  rw [← e] at hU s
+  have L := XMach.trace_live σ (XMach.init_live (xs := xs) hU hnt) i
+  obtain ⟨q, hn⟩ := L.rest hr
+  have r := XMach.trace_run xs σ (XMach.init (XNet.unions (T.map mem)) nt) i
+  rw [XMach.init_toMach] at r
+  obtain ⟨-, hu⟩ := MRun.final hU r q hn
+  obtain ⟨e', ek⟩ := (hu s).2 hn'
+  exact ⟨ek.symm, e'.symm⟩
+
+/-- **A part can be reduced first, in thought.**  Let a memory hold a
+well-formed net that is a net `A` beside another, with any ports joined.
+If `A` reduces to `A'`, and the net with `A'` in the place of `A` reduces
+to the normal form `N`, then with any number of threads and any schedule
+a run that ends at rest has made the claims of both reductions, and the
+memory holds `N`. -/
+theorem XMach.part_first (xs : XSys S) {M : XNet S} (hM : M.toNet.WF xs.sys.ar) {N : Net S}
+    {J : Port → Port → Prop} (e : M.toNet = (A.union B).plug J) (hA : A.WF xs.sys.ar)
+    (h : A.Apart B) {n m : Nat} (sA : Steps (Step xs.sys) n A A')
+    (sN : Steps (Step xs.sys) m ((A'.union B).plug J) N) (nN : Normal (Step xs.sys) N)
+    {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+    (hr : ((XMach.init M nt).trace xs σ i).1.resting = true) :
+    ((XMach.init M nt).trace xs σ i).2 = n + m ∧
+      ((XMach.init M nt).trace xs σ i).1.mem.toNet = N := by
+  have s := Steps.part_first hA h J sA sN
+  rw [← e] at s
+  have L := XMach.trace_live σ (XMach.init_live (xs := xs) hM hnt) i
+  obtain ⟨q, hn⟩ := L.rest hr
+  have r := XMach.trace_run xs σ (XMach.init M nt) i
+  rw [XMach.init_toMach] at r
+  obtain ⟨-, hu⟩ := MRun.final hM r q hn
+  obtain ⟨e', ek⟩ := (hu s).2 nN
+  exact ⟨ek.symm, e'.symm⟩
 
 /-! ### Tags, in any system -/
 

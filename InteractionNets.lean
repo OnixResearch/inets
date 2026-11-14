@@ -1787,6 +1787,13 @@ Two threads.  A second thread can make the program slower.
                                 with normal forms side by side come out
                                 right with any number of threads and
                                 any schedule
+* `INet.XMach.part_first`, `INet.Steps.part_first`,
+  `INet.XMach.unions_rest`, `INet.Net.unions_reduce`
+                                in any system, a part of a net can be
+                                reduced first: the claims of a run are
+                                those of the part and of what is left;
+                                and any number of nets with names apart
+                                come out right side by side
 * `INet.XMach.tagged_rest`      two nets side by side under tags, in any
                                 system: at rest the memory holds the
                                 two normal forms up to the names of the
@@ -3130,8 +3137,14 @@ holds up to equality rather than up to renaming.
   (`Net.WF.union`, `Net.Apart.normal`); so two nets with normal forms
   side by side reduce to the two normal forms side by side
   (`Net.Apart.reduce`), and the thread machine at rest holds exactly
-  those (`XMach.union_rest`, `XMach.union_fair`).  This is stated for
-  two nets; names that end in different tags are apart
+  those (`XMach.union_rest`, `XMach.union_fair`).  The same holds for
+  any number of nets, the names of any two of them apart
+  (`Net.unions_reduce`, `XMach.unions_rest`).  A part can also be
+  reduced first: if a net reduces to `A'`, and the larger net with `A'`
+  in its place reduces to a normal form, the larger net reduces to that
+  normal form in the steps of both (`Steps.part_first`), so that is
+  what the thread machine reaches, and the claims it makes
+  (`XMach.part_first`).  Names that end in different tags are apart
   (`Net.Apart.of_tags`).  Putting a tag at the end of every name is a
   renaming (`Renaming.tag`), and a reduction of a net is a reduction of
   the renamed net up to a renaming of what it reaches (`Steps.map`).
