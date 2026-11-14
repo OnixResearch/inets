@@ -1,0 +1,6 @@
+name = "InteractionNets"
+defaultTargets = ["InteractionNets"]
+
+[[lean_lib]]
+name = "InteractionNets"
+moreLeanArgs = ["-DwarningAsError=true"]
