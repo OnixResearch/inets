@@ -1620,6 +1620,14 @@ Two threads.  A second thread can make the program slower.
                                 again, so the rounds and the threads are
                                 together at least
                                 `6 * n + 3 * n' + m + m' + 4`
+* `INet.Arith.seg_cost`, `INet.Arith.trace_bnd`, `INet.Arith.claim_rest`,
+  `INet.Arith.late_floor2`, `INet.Arith.two_sums_rounds_late2`,
+  `INet.Arith.two_threads_late2`
+                                and the interactions of the second
+                                addition come after those rounds, sixteen
+                                actions each among the threads: two
+                                threads in turn take at least
+                                `6 * n + 3 * n' + m + 9 * m' - 6` rounds
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -2735,8 +2743,24 @@ holds up to equality rather than up to renaming.
   the rounds proved for the family: on `6 + 200` twice two threads take
   2,001 rounds and cannot take fewer than 1,812.  On `6 + 32` twice it
   gives 300, one more than the limit before: there the interactions
-  weigh more than the reading, and this limit does not count what the
-  interactions of the second addition cost after the first stretch.  For one
+  weigh more than the reading.  The interactions of the second addition
+  are counted next.  They all come after the first `3 * n` rounds, and
+  over any stretch of a run sixteen actions go to each claim, but for
+  what the threads had put toward claims when the stretch began, four
+  actions each at most, for eight for each adder, and for what they owe
+  at its end, eleven each at most (`Arith.seg_cost`, `Arith.trace_bnd`).
+  So the last claim comes `(16 * (m' + 2) - 15 * c - 17) / c` rounds or
+  more after the first stretch, and its thread reads the memory after it
+  (`Arith.claim_rest`, `Arith.late_floor2`).  With `c` threads,
+  `c * (6 * n + 3 * n' + m + m' + 4) + 16 * (m' + 1) ≤ c * (R + c + 16)`
+  (`Arith.two_sums_rounds_late2`), and for two threads
+  `6 * n + 3 * n' + m + 9 * m' ≤ R + 6` (`Arith.two_threads_late2`):
+  332 rounds on `6 + 32` twice, where they take 489, and 1,844 on
+  `6 + 200` twice, where they take 2,001.  This count shares the
+  interactions among the threads, sixteen actions for all of them
+  together; in the runs of the family one thread makes them all, at
+  seventeen rounds each, and that is what is left between the limit and
+  the rounds proved.  For one
   addition, the condition on the number of threads in
   `Arith.threads_exact` is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
@@ -64876,6 +64900,413 @@ example : Rounds 2 (XMach.init (twoSums 6 200 6 200) 2) 2001 :=
 
 example {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 200 6 200) 2) R) : 1812 ≤ R := by
   have h' := two_sums_rounds_late 5 200 5 200 (by decide) (by decide) h
+  omega
+
+/-- **What a rule of the addition writes**: ten cells at most, and no
+more adders than it takes. -/
+theorem rule_sizes {α β : Arith} {R : XRhs Arith} (hR : xsys.rule α β = some R) {a b : Id}
+    (hne : a ≠ b) :
+    (R.newAgents a b).length + (R.newLinks xsys.sys.ar a b α β).length ≤ 10 ∧
+      adders (R.newAgents a b) ≤ isAdd α + isAdd β := by
+  cases α <;> cases β <;> first
+    | (exfalso
+       revert hR
+       show (none : Option (XRhs Arith)) = some R → False
+       intro h
+       cases h)
+    | (have e : R = addZero.toX := (Option.some.inj hR).symm
+       subst e
+       show (addZero.toX.newAgents a b).length +
+           (addZero.toX.newLinks ar a b .add .zero).length ≤ 10 ∧
+         adders (addZero.toX.newAgents a b) ≤ isAdd .add + isAdd .zero
+       rw [newAgents_zero, newLinks_zero]
+       exact ⟨(by omega : (2 : Nat) ≤ 10), Nat.zero_le _⟩)
+    | (have e : R = addZero.swap.toX := (Option.some.inj hR).symm
+       subst e
+       show (addZero.swap.toX.newAgents a b).length +
+           (addZero.swap.toX.newLinks ar a b .zero .add).length ≤ 10 ∧
+         adders (addZero.swap.toX.newAgents a b) ≤ isAdd .zero + isAdd .add
+       rw [newAgents_zero_swap, newLinks_zero_swap]
+       exact ⟨(by omega : (2 : Nat) ≤ 10), Nat.zero_le _⟩)
+    | (have e : R = addSucc.toX := (Option.some.inj hR).symm
+       subst e
+       show (addSucc.toX.newAgents a b).length +
+           (addSucc.toX.newLinks ar a b .add .succ).length ≤ 10 ∧
+         adders (addSucc.toX.newAgents a b) ≤ isAdd .add + isAdd .succ
+       rw [newAgents_add hne, newLinks_add]
+       exact ⟨Nat.le_refl 10, Nat.le_refl 1⟩)
+    | (have e : R = addSucc.swap.toX := (Option.some.inj hR).symm
+       subst e
+       show (addSucc.swap.toX.newAgents a b).length +
+           (addSucc.swap.toX.newLinks ar a b .succ .add).length ≤ 10 ∧
+         adders (addSucc.swap.toX.newAgents a b) ≤ isAdd .succ + isAdd .add
+       rw [newAgents_swap (a := b) (s := a) (fun e => hne e.symm), newLinks_swap]
+       exact ⟨Nat.le_refl 10, Nat.le_refl 1⟩)
+
+/-- **A thread never owes more than eleven actions, and no action makes
+an adder.** -/
+theorem act_bnd (X : XNet Arith) (T : XThread Arith) (h : owed T.st ≤ 11) :
+    owed (XMach.act xsys X T).2.1.st ≤ 11 ∧
+      adders (XMach.act xsys X T).1.agents + heldAdd (XMach.act xsys X T).2.1.st ≤
+        adders X.agents + heldAdd T.st := by
+  obtain ⟨todo, st⟩ := T
+  cases st with
+  | idle =>
+    cases todo with
+    | nil =>
+      show 0 ≤ 11 ∧ adders X.agents + 0 ≤ adders X.agents + 0
+      omega
+    | cons e rest =>
+      by_cases ha : assoc e.1 X.agents = some e.2
+      · rw [XMach.act_idle_pos (xs := xsys) (X := X) (rest := rest) ha]
+        show 0 ≤ 11 ∧ adders X.agents + 0 ≤ adders X.agents + 0
+        omega
+      · rw [XMach.act_idle_neg (xs := xsys) (X := X) (rest := rest) ha]
+        show 0 ≤ 11 ∧ adders X.agents + 0 ≤ adders X.agents + 0
+        omega
+  | look a α =>
+    cases hq : assoc ((a, 0) : Port) X.wires with
+    | none =>
+      rw [XMach.act_look_none (xs := xsys) (todo := todo) (α := α) hq]
+      show 0 ≤ 11 ∧ adders X.agents + 0 ≤ adders X.agents + 0
+      omega
+    | some q =>
+      rw [XMach.act_look (xs := xsys) (todo := todo) (α := α) hq]
+      show 0 ≤ 11 ∧ adders X.agents + 0 ≤ adders X.agents + 0
+      omega
+  | seek a α p q =>
+    cases hc : (if q.2 = 0 then assoc q.1 X.agents else none) with
+    | none =>
+      cases hn : nextSeg X.wires q p with
+      | none =>
+        rw [XMach.act_seek_stop (xs := xsys) (todo := todo) (a := a) (α := α) hc hn]
+        show 0 ≤ 11 ∧ adders X.agents + 0 ≤ adders X.agents + 0
+        omega
+      | some q' =>
+        rw [XMach.act_seek_next (xs := xsys) (todo := todo) (a := a) (α := α) hc hn]
+        show 0 ≤ 11 ∧ adders X.agents + 0 ≤ adders X.agents + 0
+        omega
+    | some β =>
+      by_cases hr : a ≠ q.1 ∧ (xsys.rule α β).isSome
+      · rw [XMach.act_seek_found (xs := xsys) (todo := todo) (p := p) hc hr]
+        show 0 ≤ 11 ∧ adders X.agents + 0 ≤ adders X.agents + 0
+        omega
+      · rw [XMach.act_seek_norule (xs := xsys) (todo := todo) (p := p) hc hr]
+        show 0 ≤ 11 ∧ adders X.agents + 0 ≤ adders X.agents + 0
+        omega
+  | ready a b α β =>
+    by_cases ha : assoc a X.agents = some α
+    · rw [XMach.act_ready (xs := xsys) (todo := todo) (b := b) (β := β) ha]
+      have ht : adders (X.takeAgent a).agents + isAdd α ≤ adders X.agents := adders_take ha
+      show 0 ≤ 11 ∧ adders (X.takeAgent a).agents + isAdd α ≤ adders X.agents + 0
+      omega
+    · rw [XMach.act_ready_neg (xs := xsys) (todo := todo) (b := b) (β := β) ha]
+      show 0 ≤ 11 ∧ adders X.agents + 0 ≤ adders X.agents + 0
+      omega
+  | half a b α β =>
+    by_cases hc : assoc b X.agents = some β ∧ a ≠ b
+    · cases hR : xsys.rule α β with
+      | none =>
+        rw [XMach.act_half_none (xs := xsys) (todo := todo) ((ite_pos' hc).trans hR)]
+        show 0 ≤ 11 ∧ isAdd α + adders X.agents + 0 ≤ adders X.agents + isAdd α
+        omega
+      | some R =>
+        rw [XMach.act_half (xs := xsys) (todo := todo) ((ite_pos' hc).trans hR)]
+        have ht : adders (X.takeAgent b).agents + isAdd β ≤ adders X.agents := adders_take hc.1
+        obtain ⟨r1, r2⟩ := rule_sizes hR hc.2
+        show (R.newAgents a b).length + (R.newLinks xsys.sys.ar a b α β).length + 1 ≤ 11 ∧
+          adders (X.takeAgent b).agents + adders (R.newAgents a b) ≤
+            adders X.agents + isAdd α
+        omega
+    · rw [XMach.act_half_none (xs := xsys) (todo := todo) (ite_neg' hc)]
+      show 0 ≤ 11 ∧ isAdd α + adders X.agents + 0 ≤ adders X.agents + isAdd α
+      omega
+  | write as ls =>
+    cases as with
+    | cons e as =>
+      obtain ⟨i, γ⟩ := e
+      have h' : as.length + 1 + ls.length + 1 ≤ 11 := h
+      show as.length + ls.length + 1 ≤ 11 ∧
+        isAdd γ + adders X.agents + adders as ≤ adders X.agents + (isAdd γ + adders as)
+      omega
+    | nil =>
+      cases ls with
+      | cons e ls =>
+        obtain ⟨p, q⟩ := e
+        have h' : 0 + (ls.length + 1) + 1 ≤ 11 := h
+        show 0 + ls.length + 1 ≤ 11 ∧ adders X.agents + 0 ≤ adders X.agents + 0
+        omega
+      | nil =>
+        show 0 ≤ 11 ∧ adders X.agents + 0 ≤ adders X.agents + 0
+        omega
+
+/-- The adders a thread holds. -/
+def heldAddT (T : XThread Arith) : Nat := heldAdd T.st
+
+/-- What a thread has put toward a claim. -/
+def creditT (T : XThread Arith) : Nat := credit T.st
+
+theorem credit_le : ∀ st : TState Arith, credit st ≤ 4
+  | .idle => Nat.zero_le 4
+  | .look _ _ => (by omega : (1 : Nat) ≤ 4)
+  | .seek _ _ _ _ => (by omega : (2 : Nat) ≤ 4)
+  | .ready _ _ _ _ => (by omega : (3 : Nat) ≤ 4)
+  | .half _ _ _ _ => Nat.le_refl 4
+  | .write _ _ => Nat.zero_le 4
+
+theorem total_paid : ∀ ths : List (XThread Arith),
+    total paid ths = total creditT ths + 8 * total heldAddT ths
+  | [] => rfl
+  | T :: ths => by
+    have ih := total_paid ths
+    show credit T.st + 8 * heldAdd T.st + total paid ths =
+      credit T.st + total creditT ths + 8 * (heldAdd T.st + total heldAddT ths)
+    omega
+
+theorem step_bnd (M : XMach Arith) (t : Nat) (h : ∀ T, T ∈ M.ths → due T ≤ 11) :
+    (∀ T, T ∈ (M.step xsys t).1.ths → due T ≤ 11) ∧
+      adders (M.step xsys t).1.mem.agents + total heldAddT (M.step xsys t).1.ths ≤
+        adders M.mem.agents + total heldAddT M.ths := by
+  cases ht : M.ths[t]? with
+  | none =>
+    have es : M.step xsys t = (M, 0) := by
+      unfold XMach.step
+      rw [ht]
+    rw [es]
+    exact ⟨h, Nat.le_refl _⟩
+  | some T0 =>
+    have es := XMach.step_eq (M := M) (t := t) ht (act_self M.mem T0)
+    have e2 : (M.step xsys t).1.ths = M.ths.set t (XMach.act xsys M.mem T0).2.1 := by rw [es]
+    have e3 : (M.step xsys t).1.mem = (XMach.act xsys M.mem T0).1 := by rw [es]
+    have hb := act_bnd M.mem T0 (h T0 (List.mem_of_getElem? ht))
+    rw [e2, e3]
+    refine ⟨fun T hT => ?_, ?_⟩
+    · rcases List.mem_or_eq_of_mem_set hT with h1 | h1
+      · exact h T h1
+      · rw [h1]
+        exact hb.1
+    · have sh := total_set heldAddT M.ths t T0 (XMach.act xsys M.mem T0).2.1 ht
+      have h1 : heldAddT T0 = heldAdd T0.st := rfl
+      have h2 : heldAddT (XMach.act xsys M.mem T0).2.1 =
+          heldAdd (XMach.act xsys M.mem T0).2.1.st := rfl
+      have hb2 := hb.2
+      omega
+
+/-- **In every run no thread owes more than eleven actions, and the
+adders in memory or held are never more than at the start.** -/
+theorem trace_bnd (X : XNet Arith) (nt : Nat) (σ : Nat → Nat) : ∀ i,
+    (∀ T, T ∈ ((XMach.init X nt).trace xsys σ i).1.ths → due T ≤ 11) ∧
+      adders ((XMach.init X nt).trace xsys σ i).1.mem.agents +
+          total heldAddT ((XMach.init X nt).trace xsys σ i).1.ths ≤ adders X.agents
+  | 0 => by
+    refine ⟨fun T hT => ?_, ?_⟩
+    · obtain ⟨t, -, rfl⟩ := List.mem_map.1 hT
+      exact Nat.zero_le 11
+    · have z := total_init heldAddT (fun _ => rfl) X nt
+      show adders X.agents + total heldAddT (XMach.init X nt).ths ≤ adders X.agents
+      omega
+  | i + 1 => by
+    obtain ⟨h1, h2⟩ := trace_bnd X nt σ i
+    obtain ⟨h3, h4⟩ := step_bnd ((XMach.init X nt).trace xsys σ i).1 (σ i) h1
+    exact ⟨h3, Nat.le_trans h4 h2⟩
+
+/-- **The price of a stretch of a run**: sixteen for each claim made in
+`d` actions, with what the threads have put toward claims and eight for
+each adder at the end, is at most `d`, what the threads owe at the end,
+and what was put and held when the stretch began. -/
+theorem seg_cost (σ : Nat → Nat) (M : XMach Arith) (i : Nat) : ∀ d,
+    16 * (M.trace xsys σ (i + d)).2 +
+        (total paid (M.trace xsys σ (i + d)).1.ths +
+          8 * adders (M.trace xsys σ (i + d)).1.mem.agents) +
+        total due (M.trace xsys σ i).1.ths ≤
+      16 * (M.trace xsys σ i).2 + d + total due (M.trace xsys σ (i + d)).1.ths +
+        (total paid (M.trace xsys σ i).1.ths + 8 * adders (M.trace xsys σ i).1.mem.agents)
+  | 0 => by
+    show 16 * (M.trace xsys σ i).2 +
+        (total paid (M.trace xsys σ i).1.ths + 8 * adders (M.trace xsys σ i).1.mem.agents) +
+        total due (M.trace xsys σ i).1.ths ≤
+      16 * (M.trace xsys σ i).2 + 0 + total due (M.trace xsys σ i).1.ths +
+        (total paid (M.trace xsys σ i).1.ths + 8 * adders (M.trace xsys σ i).1.mem.agents)
+    omega
+  | d + 1 => by
+    have ih := seg_cost σ M i d
+    have hs := step_cost (M.trace xsys σ (i + d)).1 (σ (i + d))
+    have hb := XMach.stepTally_busy_le (M.trace xsys σ (i + d)).1 (σ (i + d))
+    show 16 * ((M.trace xsys σ (i + d)).2 +
+          ((M.trace xsys σ (i + d)).1.step xsys (σ (i + d))).2) +
+        (total paid ((M.trace xsys σ (i + d)).1.step xsys (σ (i + d))).1.ths +
+          8 * adders ((M.trace xsys σ (i + d)).1.step xsys (σ (i + d))).1.mem.agents) +
+        total due (M.trace xsys σ i).1.ths ≤
+      16 * (M.trace xsys σ i).2 + (d + 1) +
+        total due ((M.trace xsys σ (i + d)).1.step xsys (σ (i + d))).1.ths +
+        (total paid (M.trace xsys σ i).1.ths + 8 * adders (M.trace xsys σ i).1.mem.agents)
+    omega
+
+/-- **After a claim, the reload and the whole memory.**  With `c` threads
+in turn from a memory in order: if an action numbered `j` claims and the
+threads are at rest after `R` rounds, then `R` is at least the rounds
+before that action, two, and what the thread has to read of the reloaded
+memory. -/
+theorem claim_rest {N : Nat → Nat} {K : Nat} {X : XNet Arith} (hX : X.toNet.WF ar)
+    (hnd : (X.agents.map Prod.fst).Nodup) (hO : MemOk N K X) {c : Nat} (hc : 0 < c) {R j : Nat}
+    (hr : ((XMach.init X c).trace xsys (fun i => i % c) (c * R)).1.resting = true)
+    (hj : j < c * R)
+    (hcl : 0 < (((XMach.init X c).trace xsys (fun i => i % c) j).1.step xsys (j % c)).2) :
+    j / c + 2 + (succs X.agents - c + 2 * K) ≤ R := by
+  -- the thread that makes it
+  have hk := Nat.mod_lt j hc
+  have hlen : ((XMach.init X c).trace xsys (fun i => i % c) j).1.ths.length = c :=
+    (XMach.trace_length xsys _ _ j).trans (init_length X c)
+  cases h0 : ((XMach.init X c).trace xsys (fun i => i % c) j).1.ths[j % c]? with
+  | none =>
+    have hle := List.getElem?_eq_none_iff.1 h0
+    omega
+  | some T0 =>
+    have es := XMach.step_eq (M := ((XMach.init X c).trace xsys (fun i => i % c) j).1)
+      (t := j % c) h0 (act_self _ T0)
+    have hj3' : 0 < (((XMach.init X c).trace xsys (fun i => i % c) j).1.step xsys (j % c)).2 :=
+      hcl
+    rw [es] at hj3'
+    have hcl := act_claim_lam N (g2 N (succs X.agents - c) K) (succs X.agents - c + 2 * K) _ T0
+      hj3'
+    have hT1 : ((XMach.init X c).trace xsys (fun i => i % c) (j + 1)).1.ths[j % c]? =
+        some (XMach.act xsys ((XMach.init X c).trace xsys (fun i => i % c) j).1.mem T0).2.1 := by
+      show (((XMach.init X c).trace xsys (fun i => i % c) j).1.step xsys (j % c)).1.ths[j % c]? = _
+      rw [es]
+      exact List.getElem?_set_self (by omega)
+    -- its own actions from there to the rest
+    obtain ⟨d', hd'⟩ : ∃ d', c * R = j + 1 + d' := ⟨c * R - (j + 1), by omega⟩
+    obtain ⟨T', hT', hin⟩ := rr_track hX hnd hO hc d' (j + 1) (j % c) _ hk hT1
+    rw [← hd'] at hT' hin
+    have hrest : T' = ⟨[], .idle⟩ :=
+      XThread.eq_rest (List.all_eq_true.1 hr T' (List.mem_of_getElem? hT'))
+    have hl0 : lam N (g2 N (succs X.agents - c) K) (succs X.agents - c + 2 * K) T' = 0 := by
+      rw [hrest]
+      show min 0 _ + 2 * min 0 K + 0 = 0
+      rw [Nat.zero_min, Nat.zero_min]
+    have ho := rr_own c j (j % c) hc hk
+    rw [ite_neg' (Nat.lt_irrefl _), ite_pos' rfl] at ho
+    rw [hl0, ho, Nat.mul_div_cancel_left R hc, Nat.mul_mod_right,
+      ite_neg' (Nat.not_lt_zero _)] at hin
+    omega
+
+/-- **The limit with the interactions of the second net.**  As
+`late_floor`, with the cost of the claims: in the first `3 * n` rounds
+the claims are those of the first net, and in `D` more actions the
+threads make one claim for each sixteen actions and no more, but for
+what they had put toward claims and for the adders; so while claims are
+left, the last comes after those actions. -/
+theorem late_floor2 {N : Nat → Nat} {K n : Nat} {B0 : List (Id × Arith)} {c : Nat}
+    {X : XNet Arith} (hc : 0 < c) (hX : X.toNet.WF ar) (hnd : (X.agents.map Prod.fst).Nodup)
+    (hO : MemOk N K X) (h1 : Mem1 B0 X) (hB : ∀ e, e ∈ B0 → tagged 1 e.1 = true)
+    (hb : ∃ b W, B0 = b :: W ∧ tagged 1 b.1 = true) (hB0 : n + sndCnt N B0 ≤ K)
+    (hinit : ∀ t, t < c → n ≤ pre N (X.agents.drop t ++ X.agents.take t)) {C R D : Nat}
+    (hD : 16 * fcnt N X.agents + D + 15 * c + 8 * adders X.agents < 16 * (fcnt N B0 + C))
+    (hr : ((XMach.init X c).trace xsys (fun i => i % c) (c * R)).1.resting = true)
+    (hC : ((XMach.init X c).trace xsys (fun i => i % c) (c * R)).2 = C) :
+    3 * n + D / c + 2 + (succs X.agents - c) + 2 * K ≤ R := by
+  -- the claims of the first `3 * n` rounds
+  have P := phase1 hc hO h1 hB hb hB0 hinit (c * (3 * n)) (Nat.le_refl _)
+  have F := trace_first (fun i => i % c) (init_ok hO c) (c * (3 * n))
+  have z := total_init (heldFT N) (fun _ => rfl) X c
+  obtain ⟨L, hL, -⟩ := P.mem.shape
+  have e0 : (XMach.init X c).mem = X := rfl
+  rw [z, e0, hL, fcnt_append] at F
+  -- the claims of `D` more actions
+  have S := seg_cost (fun i => i % c) (XMach.init X c) (c * (3 * n)) D
+  obtain ⟨-, b2⟩ := trace_bnd X c (fun i => i % c) (c * (3 * n))
+  obtain ⟨b3, -⟩ := trace_bnd X c (fun i => i % c) (c * (3 * n) + D)
+  have hlen0 : ((XMach.init X c).trace xsys (fun i => i % c) (c * (3 * n))).1.ths.length = c :=
+    (XMach.trace_length xsys _ _ _).trans (init_length X c)
+  have hlenD : ((XMach.init X c).trace xsys (fun i => i % c)
+      (c * (3 * n) + D)).1.ths.length = c :=
+    (XMach.trace_length xsys _ _ _).trans (init_length X c)
+  have d1 := total_le_mul (f := due) (P := 11) b3
+  have c1 := total_le_mul (f := creditT) (P := 4)
+    (ths := ((XMach.init X c).trace xsys (fun i => i % c) (c * (3 * n))).1.ths)
+    (fun T _ => credit_le T.st)
+  have p1 := total_paid ((XMach.init X c).trace xsys (fun i => i % c) (c * (3 * n))).1.ths
+  rw [hlenD] at d1
+  rw [hlen0] at c1
+  have hlt : ((XMach.init X c).trace xsys (fun i => i % c) (c * (3 * n) + D)).2 < C := by
+    omega
+  -- a claim after them
+  have hlt2 : c * (3 * n) + D < c * R := by
+    refine Nat.lt_of_not_le fun hle => ?_
+    obtain ⟨d, hd⟩ : ∃ d, c * (3 * n) + D = c * R + d := ⟨c * (3 * n) + D - c * R, by omega⟩
+    have hm := claims_mono (fun i => i % c) (XMach.init X c) d (c * R)
+    rw [← hd, hC] at hm
+    omega
+  obtain ⟨d, hd⟩ : ∃ d, c * R = c * (3 * n) + D + d := ⟨c * R - (c * (3 * n) + D), by omega⟩
+  have hgrow : ((XMach.init X c).trace xsys (fun i => i % c) (c * (3 * n) + D)).2 <
+      ((XMach.init X c).trace xsys (fun i => i % c) (c * (3 * n) + D + d)).2 := by
+    rw [← hd, hC]
+    exact hlt
+  obtain ⟨j, hj1, hj2, hj3⟩ := claim_between (fun i => i % c) (XMach.init X c) d _ hgrow
+  have hcr := claim_rest hX hnd hO hc hr (by omega) hj3
+  have e : (c * (3 * n) + D) / c = D / c + 3 * n := by
+    rw [Nat.add_comm, Nat.add_mul_div_left _ _ hc]
+  have hj' : (c * (3 * n) + D) / c ≤ j / c := Nat.div_le_div_right hj1
+  omega
+
+/-- **Two additions side by side, with the interactions of the second
+counted.**  With `c` threads in turn, `c` at most `m + 2`: the rounds to
+rest and the threads are together at least
+`6 * n + 3 * n' + m + m' + 4`, less sixteen, and more by sixteen for
+each of the `m' + 1` successors of the first argument of the second
+addition, shared among the threads. -/
+theorem two_sums_rounds_late2 (m n m' n' : Nat) {c R : Nat} (hc : 0 < c) (hcm : c ≤ m + 2)
+    (h : Rounds c (XMach.init (twoSums (m + 1) n (m' + 1) n') c) R) :
+    c * (6 * n + 3 * n' + m + m' + 4) + 16 * (m' + 1) ≤ c * (R + c + 16) := by
+  by_cases hsmall : 16 * (m' + 2) ≤ 15 * c + 17
+  · have h0 := two_sums_rounds_late m n m' n' hc hcm h
+    have h1 : c * (6 * n + 3 * n' + m + m' + 4) ≤ c * (R + c) := Nat.mul_le_mul_left c h0
+    rw [Nat.mul_add c (R + c) 16]
+    omega
+  · obtain ⟨D, hD⟩ : ∃ D, 16 * (m' + 2) = D + 15 * c + 17 :=
+      ⟨16 * (m' + 2) - 15 * c - 17, by omega⟩
+    have hr := h.1
+    have hC := two_sums_claims m n m' n' hc (fun i => i % c) hr
+    have hF : 16 * fcnt (sideN n n') (twoSums (m + 1) n (m' + 1) n').agents + D + 15 * c +
+        8 * adders (twoSums (m + 1) n (m' + 1) n').agents <
+        16 * (fcnt (sideN n n') ((sum (m' + 1) n').agents.map (tagA 1)) + (m + m' + 4)) := by
+      rw [adders_two_sums]
+      show 16 * fcnt (sideN n n') ((sum (m + 1) n).agents.map (tagA 0) ++
+        (sum (m' + 1) n').agents.map (tagA 1)) + D + 15 * c + 8 * 2 < _
+      rw [fcnt_append]
+      have h1 := sum_fcnt_le (sideN n n') 0 n rfl (m + 1)
+      omega
+    have hl := late_floor2 (n := n) (D := D) hc (two_sums_wf (m + 1) n (m' + 1) n')
+      (two_sums_nodup (m + 1) n (m' + 1) n') (two_sums_memOk m n m' n')
+      (two_sums_mem1 m n m' n') (fun _ he => mem_tag_self he) (two_sums_b0 m' n')
+      (two_sums_b0_cnt n m' n') (fun _ ht => two_sums_init_pre m n m' n' (by omega)) hF hr hC
+    rw [succs_two_sums] at hl
+    have hdm := Nat.div_add_mod D c
+    have hml := Nat.mod_lt D hc
+    have h2 : 6 * n + 3 * n' + m + m' + 4 + D / c ≤ R + c := by omega
+    have h3 := Nat.mul_le_mul_left c h2
+    rw [Nat.mul_add c _ (D / c)] at h3
+    rw [Nat.mul_add c (R + c) 16]
+    omega
+
+/-- **Two threads in turn on two additions**: at least
+`6 * n + 3 * n' + m + 9 * m' - 6` rounds. -/
+theorem two_threads_late2 (m n m' n' : Nat) {R : Nat}
+    (h : Rounds 2 (XMach.init (twoSums (m + 1) n (m' + 1) n') 2) R) :
+    6 * n + 3 * n' + m + 9 * m' ≤ R + 6 := by
+  have h' := two_sums_rounds_late2 m n m' n' (by decide) (by omega) h
+  omega
+
+/-- `6 + 32` twice: two threads take 489 rounds and cannot take fewer
+than 332. -/
+example {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 32 6 32) 2) R) : 332 ≤ R := by
+  have h' := two_threads_late2 5 32 5 32 h
+  omega
+
+/-- `6 + 200` twice: two threads take 2,001 rounds and cannot take fewer
+than 1,844. -/
+example {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 200 6 200) 2) R) : 1844 ≤ R := by
+  have h' := two_threads_late2 5 200 5 200 h
   omega
 
 end Arith
