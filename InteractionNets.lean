@@ -1416,6 +1416,24 @@ Two threads.  A second thread can make the program slower.
                                 thread, at most `k + 1` times the work of
                                 one less two for each other thread (two
                                 threads on `6 + 28` make 456, one 229)
+* `INet.Arith.Rounds`, `INet.Arith.rounds_readers`
+                                the rounds a run of threads in turn takes
+                                before all are at rest; when every thread
+                                but the first only reads, they are the
+                                actions of the first alone
+* `INet.Arith.threads_rounds`, `INet.Arith.threads_overhead`
+                                so outside the race `k + 1` threads in
+                                turn take exactly `soloWork (m + 1) n`
+                                rounds, as one thread does, and make its
+                                work and `turnSum m n k` more: 273 rounds
+                                for three threads on `8 + 28`, 313 for
+                                five on `9 + 34`
+* `INet.Arith.threads_rounds_ge`, `INet.Arith.two_threads_rounds_ge`
+                                in every case the rounds are at least the
+                                work shared among the threads; so two
+                                threads in the race end at most nine
+                                rounds sooner than one, unless the first
+                                thread keeps the pair
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -2334,6 +2352,16 @@ holds up to equality rather than up to renaming.
   `k + 1` threads in turn do at least the work of one thread and
   `3 * n + 4` for each other thread, and at most `k + 1` times the work
   of one less two for each other thread (`Arith.threads_bounds`).  The
+  time is counted in rounds (`Arith.Rounds`).  Outside the race the run
+  of `k + 1` threads is at rest after exactly `soloWork (m + 1) n`
+  rounds, the actions of one thread alone, so the other threads save no
+  time and their actions are pure overhead (`Arith.threads_overhead`).
+  In the race the runs computed, with two to five threads, end sooner
+  than one thread by 9, 8, 7, 6, 4, 4, 3, 2, 0 and 0 rounds for `d` from
+  0 to 9.  Of that only a bound for two threads is proved, at most nine
+  rounds when the first thread does not keep the pair
+  (`Arith.two_threads_rounds_ge`); it comes from the work shared between
+  the two, and the rounds of the race itself are not proved.  The
   condition on the number of threads is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
   to each after the round that takes it.  The agents the first thread has
@@ -55710,6 +55738,191 @@ example : (XMach.init (sum 6 28) 2).Total xsys (fun i => i % 2) (2 * soloWork 6 
   (threads_exact 5 28 1 (by decide) (by decide) (by decide)).cast (by decide)
 
 example : 2 * soloWork 6 28 - 2 = 456 := by decide
+
+/-- `Rounds c M R`: the `c` threads of `M`, acting in turn, are all at rest
+after `R` rounds, and not after fewer. -/
+def Rounds (c : Nat) (M : XMach Arith) (R : Nat) : Prop :=
+  (M.trace xsys (fun i => i % c) (c * R)).1.resting = true ∧
+    ∀ R', R' < R → ¬ (M.trace xsys (fun i => i % c) (c * R')).1.resting = true
+
+theorem Rounds.cast {c : Nat} {M : XMach Arith} {R R' : Nat} (h : Rounds c M R) (e : R = R') :
+    Rounds c M R' := by
+  subst e
+  exact h
+
+/-- A run takes one number of rounds. -/
+theorem Rounds.unique {c : Nat} {M : XMach Arith} {R R' : Nat} (h : Rounds c M R)
+    (h' : Rounds c M R') : R = R' := by
+  have a : ¬ R < R' := fun lt => h'.2 R lt h.1
+  have b : ¬ R' < R := fun lt => h.2 R' lt h'.1
+  omega
+
+/-- A run that is at rest after `N` actions has made all its work by then,
+one action at most at a time. -/
+theorem total_le_rest {c : Nat} {M : XMach Arith} {W N : Nat}
+    (t : M.Total xsys (fun i => i % c) W)
+    (h : (M.trace xsys (fun i => i % c) N).1.resting = true) : W ≤ N := by
+  obtain ⟨N0, hN0⟩ := t
+  have e := XMach.work_rest (xs := xsys) (fun i => i % c) h N0
+  have e2 := hN0 (N + N0) (by omega)
+  have le := XMach.work_le_count xsys (fun i => i % c) M N
+  omega
+
+theorem all_rest_resting {Y : XNet Arith} {Ts : List (XThread Arith)}
+    (h : ∀ T, T ∈ Ts → T = ⟨[], .idle⟩) : (⟨Y, Ts⟩ : XMach Arith).resting = true :=
+  List.all_eq_true.2 fun T hT => by
+    rw [h T hT]
+    rfl
+
+theorem first_of_resting {Y : XNet Arith} {T : XThread Arith} {Ts : List (XThread Arith)}
+    (h : (⟨Y, T :: Ts⟩ : XMach Arith).resting = true) : T = ⟨[], .idle⟩ :=
+  XThread.eq_rest (List.all_eq_true.1 h T List.mem_cons_self)
+
+/-- **The rounds of a run in which every thread but the first only reads.**
+If the first thread alone is at rest after `A + 1` actions and not after
+`A`, and the others, which leave the memory as it is, are at rest by then,
+the run of all of them in turn takes exactly `A + 1` rounds. -/
+theorem rounds_readers {X : XNet Arith} {T₀ : XThread Arith} {Ts : List (XThread Arith)}
+    {A : Nat}
+    (h : ∀ T, T ∈ Ts → ∀ a,
+      (XMach.act xsys (XMach.solo xsys X T₀ (a + 1)).1 (XMach.reader xsys X T₀ T a)).1 =
+          (XMach.solo xsys X T₀ (a + 1)).1 ∧
+        (XMach.act xsys (XMach.solo xsys X T₀ (a + 1)).1 (XMach.reader xsys X T₀ T a)).2.2 = 0)
+    (h0 : (XMach.solo xsys X T₀ A).2 ≠ ⟨[], .idle⟩)
+    (h1 : (XMach.solo xsys X T₀ (A + 1)).2 = ⟨[], .idle⟩)
+    (hr : ∀ T, T ∈ Ts → XMach.reader xsys X T₀ T (A + 1) = ⟨[], .idle⟩) :
+    Rounds (Ts.length + 1) ⟨X, T₀ :: Ts⟩ (A + 1) := by
+  have tr : ∀ a, ((⟨X, T₀ :: Ts⟩ : XMach Arith).trace xsys (fun i => i % (Ts.length + 1))
+      ((Ts.length + 1) * a)).1 = ⟨(XMach.solo xsys X T₀ a).1, (XMach.solo xsys X T₀ a).2 ::
+        Ts.map fun T => XMach.reader xsys X T₀ T a⟩ := fun a =>
+    congrArg Prod.fst (XMach.trace_readers (xs := xsys) (A := a)
+      (fun T hT a' _ => h T hT a') a (Nat.le_refl a))
+  refine ⟨?_, fun R' hR' hrest => ?_⟩
+  · rw [tr]
+    exact all_rest_resting fun T hT => by
+      rcases List.mem_cons.1 hT with e | hT
+      · rw [e]
+        exact h1
+      · obtain ⟨T', hT', rfl⟩ := List.mem_map.1 hT
+        exact hr T' hT'
+  · obtain ⟨d, rfl⟩ : ∃ d, A = R' + d := ⟨A - R', by omega⟩
+    have h2 := XMach.resting_trace (xs := xsys) (fun i => i % (Ts.length + 1)) hrest
+      ((Ts.length + 1) * d)
+    rw [← Nat.mul_add, tr] at h2
+    exact h0 (first_of_resting h2)
+
+/-- Outside the race the thread numbered `t + 1` only reads and is at rest
+after `turnRest m n t` actions. -/
+theorem turn_reader_rest (m n t : Nat) (ht : t + 2 ≤ m)
+    (hw : turnAt m n t ≤ 17 * m + 6 ∨ 17 * m + 17 ≤ turnAt m n t)
+    (hk : 20 * t ≤ 3 * m + 3 * n + 1) :
+    RdAt m n ⟨(sum (m + 1) n).agents.drop (t + 1) ++ (sum (m + 1) n).agents.take (t + 1),
+      .idle⟩ (turnRest m n t) ⟨[], .idle⟩ := by
+  cases n with
+  | zero =>
+    obtain ⟨b, eb, r, -⟩ := turn_reader_zero m t ht (by omega)
+    rw [turn_list_zero m t (by omega), eb]
+    exact r
+  | succ n' =>
+    obtain ⟨b, eb, r, -⟩ := turn_reader_quiet m n' t ht hw (by
+      unfold turnAt
+      omega)
+    rw [turn_list_succ m n' t (by omega), eb]
+    exact r
+
+/-- **Threads in turn outside the race take the rounds of one thread.**  On
+the net for `(m + 1) + n` take `k + 1` threads that act in turn, with
+`k + 1 ≤ m` and `20 * k ≤ 3 * m + 3 * n + 21`.  If none of the threads after
+the first comes to the zero of the first argument at one of the ten moments
+of the race, all are at rest after exactly `soloWork (m + 1) n` rounds, the
+number of actions one thread alone needs: the others save no time. -/
+theorem threads_rounds (m n k : Nat) (hm : k + 1 ≤ m) (hk : 20 * k ≤ 3 * m + 3 * n + 21)
+    (hw : ∀ t, t < k → turnAt m n t ≤ 17 * m + 6 ∨ 17 * m + 17 ≤ turnAt m n t) :
+    Rounds (k + 1) (XMach.init (sum (m + 1) n) (k + 1)) (soloWork (m + 1) n) := by
+  rw [XMach.init_succ]
+  obtain ⟨hr, -, hb⟩ := solo_work (m + 1) n
+  rw [XMach.init_one] at hr hb
+  obtain ⟨A, hA⟩ : ∃ A, soloWork (m + 1) n = A + 1 := ⟨soloWork (m + 1) n - 1, by
+    rw [soloWork_succ]
+    omega⟩
+  have s0 : (XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ A).2 ≠
+      ⟨[], .idle⟩ := fun e => by
+    have h := hb A (by omega)
+    rw [XMach.trace_one] at h
+    exact h (all_rest_resting fun T hT => by
+      rcases List.mem_cons.1 hT with e' | hT
+      · rw [e']
+        exact e
+      · cases hT)
+  have s1 : (XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ (A + 1)).2 =
+      ⟨[], .idle⟩ := by
+    rw [hA, XMach.trace_one] at hr
+    exact XMach.resting_single hr
+  have rd : ∀ T, T ∈ ((List.range k).map fun t => (⟨(sum (m + 1) n).agents.drop (t + 1) ++
+      (sum (m + 1) n).agents.take (t + 1), .idle⟩ : XThread Arith)) →
+      RdAt m n T (A + 1) ⟨[], .idle⟩ := by
+    intro T hT
+    obtain ⟨t, ht, rfl⟩ := List.mem_map.1 hT
+    have ht' : t < k := List.mem_range.1 ht
+    have r := turn_reader_rest m n t (by omega) (hw t ht') (by omega)
+    have tb := (turnRest_bounds m n t (by omega)).2
+    obtain ⟨d, hd⟩ : ∃ d, A + 1 = turnRest m n t + d := ⟨A + 1 - turnRest m n t, by omega⟩
+    rw [hd]
+    exact r.rest d
+  have res := rounds_readers (X := sum (m + 1) n) (T₀ := ⟨(sum (m + 1) n).agents, .idle⟩)
+    (Ts := (List.range k).map fun t => (⟨(sum (m + 1) n).agents.drop (t + 1) ++
+      (sum (m + 1) n).agents.take (t + 1), .idle⟩ : XThread Arith)) (A := A)
+    (fun T hT a => ((rd T hT).rest (a + 1)).2 a (by omega)) s0 s1 (fun T hT => (rd T hT).1)
+  rw [List.length_map, List.length_range] at res
+  rw [hA]
+  exact res
+
+/-- The same, the condition read off `racerOf`. -/
+theorem threads_rounds_none (m n k : Nat) (hm : k + 1 ≤ m) (hk : 20 * k ≤ 3 * m + 3 * n + 21)
+    (h : racerOf m n k = none) :
+    Rounds (k + 1) (XMach.init (sum (m + 1) n) (k + 1)) (soloWork (m + 1) n) :=
+  threads_rounds m n k hm hk fun t ht => by
+    have g := racerOf_none k h t ht
+    omega
+
+/-- **Outside the race more threads are pure overhead**: the run takes the
+rounds of one thread alone, and its work is that of one thread and the
+actions of the others. -/
+theorem threads_overhead (m n k : Nat) (hm : k + 1 ≤ m) (hk : 20 * k ≤ 3 * m + 3 * n + 21)
+    (h : racerOf m n k = none) :
+    Rounds (k + 1) (XMach.init (sum (m + 1) n) (k + 1)) (soloWork (m + 1) n) ∧
+      (XMach.init (sum (m + 1) n) (k + 1)).Total xsys (fun i => i % (k + 1))
+        (soloWork (m + 1) n + turnSum m n k) :=
+  ⟨threads_rounds_none m n k hm hk h, threads_total m n k hm hk fun t ht => by
+    have g := racerOf_none k h t ht
+    omega⟩
+
+/-- In every case the rounds are at least the work shared among the
+threads. -/
+theorem threads_rounds_ge (m n k R : Nat) (hm4 : 4 ≤ m) (hm : k + 1 ≤ m)
+    (hn : 20 * k ≤ 3 * m + 3 * n + 21)
+    (h : Rounds (k + 1) (XMach.init (sum (m + 1) n) (k + 1)) R) :
+    allWork m n k ≤ (k + 1) * R :=
+  total_le_rest (threads_exact m n k hm4 hm hn) h.1
+
+/-- **Two threads in the race end at most nine rounds sooner than one**,
+when the first thread does not keep the pair. -/
+theorem two_threads_rounds_ge (m n R : Nat) (hm : 4 ≤ m)
+    (h1 : 17 * m + 7 ≤ turnAt m n 0) (h2 : turnAt m n 0 ≤ 17 * m + 16)
+    (h8 : turnAt m n 0 ≠ 17 * m + 15)
+    (h : Rounds 2 (XMach.init (sum (m + 1) n) 2) R) : soloWork (m + 1) n ≤ R + 9 := by
+  have e : twoAt m n = turnAt m n 0 := rfl
+  have le := total_le_rest (two_threads_race_at m n hm h1 h2) h.1
+  rw [soloWork_succ]
+  rcases raceWork_cases m n (twoAt m n - (17 * m + 7)) with ⟨e8, -⟩ | ⟨-, lo, -⟩
+  · omega
+  · omega
+
+example : Rounds 3 (XMach.init (sum 8 28) 3) 273 :=
+  (threads_rounds_none 7 28 2 (by decide) (by decide) (by decide)).cast (by decide)
+
+example : Rounds 5 (XMach.init (sum 9 34) 5) 313 :=
+  (threads_rounds_none 8 34 4 (by decide) (by decide) (by decide)).cast (by decide)
 
 end Arith
 
