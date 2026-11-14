@@ -1781,13 +1781,15 @@ Two threads.  A second thread can make the program slower.
                                 the value of its first argument, and
                                 has the numeral of the value of the
                                 expression on its free port
-* `INet.Arith.Expr.run_sound`, `INet.Arith.readNum_sound`,
+* `INet.Arith.Expr.run_sound`, `INet.Arith.Expr.run_complete`,
+  `INet.Arith.readNum_sound`, `INet.Arith.readNum_complete`,
   `INet.Arith.IsNum.unique`
                                 an expression can be run: threads take
                                 turns on its net for a number of
                                 actions and the result is read off the
                                 memory; whatever is returned is the
-                                value of the expression
+                                value of the expression, and with
+                                enough actions the value is returned
 * `INet.Steps.context`, `INet.XMach.union_rest`, `INet.XMach.union_fair`,
   `INet.Net.Apart.reduce`, `INet.Net.WF.union`, `INet.Net.Apart.normal`
                                 in any system, a net reduces inside a
@@ -3142,9 +3144,14 @@ holds up to equality rather than up to renaming.
   follows wires of several segments as a thread does.  What `readNum`
   returns is a numeral of the net (`Arith.readNum_sound`), and a port
   carries at most one (`Arith.IsNum.unique`), so whatever the run
-  returns is the value of the expression (`Arith.Expr.run_sound`).  That
-  the run returns something when given enough actions is checked on
-  examples, by evaluation in the kernel, and not proved in general.
+  returns is the value of the expression (`Arith.Expr.run_sound`).
+  Given enough actions the run does return it
+  (`Arith.Expr.run_complete`): threads that take turns are scheduled
+  fairly, so they come to rest; from then on the memory does not change
+  (`XMach.trace_rest_eq`), and `readNum` returns every numeral of a
+  well-formed memory given enough fuel (`Arith.readNum_complete`).  How
+  many actions are enough is not bounded; two runs are evaluated in the
+  kernel.
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers
