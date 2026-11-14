@@ -43,6 +43,7 @@ import InteractionNets.Arith.AnyNets
 import InteractionNets.Plug
 import InteractionNets.Arith.Compose
 import InteractionNets.Arith.Expr
+import InteractionNets.Union
 import InteractionNets.LongRun
 import InteractionNets.Window
 import InteractionNets.Measure
@@ -1778,6 +1779,14 @@ Two threads.  A second thread can make the program slower.
                                 the value of its first argument, and
                                 has the numeral of the value of the
                                 expression on its free port
+* `INet.Steps.context`, `INet.XMach.union_rest`, `INet.XMach.union_fair`,
+  `INet.Net.Apart.reduce`, `INet.Net.WF.union`, `INet.Net.Apart.normal`
+                                in any system, a net reduces inside a
+                                larger net as it does alone, when the
+                                names of the two are apart; two nets
+                                with normal forms side by side come out
+                                right with any number of threads and
+                                any schedule
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -3103,7 +3112,23 @@ holds up to equality rather than up to renaming.
   are well formed comes from `Net.Made.wf` and `Net.WF.plug`, not from
   the validator, and the results about the list reducers, which ask for
   compact nets, do not apply to them.  Only the claims are counted;
-  nothing is said about how many actions the threads take.  For one
+  nothing is said about how many actions the threads take.
+  Tags are one way to keep the names of nets apart, and they are what
+  asks for rules with sides.  Without them, two nets can be put side by
+  side as they are (`Net.union`) when no name of one, with any numbers
+  in front, is a name of the other with any numbers in front
+  (`Net.Apart`): new agents are named by putting a number in front of
+  the name of an agent that fires, so names that are apart stay apart
+  (`Net.Apart.fire`).  Then, in any system, a reduction of a
+  well-formed net is a reduction of the net beside another and with any
+  ports of the two joined (`Steps.context`); the union of well-formed
+  nets is well formed and the union of normal nets is normal
+  (`Net.WF.union`, `Net.Apart.normal`); so two nets with normal forms
+  side by side reduce to the two normal forms side by side
+  (`Net.Apart.reduce`), and the thread machine at rest holds exactly
+  those (`XMach.union_rest`, `XMach.union_fair`).  This is stated for
+  two nets; names that end in different tags are apart
+  (`Net.Apart.of_tags`).  For one
   addition, the condition on the number of threads in
   `Arith.threads_exact` is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
