@@ -44,6 +44,7 @@ import InteractionNets.Plug
 import InteractionNets.Arith.Compose
 import InteractionNets.Arith.Expr
 import InteractionNets.Union
+import InteractionNets.UnionExamples
 import InteractionNets.LongRun
 import InteractionNets.Window
 import InteractionNets.Measure
@@ -1794,6 +1795,9 @@ Two threads.  A second thread can make the program slower.
                                 those of the part and of what is left;
                                 and any number of nets with names apart
                                 come out right side by side
+* `INet.XNet.normalize_steps`   what the list reducer returns after `k`
+                                steps is the compact form of a normal
+                                form reached in `k` steps of reduction
 * `INet.XMach.tagged_rest`      two nets side by side under tags, in any
                                 system: at rest the memory holds the
                                 two normal forms up to the names of the
@@ -3152,7 +3156,12 @@ holds up to equality rather than up to renaming.
   in any system, rules with sides or not: at rest the claims are the
   steps of the two reductions, and the memory holds the two normal
   forms side by side, each renamed, the names of the start carrying
-  the tag (`XMach.tagged_rest`).  For one
+  the tag (`XMach.tagged_rest`).  It is used in `UnionExamples` on the
+  system `Solo`, whose rule makes an agent of neither side: what
+  `normalize` returns is reached by steps (`XNet.normalize_steps`), and
+  two copies of the net `aa` side by side under tags make two claims and
+  leave two renamed normal forms, with any number of threads and any
+  schedule.  For one
   addition, the condition on the number of threads in
   `Arith.threads_exact` is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
