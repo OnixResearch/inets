@@ -1787,6 +1787,10 @@ Two threads.  A second thread can make the program slower.
                                 with normal forms side by side come out
                                 right with any number of threads and
                                 any schedule
+* `INet.XMach.tagged_rest`      two nets side by side under tags, in any
+                                system: at rest the memory holds the
+                                two normal forms up to the names of the
+                                agents made on the way
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -3074,8 +3078,8 @@ holds up to equality rather than up to renaming.
   addition, `Arith.system_sided`).  An agent that belongs to neither is
   named after one of the two by comparing their names, and a tag at the
   end of both names can change the comparison; with such agents the
-  whole would reach the normal forms up to a renaming only, and that is
-  not proved.  The nets are side by side: no wire runs from one to
+  whole reaches the normal forms up to a renaming only, which is proved
+  for two nets (`XMach.tagged_rest`, below).  The nets are side by side: no wire runs from one to
   another.  Wires between nets are made by plugging: new segments join
   free ports, which stop being free and become points of longer wires
   (`Net.plug`).  A step of a net is a step of the plugged net, whatever
@@ -3128,7 +3132,14 @@ holds up to equality rather than up to renaming.
   (`Net.Apart.reduce`), and the thread machine at rest holds exactly
   those (`XMach.union_rest`, `XMach.union_fair`).  This is stated for
   two nets; names that end in different tags are apart
-  (`Net.Apart.of_tags`).  For one
+  (`Net.Apart.of_tags`).  Putting a tag at the end of every name is a
+  renaming (`Renaming.tag`), and a reduction of a net is a reduction of
+  the renamed net up to a renaming of what it reaches (`Steps.map`).
+  So two memories put side by side under different tags come out right
+  in any system, rules with sides or not: at rest the claims are the
+  steps of the two reductions, and the memory holds the two normal
+  forms side by side, each renamed, the names of the start carrying
+  the tag (`XMach.tagged_rest`).  For one
   addition, the condition on the number of threads in
   `Arith.threads_exact` is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come

@@ -391,6 +391,106 @@ theorem XMach.union_fair (xs : XSys S) {X Y : XNet S} (hX : X.toNet.WF xs.sys.ar
   rw [← XNet.union_toNet] at s
   exact XMach.fair_complete (xs := xs) hU hnt s hn' σ hfair
 
+/-! ### Tags, in any system -/
+
+omit [DecidableEq S] in
+/-- Putting a tag at the end of every name is a renaming of a well-formed
+net. -/
+theorem Renaming.tag {ar : S → Nat} {N : Net S} (hN : N.WF ar) (c : Nat) :
+    Renaming (fun i => i ++ [c]) N where
+  inj := fun _ _ e => List.append_cancel_right e
+  fresh := by
+    intro a α i l ha hu e
+    have e0 : i ++ [c] = l ++ (a ++ [c]) := e
+    rw [← List.append_assoc] at e0
+    have ei : i = l ++ a := List.append_cancel_right e0
+    rw [ei] at hu
+    exact hN.fresh l ha hu
+
+/-- A memory with a tag at the end of every name. -/
+def XNet.tag (c : Nat) (X : XNet S) : XNet S :=
+  ⟨X.agents.map fun e => (e.1 ++ [c], e.2), X.free.map fun p => (p.1 ++ [c], p.2),
+    X.wires.map fun e => ((e.1.1 ++ [c], e.1.2), (e.2.1 ++ [c], e.2.2))⟩
+
+omit [DecidableEq S] in
+theorem XNet.tag_toNet (c : Nat) (X : XNet S) :
+    (X.tag c).toNet = X.toNet.map (fun i => i ++ [c]) := by
+  apply Net.ext'
+  · intro i γ
+    show (i, γ) ∈ X.agents.map (fun e => (e.1 ++ [c], e.2)) ↔
+      ∃ i', i = i' ++ [c] ∧ (i', γ) ∈ X.agents
+    rw [List.mem_map]
+    constructor
+    · rintro ⟨⟨i', γ'⟩, h, e⟩
+      injection e with e1 e2
+      have e2' : γ' = γ := e2
+      rw [e2'] at h
+      exact ⟨i', e1.symm, h⟩
+    · rintro ⟨i', rfl, h⟩
+      exact ⟨(i', γ), h, rfl⟩
+  · intro p q
+    show (p, q) ∈ X.wires.map (fun e => ((e.1.1 ++ [c], e.1.2), (e.2.1 ++ [c], e.2.2))) ↔
+      ∃ p' q', p = mapPort (fun i => i ++ [c]) p' ∧ q = mapPort (fun i => i ++ [c]) q' ∧
+        (p', q') ∈ X.wires
+    rw [List.mem_map]
+    constructor
+    · rintro ⟨⟨p', q'⟩, h, e⟩
+      injection e with e1 e2
+      exact ⟨p', q', e1.symm, e2.symm, h⟩
+    · rintro ⟨p', q', rfl, rfl, h⟩
+      exact ⟨(p', q'), h, rfl⟩
+  · intro p
+    show p ∈ X.free.map (fun p => (p.1 ++ [c], p.2)) ↔
+      ∃ p', p = mapPort (fun i => i ++ [c]) p' ∧ p' ∈ X.free
+    rw [List.mem_map]
+    constructor
+    · rintro ⟨p', h, e⟩
+      exact ⟨p', e.symm, h⟩
+    · rintro ⟨p', rfl, h⟩
+      exact ⟨p', h, rfl⟩
+
+/-- **Two nets side by side under tags come out right, whatever the
+threads do, in any system.**  Let two memories hold well-formed nets,
+each with a normal form, and let them be put side by side with different
+tags at the end of their names.  Then, with any number of threads and any
+schedule, a run that ends at rest has made as many claims as the two
+reductions have steps, and the memory holds the two normal forms side by
+side, each renamed: the names of the start carry the tag, and the names
+of the agents made on the way are whatever the renaming says. -/
+theorem XMach.tagged_rest (xs : XSys S) {X Y : XNet S} (hX : X.toNet.WF xs.sys.ar)
+    (hY : Y.toNet.WF xs.sys.ar) {c c' : Nat} (hc : c ≠ c') {n m : Nat}
+    (sA : Steps (Step xs.sys) n X.toNet A') (nA : Normal (Step xs.sys) A')
+    (sB : Steps (Step xs.sys) m Y.toNet B') (nB : Normal (Step xs.sys) B')
+    {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+    (hr : ((XMach.init ((X.tag c).union (Y.tag c')) nt).trace xs σ i).1.resting = true) :
+    ∃ g g', Renaming g A' ∧ Renaming g' B' ∧
+      (∀ j, X.toNet.Used j → g j = j ++ [c]) ∧ (∀ j, Y.toNet.Used j → g' j = j ++ [c']) ∧
+      ((XMach.init ((X.tag c).union (Y.tag c')) nt).trace xs σ i).2 = n + m ∧
+      ((XMach.init ((X.tag c).union (Y.tag c')) nt).trace xs σ i).1.mem.toNet =
+        (A'.map g).union (B'.map g') := by
+  have rX := Renaming.tag hX c
+  have rY := Renaming.tag hY c'
+  obtain ⟨g, hg, eg, sg⟩ := Steps.map hX rX sA
+  obtain ⟨g', hg', eg', sg'⟩ := Steps.map hY rY sB
+  have ng := (hg.normal (Steps.wf hX sA)).1 nA
+  have ng' := (hg'.normal (Steps.wf hY sB)).1 nB
+  have wX : (X.tag c).toNet.WF xs.sys.ar := by
+    rw [XNet.tag_toNet]
+    exact rX.wf_map hX
+  have wY : (Y.tag c').toNet.WF xs.sys.ar := by
+    rw [XNet.tag_toNet]
+    exact rY.wf_map hY
+  have ap : (X.tag c).toNet.Apart (Y.tag c').toNet := by
+    rw [XNet.tag_toNet, XNet.tag_toNet]
+    refine Net.Apart.of_tags hc (fun j hj => ?_) (fun j hj => ?_)
+    · obtain ⟨j', e, -⟩ := Net.used_map hj
+      exact ⟨j', e⟩
+    · obtain ⟨j', e, -⟩ := Net.used_map hj
+      exact ⟨j', e⟩
+  rw [← XNet.tag_toNet] at sg sg'
+  obtain ⟨h1, h2⟩ := XMach.union_rest xs wX wY ap sg ng sg' ng' hnt σ hr
+  exact ⟨g, g', hg, hg', eg, eg', h1, h2⟩
+
 end Machine
 
 end INet
