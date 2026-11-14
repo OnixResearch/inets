@@ -41,6 +41,7 @@ import InteractionNets.Arith.Lists
 import InteractionNets.Arith.ListsAtRest
 import InteractionNets.Arith.AnyNets
 import InteractionNets.Plug
+import InteractionNets.Arith.Compose
 import InteractionNets.LongRun
 import InteractionNets.Window
 import InteractionNets.Measure
@@ -1757,6 +1758,15 @@ Two threads.  A second thread can make the program slower.
                                 segments, in any system; the net stays
                                 well formed, and two wires that ended
                                 at joined ports are one wire
+* `INet.Arith.sum3_rest`, `INet.Arith.sum3_fair`,
+  `INet.Arith.sum3_normal`, `INet.Arith.add_add`
+                                one addition after another: the net for
+                                `(m + n) + k`, the result of the first
+                                adder wired to the second, with any
+                                number of threads and any schedule: a
+                                run that ends at rest has made `m + 1`
+                                and `m + n + 1` claims and has the
+                                numeral `m + n + k` on its free port
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -3055,7 +3065,19 @@ holds up to equality rather than up to renaming.
   finite matching of free ports (`Net.WF.plug`), and two wires that
   ended at joined ports are then one wire (`Net.Conn.plug`).  What a
   plugged net reduces to once its parts have met is not said by this:
-  new active pairs can form across the new segments.  For one
+  new active pairs can form across the new segments.  For addition it
+  is worked out in one case, the result of one adder wired to the first
+  argument of another.  The first net reduces inside the whole as it
+  does alone; its sum is then, across the new segment, the first
+  argument of the second adder, so the whole is a net that addition is
+  about and `Arith.add_correct` applies again (`Arith.add_add`).  The
+  nets `Arith.sum3 m n k` are built this way from the net for `m + n`
+  and an adder that waits for its first argument (`Arith.openSnd`,
+  `Arith.OpenAdd`), and they come out right for all `m`, `n`, `k`:
+  `(m + 1) + (m + n + 1)` claims and the numeral `m + n + k`, with any
+  number of threads and any schedule (`Arith.sum3_rest`,
+  `Arith.sum3_fair`).  Longer chains of additions, and an adder wired to
+  the second argument of another, are not done.  For one
   addition, the condition on the number of threads in
   `Arith.threads_exact` is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come

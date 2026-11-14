@@ -72,7 +72,7 @@ theorem Steps.plug {sys : System S} (J : Port → Port → Prop) {n : Nat}
 
 /-- When the new segments touch free ports only, the ends of the plugged
 net are the ends that no new segment touches. -/
-theorem Net.plug_end_iff {ar : S → Nat} (hU : U.WF ar) (hfree : ∀ {p q}, J p q → U.free p)
+theorem Net.plug_end_iff {ar : S → Nat} (hU : U.WF ar) (hfree : ∀ p q, J p q → U.free p)
     (p : Port) : (U.plug J).End ar p ↔ U.End ar p ∧ ¬ ∃ q, J p q := by
   constructor
   · intro h
@@ -80,24 +80,24 @@ theorem Net.plug_end_iff {ar : S → Nat} (hU : U.WF ar) (hfree : ∀ {p q}, J p
     rcases h with ⟨-, h2⟩ | ⟨γ, hγ, -⟩
     · exact h2
     · rintro ⟨q, hq⟩
-      exact hU.free_agent (i := p.1) (k := p.2) (hfree hq) hγ
+      exact hU.free_agent (i := p.1) (k := p.2) (hfree _ _ hq) hγ
   · rintro ⟨h, hp⟩
     exact Net.end_plug h hp
 
 /-- No new segment touches a port of an agent. -/
-theorem Net.WF.unplugged {ar : S → Nat} (hU : U.WF ar) (hfree : ∀ {p q}, J p q → U.free p)
+theorem Net.WF.unplugged {ar : S → Nat} (hU : U.WF ar) (hfree : ∀ p q, J p q → U.free p)
     {i : Id} {γ : S} (hi : U.agent i γ) (k : Nat) : ¬ ∃ r, J (i, k) r := by
   rintro ⟨r, hr⟩
-  exact hU.free_agent (hfree hr) hi
+  exact hU.free_agent (hfree _ _ hr) hi
 
 /-- **A well-formed net with free ports wired together is well formed**,
 when the new segments are finitely many, join free ports, and no port is
 on two of them. -/
 theorem Net.WF.plug {ar : S → Nat} (hU : U.WF ar)
     (hs : ∀ {p q}, J p q → J q p) (hi : ∀ {p}, ¬ J p p)
-    (hf : ∀ {p q r}, J p q → J p r → q = r) (hfree : ∀ {p q}, J p q → U.free p)
+    (hf : ∀ {p q r}, J p q → J p r → q = r) (hfree : ∀ p q, J p q → U.free p)
     (l : List Port) (hl : ∀ {p q}, J p q → p ∈ l) : (U.plug J).WF ar := by
-  have hT : ∀ {p q}, J p q → U.End ar p := fun h => .inl (hfree h)
+  have hT : ∀ {p q}, J p q → U.End ar p := fun h => .inl (hfree _ _ h)
   have hE := Net.plug_end_iff hU (J := J) hfree
   have W : Wiring (U.plug J).link ((U.plug J).End ar) :=
     (hU.wiring.add (M := J) hs hf hT).congr (fun _ _ => Iff.rfl) (fun p => (hE p).symm)
@@ -117,7 +117,7 @@ theorem Net.WF.plug {ar : S → Nat} (hU : U.WF ar)
     rcases hu with hu | ⟨k, q, hu | hu⟩ | ⟨k, hu⟩
     · exact .inl hu
     · exact .inr (.inl ⟨k, q, hu⟩)
-    · exact .inr (.inr ⟨k, hfree hu⟩)
+    · exact .inr (.inr ⟨k, hfree _ _ hu⟩)
     · obtain ⟨h1, -⟩ := hu
       exact .inr (.inr ⟨k, h1⟩)
 
@@ -131,13 +131,13 @@ theorem Net.Paired.plug {ar : S → Nat} {p q : Port} (h : U.Paired ar p q)
 
 /-- **Two wires that end at ports joined by a new segment are one
 wire.** -/
-theorem Net.Conn.plug {ar : S → Nat} (hU : U.WF ar) (hfree : ∀ {p q}, J p q → U.free p)
+theorem Net.Conn.plug {ar : S → Nat} (hU : U.WF ar) (hfree : ∀ p q, J p q → U.free p)
     {x p q y : Port} (hpq : J p q) (hqp : J q p) (hx : x ≠ q)
     (c₁ : U.Conn ar x p) (c₂ : U.Conn ar q y) : (U.plug J).Conn ar x y := by
   obtain ⟨z, u, w⟩ := c₁
   obtain ⟨z₂, u₂, w₂⟩ := c₂
   have hE := Net.plug_end_iff hU (J := J) hfree
-  exact Walk.splice hU.wiring (.inl (hfree hpq)) (.inl (hfree hqp)) (fun h => .inl h)
+  exact Walk.splice hU.wiring (.inl (hfree _ _ hpq)) (.inl (hfree _ _ hqp)) (fun h => .inl h)
     (fun h => Net.plug_end h) (fun h => ((hE p).1 h).2 ⟨q, hpq⟩)
     (fun h => ((hE q).1 h).2 ⟨p, hqp⟩) (.inr hpq) hx w w₂
 
