@@ -1273,6 +1273,18 @@ Two threads.  A second thread can make the program slower.
                                 size where no thread comes to that zero
                                 after `17 * m + 7` to `17 * m + 16`
                                 actions: 300 for three threads on `7 + 9`
+* `INet.Arith.third_quiet`, `INet.Arith.third_total`,
+  `INet.Arith.three_entry`      a third thread that only reads does not
+                                disturb two threads in turn: the run of
+                                the three is the run of the two with that
+                                thread beside it, and the work is theirs
+                                and its busy actions
+* `INet.Arith.three_threads_race_first`
+                                three threads in turn, the second in the
+                                race and the third past the zero of the
+                                first argument: the work is exactly
+                                `raceWork m n d` and `turnRest m n 1`
+                                (612 on `7 + 30`)
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -2122,8 +2134,18 @@ holds up to equality rather than up to renaming.
   every thread after the first only reads and rests after exactly
   `Arith.turnRest m n t` actions, its `t + 1` top successors costing one
   each, and the work is that of one thread and those actions (300 for
-  three threads on `7 + 9`, 580 for four on `6 + 31`).  Inside the race,
-  three threads or more have only the bound with the large constants.  The
+  three threads on `7 + 9`, 580 for four on `6 + 31`).  For three threads
+  the race is exact when the second thread is in it and the third is
+  already past that zero, `turnAt m n 1 ≤ 17 * m + 6`
+  (`Arith.three_threads_race_first`): the third thread has one action left
+  at most, which changes nothing, and the work is that of the race of two
+  threads and `turnRest m n 1` (612 on `7 + 30`).  When the third thread
+  is in the race the second comes to that zero three or four actions
+  later, in the middle of it; in the runs computed it reads on and the
+  work is `raceWork` for the third thread and eight more than
+  `turnAt m n 0`, one more still when the first thread keeps the pair,
+  but that is not proved.  With four threads or more inside the race only
+  the bound with the large constants is proved.  The
   condition on the number of threads is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
   to each after the round that takes it.  The agents the first thread has
@@ -48156,6 +48178,458 @@ example : (XMach.init (sum 6 31) 4).Total xsys (fun i => i % 4) 580 :=
   (threads_total 5 31 3 (by decide) (by decide) (fun t ht => by
     have h : t = 0 ∨ t = 1 ∨ t = 2 := by omega
     rcases h with rfl | rfl | rfl <;> decide)).cast (by decide)
+
+/-- A run of threads in turn, in two parts. -/
+theorem work_mod_add (c : Nat) (M : XMach Arith) (w j : Nat) :
+    M.work xsys (fun i => i % c) (c * w + j) = M.work xsys (fun i => i % c) (c * w) +
+      (M.trace xsys (fun i => i % c) (c * w)).1.work xsys (fun i => i % c) j := by
+  have h0 := XMach.work_add xsys (fun i => i % c) M (c * w) j
+  have e : (M.trace xsys (fun i => i % c) (c * w)).1.work xsys (fun k => (c * w + k) % c) j =
+      (M.trace xsys (fun i => i % c) (c * w)).1.work xsys (fun i => i % c) j :=
+    XMach.tally_congr XThread.busy xsys _ j fun k _ => Nat.mul_add_mod c w k
+  exact h0.trans (congrArg (M.work xsys (fun i => i % c) (c * w) + ·) e)
+
+/-- A run of three threads in turn, in two parts. -/
+theorem trace_triple_add (M : XMach Arith) (w w' : Nat) :
+    (M.trace xsys (fun i => i % 3) (3 * (w + w'))).1 =
+      ((M.trace xsys (fun i => i % 3) (3 * w)).1.trace xsys (fun i => i % 3) (3 * w')).1 := by
+  rw [Nat.mul_add, XMach.trace_add xsys (fun i => i % 3) M (3 * w) (3 * w')]
+  show ((M.trace xsys (fun i => i % 3) (3 * w)).1.trace xsys
+    (fun i => (3 * w + i) % 3) (3 * w')).1 = _
+  rw [XMach.trace_congr xsys _ (σ' := fun i => i % 3) (3 * w') fun j _ => by
+    show (3 * w + j) % 3 = j % 3
+    omega]
+
+/-- One action of each of two threads in turn, with the work. -/
+theorem sweep2_one {Y Y₁ Y₂ : XNet Arith} {a a' b b' : XThread Arith} {c₁ c₂ : Nat}
+    (a₁ : XMach.act xsys Y a = (Y₁, a', c₁)) (a₂ : XMach.act xsys Y₁ b = (Y₂, b', c₂)) :
+    ((⟨Y, [a, b]⟩ : XMach Arith).trace xsys (fun i => i % 2) (2 * 1)).1 = ⟨Y₂, [a', b']⟩ ∧
+      (⟨Y, [a, b]⟩ : XMach Arith).work xsys (fun i => i % 2) (2 * 1) = a.busy + b.busy := by
+  have e₁ : XMach.step xsys ⟨Y, [a, b]⟩ 0 = (⟨Y₁, [a', b]⟩, c₁) :=
+    XMach.step_eq (M := ⟨Y, [a, b]⟩) (t := 0) rfl a₁
+  refine ⟨XMach.trace_pair a₁ a₂, ?_⟩
+  show 0 + (⟨Y, [a, b]⟩ : XMach Arith).stepTally XThread.busy 0 +
+    (XMach.step xsys ⟨Y, [a, b]⟩ 0).1.stepTally XThread.busy 1 = _
+  rw [e₁]
+  show 0 + a.busy + b.busy = a.busy + b.busy
+  omega
+
+/-- One action of each of three threads in turn, with the work. -/
+theorem sweep3_one {Y Y₁ Y₂ Y₃ : XNet Arith} {a a' b b' q q' : XThread Arith}
+    {c₁ c₂ c₃ : Nat} (a₁ : XMach.act xsys Y a = (Y₁, a', c₁))
+    (a₂ : XMach.act xsys Y₁ b = (Y₂, b', c₂)) (a₃ : XMach.act xsys Y₂ q = (Y₃, q', c₃)) :
+    ((⟨Y, [a, b, q]⟩ : XMach Arith).trace xsys (fun i => i % 3) (3 * 1)).1 =
+        ⟨Y₃, [a', b', q']⟩ ∧
+      (⟨Y, [a, b, q]⟩ : XMach Arith).work xsys (fun i => i % 3) (3 * 1) =
+        a.busy + b.busy + q.busy := by
+  have e₁ : XMach.step xsys ⟨Y, [a, b, q]⟩ 0 = (⟨Y₁, [a', b, q]⟩, c₁) :=
+    XMach.step_eq (M := ⟨Y, [a, b, q]⟩) (t := 0) rfl a₁
+  have e₂ : XMach.step xsys ⟨Y₁, [a', b, q]⟩ 1 = (⟨Y₂, [a', b', q]⟩, c₂) :=
+    XMach.step_eq (M := ⟨Y₁, [a', b, q]⟩) (t := 1) rfl a₂
+  have e₃ : XMach.step xsys ⟨Y₂, [a', b', q]⟩ 2 = (⟨Y₃, [a', b', q']⟩, c₃) :=
+    XMach.step_eq (M := ⟨Y₂, [a', b', q]⟩) (t := 2) rfl a₃
+  constructor
+  · show (XMach.step xsys (XMach.step xsys (XMach.step xsys ⟨Y, [a, b, q]⟩ 0).1 1).1 2).1 = _
+    rw [e₁, e₂, e₃]
+  · show 0 + (⟨Y, [a, b, q]⟩ : XMach Arith).stepTally XThread.busy 0 +
+      (XMach.step xsys ⟨Y, [a, b, q]⟩ 0).1.stepTally XThread.busy 1 +
+      (XMach.step xsys (XMach.step xsys ⟨Y, [a, b, q]⟩ 0).1 1).1.stepTally XThread.busy 2 = _
+    rw [e₁, e₂]
+    show 0 + a.busy + b.busy + q.busy = a.busy + b.busy + q.busy
+    omega
+
+/-- **A third thread that only reads does not disturb two threads in
+turn.**  If its actions, each after an action of each of the two, leave the
+memory as it is and take it through the states `s`, the run of the three is
+the run of the two with that thread beside it, and its work is theirs and
+the busy actions of the third. -/
+theorem third_quiet {X : XNet Arith} {T0 T1 : XThread Arith} (s : Nat → XThread Arith)
+    (hs : ∀ w, XMach.act xsys
+        ((⟨X, [T0, T1]⟩ : XMach Arith).trace xsys (fun i => i % 2) (2 * (w + 1))).1.mem (s w) =
+      (((⟨X, [T0, T1]⟩ : XMach Arith).trace xsys (fun i => i % 2) (2 * (w + 1))).1.mem,
+        s (w + 1), 0)) :
+    ∀ w, ((⟨X, [T0, T1, s 0]⟩ : XMach Arith).trace xsys (fun i => i % 3) (3 * w)).1 =
+        ⟨((⟨X, [T0, T1]⟩ : XMach Arith).trace xsys (fun i => i % 2) (2 * w)).1.mem,
+          ((⟨X, [T0, T1]⟩ : XMach Arith).trace xsys (fun i => i % 2) (2 * w)).1.ths ++ [s w]⟩ ∧
+      (⟨X, [T0, T1, s 0]⟩ : XMach Arith).work xsys (fun i => i % 3) (3 * w) =
+        (⟨X, [T0, T1]⟩ : XMach Arith).work xsys (fun i => i % 2) (2 * w) +
+          seqTally XThread.busy s w
+  | 0 => ⟨rfl, rfl⟩
+  | w + 1 => by
+    obtain ⟨ih1, ih2⟩ := third_quiet s hs w
+    have hlen := XMach.trace_length xsys (fun i => i % 2) (⟨X, [T0, T1]⟩ : XMach Arith) (2 * w)
+    have p2 := XMach.trace_pair_add xsys (⟨X, [T0, T1]⟩ : XMach Arith) w 1
+    have hq := hs w
+    rw [p2] at hq
+    have w2' := work_mod_add 2 (⟨X, [T0, T1]⟩ : XMach Arith) w (2 * 1)
+    generalize hN : ((⟨X, [T0, T1]⟩ : XMach Arith).trace xsys (fun i => i % 2) (2 * w)).1 = N
+      at ih1 hlen p2 hq w2'
+    obtain ⟨Y, ths⟩ := N
+    have hlen' : ths.length = 2 := hlen
+    obtain ⟨a, b, rfl⟩ : ∃ a b, ths = [a, b] := by
+      match ths, hlen' with
+      | [a, b], _ => exact ⟨a, b, rfl⟩
+    obtain ⟨t2, w2⟩ := sweep2_one (Y := Y) (a := a) (b := b)
+      (Y₁ := (XMach.act xsys Y a).1) (a' := (XMach.act xsys Y a).2.1)
+      (c₁ := (XMach.act xsys Y a).2.2)
+      (Y₂ := (XMach.act xsys (XMach.act xsys Y a).1 b).1)
+      (b' := (XMach.act xsys (XMach.act xsys Y a).1 b).2.1)
+      (c₂ := (XMach.act xsys (XMach.act xsys Y a).1 b).2.2) rfl rfl
+    rw [t2] at hq p2
+    obtain ⟨t3, w3⟩ := sweep3_one (Y := Y) (a := a) (b := b) (q := s w)
+      (Y₁ := (XMach.act xsys Y a).1) (a' := (XMach.act xsys Y a).2.1)
+      (c₁ := (XMach.act xsys Y a).2.2)
+      (Y₂ := (XMach.act xsys (XMach.act xsys Y a).1 b).1)
+      (b' := (XMach.act xsys (XMach.act xsys Y a).1 b).2.1)
+      (c₂ := (XMach.act xsys (XMach.act xsys Y a).1 b).2.2) rfl rfl hq
+    have ih1' : ((⟨X, [T0, T1, s 0]⟩ : XMach Arith).trace xsys (fun i => i % 3) (3 * w)).1 =
+        ⟨Y, [a, b, s w]⟩ := ih1
+    have p3 := trace_triple_add (⟨X, [T0, T1, s 0]⟩ : XMach Arith) w 1
+    have w3' := work_mod_add 3 (⟨X, [T0, T1, s 0]⟩ : XMach Arith) w (3 * 1)
+    rw [ih1'] at p3 w3'
+    rw [w3] at w3'
+    rw [w2] at w2'
+    constructor
+    · rw [p3, p2]
+      exact t3
+    · rw [Nat.mul_add 3 w 1, Nat.mul_add 2 w 1, w3', w2', ih2]
+      show _ = _ + (seqTally XThread.busy s w + XThread.busy (s w))
+      omega
+
+/-- A thread, and then rest. -/
+def thenRest (T : XThread Arith) : Nat → XThread Arith
+  | 0 => T
+  | _ + 1 => ⟨[], .idle⟩
+
+theorem seqTally_thenRest (T : XThread Arith) :
+    ∀ w, seqTally XThread.busy (thenRest T) (w + 1) = T.busy
+  | 0 => Nat.zero_add _
+  | w + 1 => by
+    show seqTally XThread.busy (thenRest T) (w + 1) + XThread.busy ⟨[], .idle⟩ = T.busy
+    rw [seqTally_thenRest T w]
+    rfl
+
+/-- **A third thread that is at rest, or has one agent left that is gone
+for good, adds its one action at most to the work of the two others in
+turn.** -/
+theorem third_total {X : XNet Arith} {T0 T1 T2 : XThread Arith} {W : Nat}
+    (tot : (⟨X, [T0, T1]⟩ : XMach Arith).Total xsys (fun i => i % 2) W)
+    (h : T2 = ⟨[], .idle⟩ ∨ ∃ j γ, j ≠ 0 ∧ T2 = ⟨[([j], γ)], .idle⟩ ∧
+      assoc [j] X.agents = none ∧ T0.st.Clear [j] ∧ T1.st.Clear [j]) :
+    (⟨X, [T0, T1, T2]⟩ : XMach Arith).Total xsys (fun i => i % 3) (W + T2.busy) := by
+  have hstep : XMach.act xsys
+      ((⟨X, [T0, T1]⟩ : XMach Arith).trace xsys (fun i => i % 2) (2 * (0 + 1))).1.mem T2 =
+      (((⟨X, [T0, T1]⟩ : XMach Arith).trace xsys (fun i => i % 2) (2 * (0 + 1))).1.mem,
+        ⟨[], .idle⟩, 0) := by
+    rcases h with e | ⟨j, γ, hj, e, hg, c0, c1⟩
+    · rw [e]
+      rfl
+    · rw [e]
+      obtain ⟨t2, -⟩ := sweep2_one (Y := X) (a := T0) (b := T1)
+        (Y₁ := (XMach.act xsys X T0).1) (a' := (XMach.act xsys X T0).2.1)
+        (c₁ := (XMach.act xsys X T0).2.2)
+        (Y₂ := (XMach.act xsys (XMach.act xsys X T0).1 T1).1)
+        (b' := (XMach.act xsys (XMach.act xsys X T0).1 T1).2.1)
+        (c₂ := (XMach.act xsys (XMach.act xsys X T0).1 T1).2.2) rfl rfl
+      have t2' : ((⟨X, [T0, T1]⟩ : XMach Arith).trace xsys (fun i => i % 2) (2 * (0 + 1))).1 =
+          ⟨(XMach.act xsys (XMach.act xsys X T0).1 T1).1,
+            [(XMach.act xsys X T0).2.1, (XMach.act xsys (XMach.act xsys X T0).1 T1).2.1]⟩ := t2
+      rw [t2']
+      have g1 := XMach.act_gone (xs := xsys) (x := [j])
+        (fun hR he => single_ne_new hj (new_head hR he)) hg c0
+      have g2 := XMach.act_gone (xs := xsys) (x := [j])
+        (fun hR he => single_ne_new hj (new_head hR he)) g1.1 c1
+      exact XMach.act_idle_neg (e := ([j], γ)) fun h' => by
+        have h'' : assoc [j] (XMach.act xsys (XMach.act xsys X T0).1 T1).1.agents = some γ := h'
+        rw [g2.1] at h''
+        cases h''
+  have hs : ∀ w, XMach.act xsys
+      ((⟨X, [T0, T1]⟩ : XMach Arith).trace xsys (fun i => i % 2) (2 * (w + 1))).1.mem
+        (thenRest T2 w) =
+      (((⟨X, [T0, T1]⟩ : XMach Arith).trace xsys (fun i => i % 2) (2 * (w + 1))).1.mem,
+        thenRest T2 (w + 1), 0)
+    | 0 => hstep
+    | _ + 1 => rfl
+  have q := third_quiet (thenRest T2) hs
+  obtain ⟨N, hN⟩ := tot
+  refine ⟨3 * (N + 1), fun i hi => ?_⟩
+  obtain ⟨v, hv⟩ : ∃ v, i / 3 = v + 1 := ⟨i / 3 - 1, by omega⟩
+  have q1 : (⟨X, [T0, T1, T2]⟩ : XMach Arith).work xsys (fun i => i % 3) (3 * (v + 1)) =
+      (⟨X, [T0, T1]⟩ : XMach Arith).work xsys (fun i => i % 2) (2 * (v + 1)) +
+        seqTally XThread.busy (thenRest T2) (v + 1) := (q (v + 1)).2
+  have q2 : (⟨X, [T0, T1, T2]⟩ : XMach Arith).work xsys (fun i => i % 3) (3 * (v + 1 + 1)) =
+      (⟨X, [T0, T1]⟩ : XMach Arith).work xsys (fun i => i % 2) (2 * (v + 1 + 1)) +
+        seqTally XThread.busy (thenRest T2) (v + 1 + 1) := (q (v + 1 + 1)).2
+  rw [seqTally_thenRest, hN _ (by omega)] at q1 q2
+  have lo := XMach.work_mono (xs := xsys) (fun i => i % 3) (⟨X, [T0, T1, T2]⟩ : XMach Arith)
+    (show 3 * (v + 1) ≤ i by omega)
+  have up := XMach.work_mono (xs := xsys) (fun i => i % 3) (⟨X, [T0, T1, T2]⟩ : XMach Arith)
+    (show i ≤ 3 * (v + 1 + 1) by omega)
+  omega
+
+/-- A thread running alone that is not at rest was not at rest before. -/
+theorem solo_busy_before {X : XNet Arith} {T : XThread Arith} {E : Nat}
+    (h : (XMach.solo xsys X T E).2 ≠ ⟨[], .idle⟩) :
+    ∀ j, j < E → (XMach.solo xsys X T j).2 ≠ ⟨[], .idle⟩ := by
+  intro j hj e
+  apply h
+  obtain ⟨d, rfl⟩ : ∃ d, E = j + d := ⟨E - j, by omega⟩
+  have h1 := XMach.solo_add xsys j X T d
+  rw [e, XMach.solo_rest] at h1
+  exact congrArg Prod.snd h1
+
+/-- Nor was a thread beside the first. -/
+theorem reader_busy_upto {X : XNet Arith} {F0 T0 : XThread Arith} {b : Nat}
+    (h : XMach.reader xsys X F0 T0 b ≠ ⟨[], .idle⟩) :
+    ∀ a, a ≤ b → XMach.reader xsys X F0 T0 a ≠ ⟨[], .idle⟩ := by
+  intro a ha e
+  have h' := reader_rest e (b - a)
+  rw [show a + (b - a) = b by omega] at h'
+  exact h h'
+
+theorem seqTally_full {κ : XThread Arith → Nat} {R : Nat → XThread Arith} :
+    ∀ a, (∀ j, j < a → κ (R j) = 1) → seqTally κ R a = a
+  | 0, _ => rfl
+  | a + 1, h => by
+    show seqTally κ R a + κ (R a) = a + 1
+    rw [seqTally_full a (fun j hj => h j (by omega)), h a (Nat.lt_succ_self a)]
+
+/-- **Three threads in turn while the second and the third only read**:
+after each has acted `E` times the memory and the first thread are those of
+one thread alone, the others are where their own actions took them, and
+every action so far was work if none of the three was at rest before. -/
+theorem three_entry {m n : Nat} {T1 T2 S1 S2 : XThread Arith} {E : Nat}
+    (h1 : RdAt m n T1 E S1) (h2 : RdAt m n T2 E S2)
+    (hb0 : (XMach.solo xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ E).2 ≠ ⟨[], .idle⟩)
+    (hb1 : ∀ a, a < E → XMach.reader xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ T1 a ≠ ⟨[], .idle⟩)
+    (hb2 : ∀ a, a < E → XMach.reader xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ T2 a ≠ ⟨[], .idle⟩) :
+    ((⟨sum (m + 1) n, [⟨(sum (m + 1) n).agents, .idle⟩, T1, T2]⟩ : XMach Arith).trace xsys
+        (fun i => i % 3) (3 * E)).1 = ⟨(XMach.solo xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ E).1, [(XMach.solo xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ E).2, S1, S2]⟩ ∧
+      (⟨sum (m + 1) n, [⟨(sum (m + 1) n).agents, .idle⟩, T1, T2]⟩ : XMach Arith).work xsys
+        (fun i => i % 3) (3 * E) = 3 * E := by
+  have hall : ∀ T, T ∈ [T1, T2] → ∀ a, a < E →
+      (XMach.act xsys (XMach.solo xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ (a + 1)).1 (XMach.reader xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ T a)).1 = (XMach.solo xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ (a + 1)).1 ∧
+      (XMach.act xsys (XMach.solo xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ (a + 1)).1 (XMach.reader xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ T a)).2.2 = 0 := by
+    intro T hT a ha
+    rcases List.mem_cons.1 hT with e | hT
+    · rw [e]
+      exact h1.2 a ha
+    · rcases List.mem_cons.1 hT with e | hT
+      · rw [e]
+        exact h2.2 a ha
+      · cases hT
+  have tr := XMach.trace_readers (xs := xsys) (X := sum (m + 1) n)
+    (T₀ := ⟨(sum (m + 1) n).agents, .idle⟩) (Ts := [T1, T2]) (A := E) hall E (Nat.le_refl _)
+  have ht := XMach.tally_readers XThread.busy (xs := xsys) (X := sum (m + 1) n)
+    (T₀ := ⟨(sum (m + 1) n).agents, .idle⟩) (Ts := [T1, T2]) (A := E) hall E (Nat.le_refl _)
+  constructor
+  · have e' : ((⟨sum (m + 1) n, [⟨(sum (m + 1) n).agents, .idle⟩, T1, T2]⟩ :
+        XMach Arith).trace xsys (fun i => i % 3) (3 * E)).1 =
+        ⟨(XMach.solo xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ E).1, [(XMach.solo xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ E).2, XMach.reader xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ T1 E, XMach.reader xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ T2 E]⟩ := congrArg Prod.fst tr
+    rw [h1.1, h2.1] at e'
+    exact e'
+  · have ht' : (⟨sum (m + 1) n, [⟨(sum (m + 1) n).agents, .idle⟩, T1, T2]⟩ :
+        XMach Arith).tally XThread.busy xsys (fun i => i % 3) (3 * E) =
+        seqTally XThread.busy (fun j => (XMach.solo xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ j).2) E +
+          (seqTally XThread.busy (XMach.reader xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ T1) E + (seqTally XThread.busy (XMach.reader xsys (sum (m + 1) (n)) ⟨(sum (m + 1) (n)).agents, .idle⟩ T2) E + 0)) := ht
+    show (⟨sum (m + 1) n, [⟨(sum (m + 1) n).agents, .idle⟩, T1, T2]⟩ :
+      XMach Arith).tally XThread.busy xsys (fun i => i % 3) (3 * E) = 3 * E
+    rw [ht', seqTally_full E (fun j hj => XThread.busy_of_ne_rest (solo_busy_before hb0 j hj)),
+      seqTally_full E (fun j hj => XThread.busy_of_ne_rest (hb1 j hj)),
+      seqTally_full E (fun j hj => XThread.busy_of_ne_rest (hb2 j hj))]
+    omega
+
+/-- The work of a run of three threads in turn, from a later state on. -/
+theorem total_after3 {M M' : XMach Arith} {E W : Nat}
+    (h : (M.trace xsys (fun i => i % 3) (3 * E)).1 = M')
+    (hw : M.work xsys (fun i => i % 3) (3 * E) = 3 * E)
+    (tot : M'.Total xsys (fun i => i % 3) W) : M.Total xsys (fun i => i % 3) (3 * E + W) := by
+  subst h
+  obtain ⟨N, hN⟩ := tot
+  refine ⟨3 * E + N, fun i hi => ?_⟩
+  obtain ⟨k, rfl⟩ : ∃ k, i = 3 * E + k := ⟨i - 3 * E, by omega⟩
+  rw [work_mod_add 3 M E k, hw, hN k (by omega)]
+
+/-- The top successors at the end of a list, down to the last. -/
+theorem RdAt.tops_last {m n r : Nat} {T0 : XThread Arith} :
+    ∀ (s a : Nat), r + s ≤ m → 17 * (m - r) + 4 ≤ a →
+      RdAt m n T0 a ⟨(chainL n (r + (s + 1))).take (s + 1), .idle⟩ →
+      RdAt m n T0 (a + s) ⟨[([n + 3 + r + 1], .succ)], .idle⟩
+  | 0, _, _, _, h => h
+  | s + 1, a, hs, ha, h => by
+    have h' : RdAt m n T0 a
+        ⟨([n + 3 + (r + (s + 1)) + 1], .succ) :: (chainL n (r + (s + 1))).take (s + 1),
+          .idle⟩ := h
+    have h1 := h'.gone (solo_gone_top m n (by omega) (by omega))
+    exact (RdAt.tops_last s (a + 1) (by omega) (by omega) h1).cast (by omega)
+
+/-- **The thread numbered `t + 1` is ready to take the zero of the first
+argument four actions after it comes to it**, when it comes to it after
+`17 * m + 7` actions at least and `17 * m + 16` at most. -/
+theorem turn_reader_ready (m n' t K : Nat) (ht : t + 2 ≤ m)
+    (hK1 : 16 * K + 5 ≤ 3 * (m - t)) (hK2 : 3 * (m - t) < 16 * K + 21)
+    (h1 : 17 * m + 7 ≤ 3 * (m - t) + 3 * n' + 5 + K) (h2 : 3 * (m - t) + 3 * n' + 5 + K ≤ 17 * m + 16) :
+    RdAt m (n' + 1) ⟨chainL (n' + 1) (m - t) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - t + (t + 1))).take (t + 1)))), .idle⟩
+      (3 * (m - t) + 3 * n' + 5 + K + 4)
+      ⟨([3], .zero) :: (chainL (n' + 1) (m - t + (t + 1))).take (t + 1), .ready [2] [0, n' + 1 + 4] .zero .add⟩ := by
+  have h := turn_reader_at_zero m n' t K ht hK1 hK2
+  have hal := solo_alive_zero m (n' + 1) (j := 2) (u := 3 * (m - t) + 3 * n' + 5 + K + 1) (by omega) (by omega)
+    (by omega) (sum_zero_agent m (n' + 1))
+  have s1 := h.step (XMach.act_idle_pos (e := ([2], Arith.zero)) hal)
+  have s2 := s1.step (XMach.act_look (solo_look_two m (n' + 1) _))
+  have s3 := s2.step (XMach.act_seek_next (seek_aux_none _ _ 1 (by decide))
+    ((solo_seek_two m (n' + 1) (by omega) _).1 (by omega)))
+  have hA := solo_adder_alive m (n' + 1) (by omega) (u := 3 * (m - t) + 3 * n' + 5 + K + 1 + 1 + 1 + 1) (by omega)
+    (by omega)
+  exact s3.step (XMach.act_seek_found (c := ([0, n' + 1 + 4], 0)) ((ite_pos' rfl).trans hA)
+    ⟨by ports_differ, rfl⟩)
+
+/-- The two threads of the race at its first four moments: the first as
+one thread alone, with what the two do from there in all. -/
+theorem race_entry_total (m' n' d : Nat) (hd : d ≤ 3) (l : List (Id × Arith)) (x : Id) :
+    ∃ X T W, XMach.solo xsys (sum (m' + 1 + 1) (n' + 1)) ⟨(sum (m' + 1 + 1) (n' + 1)).agents, .idle⟩ (17 * (m' + 1) + 11 + d) = (X, T) ∧ T ≠ ⟨[], .idle⟩ ∧ T.st.Clear x ∧
+      (⟨X, [T, ⟨l, .ready [2] [0, n' + 1 + 4] .zero .add⟩]⟩ : XMach Arith).Total xsys
+        (fun i => i % 2) W ∧
+      2 * (17 * (m' + 1) + 11 + d) + W = raceWork (m' + 1) (n' + 1) d := by
+  obtain ⟨V, todo, rest, p5, q5, p6, q6, p7, q7, p8, q8, B, s11, s12, s13, s14, -⟩ :=
+    race_write (m' + 1) (n' + 1) (by omega)
+  have hd' : d = 0 ∨ d = 1 ∨ d = 2 ∨ d = 3 := by omega
+  rcases hd' with rfl | rfl | rfl | rfl
+  · exact ⟨_, _, _, solo_at s11 (by omega), (fun h => by
+      injection h with _ h2
+      cases h2), (fun e he => by cases he), (race_d0 B todo l).total, by
+      show _ = 44 * (m' + 1) + 6 * (n' + 1) + 52
+      omega⟩
+  · exact ⟨_, _, _, solo_at s12 (by omega), (fun h => by
+      injection h with _ h2
+      cases h2), (fun e he => by cases he), (race_d1 B todo l).total, by
+      show _ = 44 * (m' + 1) + 6 * (n' + 1) + 53
+      omega⟩
+  · exact ⟨_, _, _, solo_at s13 (by omega), (fun h => by
+      injection h with _ h2
+      cases h2), (fun e he => by cases he), (race_d2 B todo l).total, by
+      show _ = 44 * (m' + 1) + 6 * (n' + 1) + 54
+      omega⟩
+  · exact ⟨_, _, _, solo_at s14 (by omega), (fun h => by
+      injection h with _ h2
+      cases h2), (fun e he => by cases he), (race_d3 B todo l).total, by
+      show _ = 44 * (m' + 1) + 6 * (n' + 1) + 56
+      omega⟩
+
+/-- **Three threads in turn, the second in the race and the third already
+past the zero of the first argument, to the action.**  On the net for
+`(m + 1) + n`, with `m` from four on: when the second thread comes to that
+zero at one of the ten moments of the race and the third has passed it
+before the segment to the last adder was written, the third thread only
+reads, and the work of the whole run is exactly that of the race of two
+threads and the actions of the third before it rests. -/
+theorem three_threads_race_first (m n : Nat) (hm : 4 ≤ m)
+    (h1 : 17 * m + 7 ≤ turnAt m n 0) (h2 : turnAt m n 1 ≤ 17 * m + 6) :
+    (XMach.init (sum (m + 1) n) 3).Total xsys (fun i => i % 3)
+      (raceWork m n (turnAt m n 0 - (17 * m + 7)) + turnRest m n 1) := by
+  obtain ⟨n', rfl⟩ : ∃ n', n = n' + 1 := ⟨n - 1, by
+    unfold turnAt at h1
+    omega⟩
+  obtain ⟨m', rfl⟩ : ∃ m', m = m' + 1 := ⟨m - 1, by omega⟩
+  obtain ⟨K1, hK1⟩ : ∃ K, (3 * (m' + 1 - 0) + 11) / 16 = K + 1 :=
+    ⟨(3 * (m' + 1 - 0) + 11) / 16 - 1, by omega⟩
+  obtain ⟨K2, hK2⟩ : ∃ K, (3 * (m' + 1 - 1) + 11) / 16 = K + 1 :=
+    ⟨(3 * (m' + 1 - 1) + 11) / 16 - 1, by omega⟩
+  have eA1 : turnAt (m' + 1) (n' + 1) 0 = 3 * (m' + 1 - 0) + 3 * n' + 5 + K1 := by
+    unfold turnAt
+    omega
+  have eA2 : turnAt (m' + 1) (n' + 1) 1 = 3 * (m' + 1 - 1) + 3 * n' + 5 + K2 := by
+    unfold turnAt
+    omega
+  have hrest : turnRest (m' + 1) (n' + 1) 1 = turnAt (m' + 1) (n' + 1) 1 +
+      zeroCost (m' + 1) (turnAt (m' + 1) (n' + 1) 1) + 3 + (1 + 1) := rfl
+  have ez : zeroCost (m' + 1) (turnAt (m' + 1) (n' + 1) 1) = 3 := by
+    rw [eA2] at h2 ⊢
+    unfold zeroCost
+    exact ite_pos' h2
+  rw [eA1] at h1
+  rw [eA2] at h2
+  obtain ⟨d, hd⟩ : ∃ d, 3 * (m' + 1 - 0) + 3 * n' + 5 + K1 = 17 * (m' + 1) + 7 + d :=
+    ⟨3 * (m' + 1 - 0) + 3 * n' + 5 + K1 - (17 * (m' + 1) + 7), by omega⟩
+  have e0 : turnAt (m' + 1) (n' + 1) 0 - (17 * (m' + 1) + 7) = d := by omega
+  rw [e0]
+  have r1 := turn_reader_ready (m' + 1) n' 0 K1 (by omega) (by omega) (by omega) (by omega)
+    (by omega)
+  have q0 := turn_reader_at_zero (m' + 1) n' 1 K2 (by omega) (by omega) (by omega)
+  have hal := solo_alive_zero (m' + 1) (n' + 1) (j := 2) (u := 3 * (m' + 1 - 1) + 3 * n' + 5 + K2 + 1) (by omega) (by omega)
+    (by omega) (sum_zero_agent (m' + 1) (n' + 1))
+  have q1 := q0.pass3 hal (solo_look_two (m' + 1) (n' + 1) _) (show ¬ (1 : Nat) = 0 by decide)
+    ((solo_seek_two (m' + 1) (n' + 1) (by omega) _).2 (by omega))
+  have hx3 : assoc [3] (sum (m' + 1 + 1) (n' + 1)).agents = some Arith.zero :=
+    sum_assoc_base (m' + 1) (n' + 1) (e := ([3], Arith.zero))
+      (List.mem_append_right _
+        (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self)))
+  have q2 := q1.pass3 (solo_snd_forever (m' + 1) (n' + 1) (j := 3) (by omega) (by omega) hx3 _)
+    (solo_look_snd (m' + 1) (n' + 1) (j := 3) (by omega) (by omega) _).1
+    (show ¬ (1 : Nat) = 0 by decide)
+    (solo_look_snd (m' + 1) (n' + 1) (j := 3) (by omega) (by omega) _).2
+  have q3 := RdAt.tops_last (r := m' + 1 - 1) 1 (3 * (m' + 1 - 1) + 3 * n' + 5 + K2 + 3 + 3) (by omega) (by omega) q2
+  have q4 := q3.gone (solo_gone_top (m' + 1) (n' + 1) (q := m' + 1 - 1) (by omega) (by omega))
+  obtain ⟨X, T, W, hs, hT, hc, tot2, hW⟩ := race_entry_total m' n' d (by omega)
+    (([3], .zero) :: (chainL (n' + 1) (m' + 1 - 0 + (0 + 1))).take (0 + 1)) [n' + 1 + 3 + (m' + 1 - 1) + 1]
+  have hinit : XMach.init (sum (m' + 1 + 1) (n' + 1)) 3 = ⟨sum (m' + 1 + 1) (n' + 1), [⟨(sum (m' + 1 + 1) (n' + 1)).agents, .idle⟩,
+      ⟨chainL (n' + 1) (m' + 1 - 0) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m' + 1 - 0 + (0 + 1))).take (0 + 1)))), .idle⟩,
+      ⟨chainL (n' + 1) (m' + 1 - 1) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m' + 1 - 1 + (1 + 1))).take (1 + 1)))), .idle⟩]⟩ :=
+    (XMach.init_succ (sum (m' + 1 + 1) (n' + 1)) 2).trans (by
+      rw [← turn_list_succ (m' + 1) n' 0 (by omega), ← turn_list_succ (m' + 1) n' 1 (by omega)]
+      rfl)
+  rw [hinit]
+  have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (n' + 1)) ⟨(sum (m' + 1 + 1) (n' + 1)).agents, .idle⟩ (17 * (m' + 1) + 11 + d)).2 ≠ ⟨[], .idle⟩ := by
+    rw [hs]
+    exact hT
+  have r1' := r1.cast (show 3 * (m' + 1 - 0) + 3 * n' + 5 + K1 + 4 = 17 * (m' + 1) + 11 + d by omega)
+  have hb1 := reader_busy_upto (X := sum (m' + 1 + 1) (n' + 1)) (F0 := ⟨(sum (m' + 1 + 1) (n' + 1)).agents, .idle⟩) (b := 17 * (m' + 1) + 11 + d)
+    (T0 := ⟨chainL (n' + 1) (m' + 1 - 0) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m' + 1 - 0 + (0 + 1))).take (0 + 1)))), .idle⟩) (fun e => by
+      rw [r1'.1] at e
+      injection e with _ e2
+      cases e2)
+  have hK : K1 = K2 ∨ K1 = K2 + 1 := by omega
+  rcases hK with hK | hK
+  · have q3' := q3.cast (show 3 * (m' + 1 - 1) + 3 * n' + 5 + K2 + 3 + 3 + 1 = 17 * (m' + 1) + 11 + d by omega)
+    have hb2 := reader_busy_upto (X := sum (m' + 1 + 1) (n' + 1)) (F0 := ⟨(sum (m' + 1 + 1) (n' + 1)).agents, .idle⟩) (b := 17 * (m' + 1) + 11 + d)
+      (T0 := ⟨chainL (n' + 1) (m' + 1 - 1) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m' + 1 - 1 + (1 + 1))).take (1 + 1)))), .idle⟩) (fun e => by
+        rw [q3'.1] at e
+        cases e)
+    obtain ⟨tr, wk⟩ := three_entry r1' q3' hb0 (fun a ha => hb1 a (by omega))
+      (fun a ha => hb2 a (by omega))
+    rw [hs] at tr
+    have hg := solo_gone_top (m' + 1) (n' + 1) (q := m' + 1 - 1) (u := 17 * (m' + 1) + 11 + d)
+      (by omega) (by omega)
+    rw [hs] at hg
+    have t3 := third_total tot2 (T2 := ⟨[([n' + 1 + 3 + (m' + 1 - 1) + 1], .succ)], .idle⟩)
+      (.inr ⟨_, _, by omega, rfl, hg, hc, trivial⟩)
+    have b1 : (⟨[([n' + 1 + 3 + (m' + 1 - 1) + 1], Arith.succ)], .idle⟩ : XThread Arith).busy = 1 := rfl
+    exact (total_after3 tr wk t3).cast (by omega)
+  · have q4' := q4.cast (show 3 * (m' + 1 - 1) + 3 * n' + 5 + K2 + 3 + 3 + 1 + 1 = 17 * (m' + 1) + 11 + d by omega)
+    have hb2 : ∀ a, a < 17 * (m' + 1) + 11 + d →
+        XMach.reader xsys (sum (m' + 1 + 1) (n' + 1)) ⟨(sum (m' + 1 + 1) (n' + 1)).agents, .idle⟩ ⟨chainL (n' + 1) (m' + 1 - 1) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m' + 1 - 1 + (1 + 1))).take (1 + 1)))), .idle⟩ a ≠ ⟨[], .idle⟩ := fun a ha =>
+      reader_busy_upto (X := sum (m' + 1 + 1) (n' + 1)) (F0 := ⟨(sum (m' + 1 + 1) (n' + 1)).agents, .idle⟩) (b := 3 * (m' + 1 - 1) + 3 * n' + 5 + K2 + 3 + 3 + 1)
+        (T0 := ⟨chainL (n' + 1) (m' + 1 - 1) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m' + 1 - 1 + (1 + 1))).take (1 + 1)))), .idle⟩) (fun e => by
+          rw [q3.1] at e
+          cases e) a (by omega)
+    obtain ⟨tr, wk⟩ := three_entry r1' q4' hb0 (fun a ha => hb1 a (by omega)) hb2
+    rw [hs] at tr
+    have t3 := third_total tot2 (T2 := ⟨[], .idle⟩) (.inl rfl)
+    have b0 : (⟨[], .idle⟩ : XThread Arith).busy = 0 := rfl
+    exact (total_after3 tr wk t3).cast (by omega)
+
+example : (XMach.init (sum 7 30) 3).Total xsys (fun i => i % 3) 612 :=
+  (three_threads_race_first 6 30 (by decide) (by decide) (by decide)).cast (by decide)
+
+example : (XMach.init (sum 8 35) 3).Total xsys (fun i => i % 3) 707 :=
+  (three_threads_race_first 7 35 (by decide) (by decide) (by decide)).cast (by decide)
 
 end Arith
 
