@@ -42,6 +42,7 @@ import InteractionNets.Arith.ListsAtRest
 import InteractionNets.Arith.AnyNets
 import InteractionNets.Plug
 import InteractionNets.Arith.Compose
+import InteractionNets.Arith.Expr
 import InteractionNets.LongRun
 import InteractionNets.Window
 import InteractionNets.Measure
@@ -1767,6 +1768,16 @@ Two threads.  A second thread can make the program slower.
                                 run that ends at rest has made `m + 1`
                                 and `m + n + 1` claims and has the
                                 numeral `m + n + k` on its free port
+* `INet.Arith.Expr.rest`, `INet.Arith.Expr.fair`,
+  `INet.Arith.Expr.good`, `INet.Arith.add_evals`, `INet.Net.Made.wf`
+                                every expression built from numerals
+                                and additions has a net; with any
+                                number of threads and any schedule a
+                                run on it that ends at rest has made,
+                                for each addition, one more claim than
+                                the value of its first argument, and
+                                has the numeral of the value of the
+                                expression on its free port
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -3076,8 +3087,23 @@ holds up to equality rather than up to renaming.
   `Arith.OpenAdd`), and they come out right for all `m`, `n`, `k`:
   `(m + 1) + (m + n + 1)` claims and the numeral `m + n + k`, with any
   number of threads and any schedule (`Arith.sum3_rest`,
-  `Arith.sum3_fair`).  Longer chains of additions, and an adder wired to
-  the second argument of another, are not done.  For one
+  `Arith.sum3_fair`).  The same works with both arguments computed: an
+  adder that waits for both (`Arith.Open2`) is wired to two nets that
+  each compute a number on a free port (`Arith.Evals`), and the whole
+  computes the sum on the free port of the adder (`Arith.add_evals`).
+  The conclusion has the shape of the hypotheses, so it gives every
+  expression built from numerals and additions (`Arith.Expr`): its net
+  (`Arith.Expr.net`) is well formed and computes its value, in one more
+  interaction per addition than the value of the first argument
+  (`Arith.Expr.good`).  So with any number of threads and any schedule
+  a run that ends at rest has made that many claims and has the numeral
+  of the value on the free port, and a fair run comes to rest
+  (`Arith.Expr.rest`, `Arith.Expr.fair`).  The nets of expressions are
+  not compact, a wire between two nets having three segments; that they
+  are well formed comes from `Net.Made.wf` and `Net.WF.plug`, not from
+  the validator, and the results about the list reducers, which ask for
+  compact nets, do not apply to them.  Only the claims are counted;
+  nothing is said about how many actions the threads take.  For one
   addition, the condition on the number of threads in
   `Arith.threads_exact` is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
