@@ -398,17 +398,18 @@ theorem pass_all {M : XNet Arith} : ∀ (F : List (Nat × XNet Arith)) (r : List
     rw [← List.append_assoc] at s
     exact s
 
-/-- **Any number of nets side by side reduce as each does alone.**  Let
-one thread alone bring each net to rest, and let a new pass over what it
-leaves only read.  Then the nets side by side, under different tags,
-reduce, in as many steps as the runs have claims, to a normal form that
-holds under each tag what the run on that net leaves. -/
-theorem besides_normal (P : List Part) (hT : ((partNets P).map Prod.fst).Nodup)
+/-- **What any number of nets side by side reduce to.**  Let one thread
+alone bring each net to rest, and let a new pass over what it leaves
+only read.  Then the nets side by side, under different tags, reduce, in
+as many steps as the runs have claims, to a normal form: a memory that
+holds what each run leaves, with the free ports of the start. -/
+theorem besides_holds (P : List Part) (hT : ((partNets P).map Prod.fst).Nodup)
     (hY : (besides (partNets P)).toNet.WF ar)
     (hR : ∀ p, p ∈ P → p.Runs) (hS : ∀ p, p ∈ P → p.Reads) :
     ∃ Z : XNet Arith,
       Steps (Step system) (claimsOf P) (besides (partNets P)).toNet Z.toNet ∧
-        Normal (Step system) Z.toNet ∧ ∀ p, p ∈ P → Within p.tag p.left Z := by
+        Normal (Step system) Z.toNet ∧ Holds (partLefts P) Z ∧
+        Z.free = (besides (partNets P)).free := by
   have h0 : Holds (partNets P ++ []) (besides (partNets P)) := by
     rw [List.append_nil]
     exact holds_besides hT
@@ -424,14 +425,33 @@ theorem besides_normal (P : List Part) (hT : ((partNets P).map Prod.fst).Nodup)
     have q := sK.works
     rw [List.append_nil, ← h'.agents] at q
     exact q
-  have n := works_normal (Steps.wf hY s) W
-  refine ⟨M, s, n, fun p hp => ?_⟩
-  obtain ⟨k, w⟩ := hR p hp
+  exact ⟨M, s, works_normal (Steps.wf hY s) W, h', f⟩
+
+/-- What the run on one of the nets leaves is within such a memory. -/
+theorem Holds.within_left {P : List Part} {Z : XNet Arith}
+    (hT : ((partNets P).map Prod.fst).Nodup) (h : Holds (partLefts P) Z)
+    (f : Z.free = (besides (partNets P)).free) {p : Part} (hp : p ∈ P) (hr : p.Runs) :
+    Within p.tag p.left Z := by
+  obtain ⟨k, w⟩ := hr
   have hm : (p.tag, p.left) ∈ partLefts P := List.mem_map.2 ⟨p, hp, rfl⟩
   have hmn : (p.tag, p.net) ∈ partNets P := List.mem_map.2 ⟨p, hp, rfl⟩
-  refine (h'.looks hm).within rfl (fun _ => Iff.rfl) (fun q => ?_)
+  refine (h.looks hm).within rfl (fun _ => Iff.rfl) (fun q => ?_)
   rw [f, works_free w]
   exact mem_flatF_tag hT hmn q
+
+/-- **Any number of nets side by side reduce as each does alone.**  Let
+one thread alone bring each net to rest, and let a new pass over what it
+leaves only read.  Then the nets side by side, under different tags,
+reduce, in as many steps as the runs have claims, to a normal form that
+holds under each tag what the run on that net leaves. -/
+theorem besides_normal (P : List Part) (hT : ((partNets P).map Prod.fst).Nodup)
+    (hY : (besides (partNets P)).toNet.WF ar)
+    (hR : ∀ p, p ∈ P → p.Runs) (hS : ∀ p, p ∈ P → p.Reads) :
+    ∃ Z : XNet Arith,
+      Steps (Step system) (claimsOf P) (besides (partNets P)).toNet Z.toNet ∧
+        Normal (Step system) Z.toNet ∧ ∀ p, p ∈ P → Within p.tag p.left Z := by
+  obtain ⟨Z, s, n, h, f⟩ := besides_holds P hT hY hR hS
+  exact ⟨Z, s, n, fun p hp => h.within_left hT f hp (hR p hp)⟩
 
 /-- A list of additions with their places as tags, from the tag `t` on. -/
 def sumsFrom : Nat → List (Nat × Nat) → List (Nat × XNet Arith)

@@ -38,6 +38,7 @@ import InteractionNets.Arith.Late
 import InteractionNets.Arith.Census
 import InteractionNets.Arith.AtRest
 import InteractionNets.Arith.Lists
+import InteractionNets.Arith.ListsAtRest
 import InteractionNets.LongRun
 import InteractionNets.Window
 import InteractionNets.Measure
@@ -1726,6 +1727,13 @@ Two threads.  A second thread can make the program slower.
                                 and has every sum on its free port; any
                                 number of nets side by side reduce as
                                 each does alone
+* `INet.Arith.sums_census`, `INet.Arith.sums_exact`,
+  `INet.Arith.numerals_all`, `INet.Arith.sums_memOk`
+                                and for any number of additions too the
+                                memory at rest holds no adder, the
+                                successors of every sum and one zero
+                                for each, and every agent in it is an
+                                agent of the numeral of one of the sums
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -2981,8 +2989,21 @@ holds up to equality rather than up to renaming.
   addition `m + n` and has the numeral `m + n` of the `j`-th addition
   on the free port `([0, j], 0)`; and a fair run comes to rest
   (`Arith.sums_rest`, `Arith.sums_fair`).  The count of the agents at
-  rest, and that nothing else is in memory, are proved for two additions
-  only.  For one
+  rest, and that nothing else is in memory, hold for any number of
+  additions as well.  A list of additions side by side is a memory in
+  order (`Arith.sums_memOk`), so the counts of the two-addition case
+  apply as they stand: at rest no cell of a first argument and no adder
+  is left, and the memory holds the successors of every sum and one zero
+  for each addition (`Arith.sums_rest_first`, `Arith.sums_rest_adders`,
+  `Arith.sums_census`).  In the memory that the nets reduce to, a
+  segment that starts in the net of one addition ends in it
+  (`Arith.Holds.link_tag`, `Arith.sums_normal_tags`), so the agents of
+  the numeral on a free port are in the net of that port, and the
+  numerals of different additions share no agent, a name having one tag
+  (`Arith.NumList.tagc`, `Arith.tagged_unique`).  Their agents, all
+  together, are as many as the memory holds (`Arith.numerals_all`), so
+  every agent in memory is an agent of the numeral of one of the
+  additions (`Arith.sums_exact`).  For one
   addition, the condition on the number of threads in
   `Arith.threads_exact` is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
