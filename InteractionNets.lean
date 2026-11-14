@@ -1402,6 +1402,20 @@ Two threads.  A second thread can make the program slower.
                                 `20 * k ≤ 3 * m + 3 * n + 21`: 1,014 for
                                 five threads on `8 + 38`, 1,284 for seven
                                 on `8 + 38`, 2,258 for eight on `13 + 60`
+* `INet.Arith.allWork_succ_out`, `INet.Arith.allWork_succ`
+                                what one more thread adds to that work:
+                                exactly `turnRest m n k` when it is not in
+                                the race, and in every case at least the
+                                `turnAt m n k` actions that bring it to
+                                the zero of the first argument and at most
+                                two fewer than the work of one thread
+* `INet.Arith.threads_more`, `INet.Arith.threads_bounds`
+                                so one more thread in turn never saves
+                                work, and `k + 1` threads do at least the
+                                work of one and `3 * n + 4` for each other
+                                thread, at most `k + 1` times the work of
+                                one less two for each other thread (two
+                                threads on `6 + 28` make 456, one 229)
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -2311,7 +2325,15 @@ holds up to equality rather than up to renaming.
   `Arith.allWork m n k`, with `m` from four on, `k + 1 ≤ m` and
   `20 * k ≤ 3 * m + 3 * n + 21` (`Arith.threads_exact`): 1,014 for five
   threads on `8 + 38`, 1,284 for seven on `8 + 38`, 2,258 for eight on
-  `13 + 60`.  The
+  `13 + 60`.  One more thread never saves work (`Arith.threads_more`):
+  under the conditions for `k + 2` threads the work grows by at least
+  `turnAt m n k`, the actions that bring the new thread to that zero, and
+  by at most the work of one thread less two; the second bound is reached
+  by two threads on `6 + 28`, 456 against 229.  A thread that is not in
+  the race adds exactly `turnRest m n k` (`Arith.allWork_succ_out`).  So
+  `k + 1` threads in turn do at least the work of one thread and
+  `3 * n + 4` for each other thread, and at most `k + 1` times the work
+  of one less two for each other thread (`Arith.threads_bounds`).  The
   condition on the number of threads is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
   to each after the round that takes it.  The agents the first thread has
@@ -55327,6 +55349,367 @@ example : (XMach.init (sum 8 38) 7).Total xsys (fun i => i % 7) 1284 :=
 
 example : (XMach.init (sum 13 60) 8).Total xsys (fun i => i % 8) 2258 :=
   (threads_exact 12 60 7 (by decide) (by decide) (by decide)).cast (by decide)
+
+/-- Each thread comes to the zero of the first argument three or four
+actions before the thread numbered one below it. -/
+theorem turnAt_step (m n t : Nat) (ht : t + 1 ≤ m) :
+    turnAt m n t = turnAt m n (t + 1) + 3 ∨ turnAt m n t = turnAt m n (t + 1) + 4 := by
+  unfold turnAt
+  omega
+
+/-- And at least three actions for each thread between them. -/
+theorem turnAt_gap (m n : Nat) {t s : Nat} (h : t ≤ s) (hs : s ≤ m) :
+    turnAt m n s + 3 * (s - t) ≤ turnAt m n t := by
+  unfold turnAt
+  omega
+
+theorem turnAt_ge (m n t : Nat) (ht : t + 1 ≤ m) : 3 * n + 4 ≤ turnAt m n t := by
+  unfold turnAt
+  omega
+
+theorem win_pos {m n t : Nat} (h : 17 * m + 7 ≤ turnAt m n t) : 1 ≤ n := by
+  unfold turnAt at h
+  omega
+
+theorem racerOf_out {m n k : Nat}
+    (h : ¬ (17 * m + 7 ≤ turnAt m n k ∧ turnAt m n k ≤ 17 * m + 16)) :
+    racerOf m n (k + 1) = racerOf m n k := by
+  show (if 17 * m + 7 ≤ turnAt m n k ∧ turnAt m n k ≤ 17 * m + 16 then some k
+    else racerOf m n k) = racerOf m n k
+  rw [ite_neg' h]
+
+theorem racerOf_in {m n k : Nat}
+    (h : 17 * m + 7 ≤ turnAt m n k ∧ turnAt m n k ≤ 17 * m + 16) :
+    racerOf m n (k + 1) = some k := by
+  show (if 17 * m + 7 ≤ turnAt m n k ∧ turnAt m n k ≤ 17 * m + 16 then some k
+    else racerOf m n k) = some k
+  rw [ite_pos' h]
+
+theorem racerOf_none_of {m n : Nat} : ∀ k,
+    (∀ t, t < k → ¬ (17 * m + 7 ≤ turnAt m n t ∧ turnAt m n t ≤ 17 * m + 16)) →
+    racerOf m n k = none
+  | 0, _ => rfl
+  | k + 1, h => by
+    rw [racerOf_out (h k (Nat.lt_succ_self k))]
+    exact racerOf_none_of k (fun t ht => h t (Nat.lt_succ_of_lt ht))
+
+theorem allWork_none {m n k : Nat} (h : racerOf m n k = none) :
+    allWork m n k = soloWork (m + 1) n + turnSum m n k := by
+  unfold allWork
+  simp only [h]
+
+theorem allWork_first {m n k : Nat} (h : racerOf m n k = some 0) :
+    allWork m n k =
+      raceWork m n (turnAt m n 0 - (17 * m + 7)) + turnSumFrom m n 1 (k - 1) := by
+  unfold allWork
+  simp only [h]
+
+theorem allWork_later {m n k j : Nat} (h : racerOf m n k = some (j + 1)) :
+    allWork m n k = raceWork m n (turnAt m n (j + 1) - (17 * m + 7)) +
+      (if turnAt m n (j + 1) = 17 * m + 15 then j + 1 else 0) +
+      sumTo (fun t => turnAt m n t + t + 5) j + (turnAt m n j + (j + 1) + 7) +
+      turnSumFrom m n (j + 2) (k - (j + 2)) := by
+  unfold allWork
+  simp only [h]
+
+theorem allWork_zero (m n : Nat) : allWork m n 0 = soloWork (m + 1) n := rfl
+
+/-- The work when the second thread races and there are no others. -/
+theorem allWork_second (m n : Nat)
+    (h : 17 * m + 7 ≤ turnAt m n 0 ∧ turnAt m n 0 ≤ 17 * m + 16) :
+    allWork m n (0 + 1) = raceWork m n (turnAt m n 0 - (17 * m + 7)) := by
+  rw [allWork_first (racerOf_in h)]
+  rfl
+
+/-- The work when the last thread races. -/
+theorem allWork_last (m n j : Nat)
+    (h : 17 * m + 7 ≤ turnAt m n (j + 1) ∧ turnAt m n (j + 1) ≤ 17 * m + 16) :
+    allWork m n (j + 1 + 1) = raceWork m n (turnAt m n (j + 1) - (17 * m + 7)) +
+      (if turnAt m n (j + 1) = 17 * m + 15 then j + 1 else 0) +
+      sumTo (fun t => turnAt m n t + t + 5) j + (turnAt m n j + (j + 1) + 7) := by
+  rw [allWork_later (racerOf_in h), show j + 1 + 1 - (j + 2) = 0 by omega]
+  rfl
+
+theorem turnSumFrom_succ (m n j q : Nat) :
+    turnSumFrom m n j (q + 1) = turnSumFrom m n j q + turnRest m n (j + q) := rfl
+
+/-- **A thread that is not in the race adds exactly its own actions.**  If
+the thread numbered `k + 1` does not come to the zero of the first argument
+at one of the ten moments, the work with it is the work without it and
+`turnRest m n k`. -/
+theorem allWork_succ_out (m n k : Nat)
+    (h : ¬ (17 * m + 7 ≤ turnAt m n k ∧ turnAt m n k ≤ 17 * m + 16)) :
+    allWork m n (k + 1) = allWork m n k + turnRest m n k := by
+  cases hr : racerOf m n k with
+  | none =>
+    rw [allWork_none hr, allWork_none ((racerOf_out h).trans hr)]
+    show soloWork (m + 1) n + (turnSum m n k + turnRest m n k) = _
+    omega
+  | some r =>
+    obtain ⟨hrk, -, -⟩ := racerOf_some k r hr
+    cases r with
+    | zero =>
+      rw [allWork_first hr, allWork_first ((racerOf_out h).trans hr)]
+      have e1 : k + 1 - 1 = (k - 1) + 1 := by omega
+      have e2 : 1 + (k - 1) = k := by omega
+      rw [e1, turnSumFrom_succ, e2]
+      omega
+    | succ j =>
+      rw [allWork_later hr, allWork_later ((racerOf_out h).trans hr)]
+      have e1 : k + 1 - (j + 2) = (k - (j + 2)) + 1 := by omega
+      have e2 : j + 2 + (k - (j + 2)) = k := by omega
+      rw [e1, turnSumFrom_succ, e2]
+      omega
+
+theorem turnRest_pos (m n t : Nat) (hn : 1 ≤ n) :
+    turnRest m n t = turnAt m n t + zeroCost m (turnAt m n t) + 3 + (t + 1) := by
+  obtain ⟨n', rfl⟩ : ∃ n', n = n' + 1 := ⟨n - 1, by omega⟩
+  rfl
+
+theorem zeroCost_le (m A : Nat) : zeroCost m A ≤ 4 := by
+  unfold zeroCost
+  by_cases h1 : A ≤ 17 * m + 6
+  · rw [ite_pos' h1]
+    omega
+  · rw [ite_neg' h1]
+    by_cases h2 : A ≤ 17 * m + 20
+    · rw [ite_pos' h2]
+      omega
+    · rw [ite_neg' h2]
+      omega
+
+/-- A thread that only reads makes at least the actions that bring it to
+the zero of the first argument, and two fewer than one thread alone makes
+at most. -/
+theorem turnRest_bounds (m n t : Nat) (ht : t ≤ m) :
+    turnAt m n t ≤ turnRest m n t ∧ turnRest m n t + 2 ≤ soloWork (m + 1) n := by
+  rw [soloWork_succ]
+  cases n with
+  | zero =>
+    show turnAt m 0 t ≤ 3 * (m - t) + 8 + (3 * (m - t) + 15) / 16 + t ∧
+      3 * (m - t) + 8 + (3 * (m - t) + 15) / 16 + t + 2 ≤ 22 * (m + 1) + 3 * 0 + 13
+    unfold turnAt
+    omega
+  | succ n' =>
+    rw [turnRest_pos m (n' + 1) t (by omega)]
+    have z := zeroCost_le m (turnAt m (n' + 1) t)
+    have a : turnAt m (n' + 1) t + t ≤ 3 * m + 3 * (n' + 1) + 1 + (3 * m + 11) / 16 := by
+      unfold turnAt
+      omega
+    omega
+
+theorem turnSum_late (m n : Nat) (hn : 1 ≤ n) : ∀ q,
+    (∀ t, t < q → 17 * m + 21 ≤ turnAt m n t) →
+    turnSum m n q = sumTo (fun t => turnAt m n t + t + 5) q
+  | 0, _ => rfl
+  | q + 1, h => by
+    show turnSum m n q + turnRest m n q =
+      sumTo (fun t => turnAt m n t + t + 5) q + (turnAt m n q + q + 5)
+    rw [turnSum_late m n hn q (fun t ht => h t (Nat.lt_succ_of_lt ht)), turnRest_pos m n q hn]
+    have hq := h q (Nat.lt_succ_self q)
+    have z : zeroCost m (turnAt m n q) = 1 := by
+      unfold zeroCost
+      rw [ite_neg' (by omega), ite_neg' (by omega)]
+    rw [z]
+    omega
+
+theorem turnSum_near (m n : Nat) (hn : 1 ≤ n) : ∀ q,
+    (∀ t, t < q → 17 * m + 20 ≤ turnAt m n t) →
+    (∀ t, t + 1 < q → 17 * m + 21 ≤ turnAt m n t) →
+    sumTo (fun t => turnAt m n t + t + 5) q ≤ turnSum m n q ∧
+      turnSum m n q ≤ sumTo (fun t => turnAt m n t + t + 5) q + 3
+  | 0, _, _ => ⟨Nat.le_refl _, Nat.zero_le _⟩
+  | q + 1, h1, h2 => by
+    have e := turnSum_late m n hn q (fun t ht => h2 t (by omega))
+    have tr := turnRest_pos m n q hn
+    have hq := h1 q (Nat.lt_succ_self q)
+    have z : zeroCost m (turnAt m n q) = 4 ∨ zeroCost m (turnAt m n q) = 1 := by
+      unfold zeroCost
+      rw [ite_neg' (by omega)]
+      by_cases c : turnAt m n q ≤ 17 * m + 20
+      · rw [ite_pos' c]
+        exact Or.inl rfl
+      · rw [ite_neg' c]
+        exact Or.inr rfl
+    show sumTo (fun t => turnAt m n t + t + 5) q + (turnAt m n q + q + 5) ≤
+        turnSum m n q + turnRest m n q ∧
+      turnSum m n q + turnRest m n q ≤
+        sumTo (fun t => turnAt m n t + t + 5) q + (turnAt m n q + q + 5) + 3
+    rw [e, tr]
+    omega
+
+/-- The work of the race is `39 * m + 3 * n + 60` when the first thread
+keeps the pair, and from `44 * m + 6 * n + 52` to `44 * m + 6 * n + 68`
+otherwise. -/
+theorem raceWork_cases (m n d : Nat) :
+    (d = 8 ∧ raceWork m n d = 39 * m + 3 * n + 60) ∨
+    (d ≠ 8 ∧ 44 * m + 6 * n + 52 ≤ raceWork m n d ∧ raceWork m n d ≤ 44 * m + 6 * n + 68) := by
+  by_cases h8 : d = 8
+  · subst h8
+    exact Or.inl ⟨rfl, rfl⟩
+  · refine Or.inr ⟨h8, ?_, raceWork_le m n d⟩
+    unfold raceWork
+    split <;> omega
+
+/-- The race of a thread and the race of the thread that comes three or
+four actions after it. -/
+theorem raceWork_next (m n d e : Nat) (h : e = d + 3 ∨ e = d + 4) (he : e ≤ 9) :
+    (e = 8 ∧ raceWork m n d = raceWork m n e + 5 * m + 3 * n + (d - 3)) ∨
+    (e ≠ 8 ∧ raceWork m n d ≤ raceWork m n e ∧ raceWork m n e ≤ raceWork m n d + 9) := by
+  have hd : d = 0 ∨ d = 1 ∨ d = 2 ∨ d = 3 ∨ d = 4 ∨ d = 5 ∨ d = 6 := by omega
+  rcases hd with rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> rcases h with rfl | rfl <;>
+    simp only [raceWork] <;> first | omega | (refine Or.inl ⟨trivial, ?_⟩; omega)
+
+/-- **What one more thread in turn adds.**  With `k ≤ m`, the work of
+`k + 2` threads is at least that of `k + 1` and the `turnAt m n k` actions
+that bring the new thread to the zero of the first argument, and at most
+that of `k + 1` and two fewer than the work of one thread alone. -/
+theorem allWork_succ (m n k : Nat) (hk : k ≤ m) :
+    allWork m n k + turnAt m n k ≤ allWork m n (k + 1) ∧
+      allWork m n (k + 1) + 2 ≤ allWork m n k + soloWork (m + 1) n := by
+  by_cases hW : 17 * m + 7 ≤ turnAt m n k ∧ turnAt m n k ≤ 17 * m + 16
+  · have hn : 1 ≤ n := win_pos hW.1
+    cases k with
+    | zero =>
+      rw [allWork_second m n hW, allWork_zero, soloWork_succ]
+      rcases raceWork_cases m n (turnAt m n 0 - (17 * m + 7)) with ⟨h8, hR⟩ | ⟨h8, hR1, hR2⟩
+      · omega
+      · omega
+    | succ k' =>
+      have st := turnAt_step m n k' (by omega)
+      by_cases hW' : 17 * m + 7 ≤ turnAt m n k' ∧ turnAt m n k' ≤ 17 * m + 16
+      · have nx := raceWork_next m n (turnAt m n (k' + 1) - (17 * m + 7))
+          (turnAt m n k' - (17 * m + 7)) (by omega) (by omega)
+        have b : (if turnAt m n (k' + 1) = 17 * m + 15 then k' + 1 else 0) = 0 :=
+          ite_neg' (by omega)
+        cases k' with
+        | zero =>
+          have e2 := allWork_last m n 0 hW
+          have s0 : sumTo (fun t => turnAt m n t + t + 5) 0 = 0 := rfl
+          rw [b, s0] at e2
+          rw [e2, allWork_second m n hW', soloWork_succ]
+          rcases nx with ⟨h8, hR⟩ | ⟨h8, hR1, hR2⟩
+          · omega
+          · omega
+        | succ j =>
+          have e2 := allWork_last m n (j + 1) hW
+          have s : sumTo (fun t => turnAt m n t + t + 5) (j + 1) =
+              sumTo (fun t => turnAt m n t + t + 5) j + (turnAt m n j + j + 5) := rfl
+          rw [b, s] at e2
+          rw [e2, allWork_last m n j hW', soloWork_succ]
+          rcases nx with ⟨h8, hR⟩ | ⟨h8, hR1, hR2⟩
+          · have b1 : (if turnAt m n (j + 1) = 17 * m + 15 then j + 1 else 0) = j + 1 :=
+              ite_pos' (by omega)
+            rw [b1]
+            omega
+          · have b1 : (if turnAt m n (j + 1) = 17 * m + 15 then j + 1 else 0) = 0 :=
+              ite_neg' (by omega)
+            rw [b1]
+            omega
+      · have hlate : ∀ t, t ≤ k' → 17 * m + 17 + 3 * (k' - t) ≤ turnAt m n t := fun t ht => by
+          have g := turnAt_gap m n ht (by omega : k' ≤ m)
+          omega
+        have hnone : racerOf m n (k' + 1) = none := racerOf_none_of (k' + 1) (fun t ht => by
+          have g := hlate t (by omega)
+          omega)
+        have near := turnSum_near m n hn k'
+          (fun t ht => by
+            have g := hlate t (by omega)
+            omega)
+          (fun t ht => by
+            have g := hlate t (by omega)
+            omega)
+        have ts : turnSum m n (k' + 1) = turnSum m n k' + turnRest m n k' := rfl
+        have zc : zeroCost m (turnAt m n k') = 4 := by
+          have g := hlate k' (Nat.le_refl k')
+          unfold zeroCost
+          rw [ite_neg' (by omega), ite_pos' (by omega)]
+        rw [allWork_last m n k' hW, allWork_none hnone, ts, turnRest_pos m n k' hn, zc,
+          soloWork_succ]
+        rcases raceWork_cases m n (turnAt m n (k' + 1) - (17 * m + 7)) with
+          ⟨h8, hR⟩ | ⟨h8, hR1, hR2⟩
+        · have b1 : (if turnAt m n (k' + 1) = 17 * m + 15 then k' + 1 else 0) = k' + 1 :=
+            ite_pos' (by omega)
+          rw [b1]
+          omega
+        · have b1 : (if turnAt m n (k' + 1) = 17 * m + 15 then k' + 1 else 0) = 0 :=
+            ite_neg' (by omega)
+          rw [b1]
+          omega
+  · rw [allWork_succ_out m n k hW]
+    have tb := turnRest_bounds m n k hk
+    omega
+
+/-- With `k ≤ m`, `k + 1` threads in turn do at most `k + 1` times the work
+of one thread, less two for each thread after the first. -/
+theorem allWork_le (m n : Nat) : ∀ k, k ≤ m →
+    allWork m n k + 2 * k ≤ (k + 1) * soloWork (m + 1) n
+  | 0, _ => by
+    rw [allWork_zero]
+    omega
+  | k + 1, h => by
+    have ih := allWork_le m n k (by omega)
+    have st := (allWork_succ m n k (by omega)).2
+    have e : (k + 1 + 1) * soloWork (m + 1) n =
+        (k + 1) * soloWork (m + 1) n + soloWork (m + 1) n := Nat.succ_mul _ _
+    rw [e]
+    omega
+
+/-- And at least the work of one thread and, for each thread after the
+first, the actions that bring it to the zero of the first argument. -/
+theorem allWork_ge (m n : Nat) : ∀ k, k ≤ m →
+    soloWork (m + 1) n + sumTo (turnAt m n) k ≤ allWork m n k
+  | 0, _ => Nat.le_refl _
+  | k + 1, h => by
+    have ih := allWork_ge m n k (by omega)
+    have st := (allWork_succ m n k (by omega)).1
+    show soloWork (m + 1) n + (sumTo (turnAt m n) k + turnAt m n k) ≤ allWork m n (k + 1)
+    omega
+
+/-- **One more thread in turn never saves work.**  On the net for
+`(m + 1) + n`, with `m` from four on, `k + 2 ≤ m` and
+`20 * (k + 1) ≤ 3 * m + 3 * n + 21`: the run of `k + 2` threads in turn
+makes more actions that are not rests than the run of `k + 1`, by at least
+the `turnAt m n k` actions that bring the new thread to the zero of the
+first argument, and by at most two fewer than the work of one thread
+alone. -/
+theorem threads_more (m n k : Nat) (hm4 : 4 ≤ m) (hm : k + 2 ≤ m)
+    (hn : 20 * (k + 1) ≤ 3 * m + 3 * n + 21) :
+    ∃ W W', (XMach.init (sum (m + 1) n) (k + 1)).Total xsys (fun i => i % (k + 1)) W ∧
+      (XMach.init (sum (m + 1) n) (k + 1 + 1)).Total xsys (fun i => i % (k + 1 + 1)) W' ∧
+      W + turnAt m n k ≤ W' ∧ W' + 2 ≤ W + soloWork (m + 1) n :=
+  ⟨allWork m n k, allWork m n (k + 1), threads_exact m n k hm4 (by omega) (by omega),
+    threads_exact m n (k + 1) hm4 hm hn, allWork_succ m n k (by omega)⟩
+
+/-- **Threads in turn: more than the work of one, less than the work of
+each.**  On the net for `(m + 1) + n`, with `m` from four on, `k + 1 ≤ m`
+and `20 * k ≤ 3 * m + 3 * n + 21`, the work `W` of `k + 1` threads in turn
+is at least that of one thread and `3 * n + 4` for each thread after the
+first, and at most `k + 1` times that of one thread, less two for each
+thread after the first. -/
+theorem threads_bounds (m n k : Nat) (hm4 : 4 ≤ m) (hm : k + 1 ≤ m)
+    (hn : 20 * k ≤ 3 * m + 3 * n + 21) :
+    ∃ W, (XMach.init (sum (m + 1) n) (k + 1)).Total xsys (fun i => i % (k + 1)) W ∧
+      soloWork (m + 1) n + k * (3 * n + 4) ≤ W ∧
+      W + 2 * k ≤ (k + 1) * soloWork (m + 1) n := by
+  refine ⟨allWork m n k, threads_exact m n k hm4 hm hn, ?_, allWork_le m n k (by omega)⟩
+  have g := allWork_ge m n k (by omega)
+  have s : k * (3 * n + 4) ≤ sumTo (turnAt m n) k :=
+    sumTo_ge k (fun t ht => turnAt_ge m n t (by omega))
+  omega
+
+example : allWork 7 38 5 = allWork 7 38 4 + 136 := by decide
+
+example : allWork 7 38 6 = allWork 7 38 5 + 134 := by decide
+
+example : soloWork 8 38 = 303 := by decide
+
+/-- The second bound is reached: two threads on `6 + 28` make 456 actions
+that are not rests, one thread 229. -/
+example : (XMach.init (sum 6 28) 2).Total xsys (fun i => i % 2) (2 * soloWork 6 28 - 2) :=
+  (threads_exact 5 28 1 (by decide) (by decide) (by decide)).cast (by decide)
+
+example : 2 * soloWork 6 28 - 2 = 456 := by decide
 
 end Arith
 
