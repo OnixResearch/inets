@@ -43,6 +43,7 @@ import InteractionNets.Arith.AnyNets
 import InteractionNets.Plug
 import InteractionNets.Arith.Compose
 import InteractionNets.Arith.Expr
+import InteractionNets.Arith.Run
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.LongRun
@@ -1780,6 +1781,13 @@ Two threads.  A second thread can make the program slower.
                                 the value of its first argument, and
                                 has the numeral of the value of the
                                 expression on its free port
+* `INet.Arith.Expr.run_sound`, `INet.Arith.readNum_sound`,
+  `INet.Arith.IsNum.unique`
+                                an expression can be run: threads take
+                                turns on its net for a number of
+                                actions and the result is read off the
+                                memory; whatever is returned is the
+                                value of the expression
 * `INet.Steps.context`, `INet.XMach.union_rest`, `INet.XMach.union_fair`,
   `INet.Net.Apart.reduce`, `INet.Net.WF.union`, `INet.Net.Apart.normal`
                                 in any system, a net reduces inside a
@@ -3127,7 +3135,16 @@ holds up to equality rather than up to renaming.
   are well formed comes from `Net.Made.wf` and `Net.WF.plug`, not from
   the validator, and the results about the list reducers, which ask for
   compact nets, do not apply to them.  Only the claims are counted;
-  nothing is said about how many actions the threads take.
+  nothing is said about how many actions the threads take.  An
+  expression can be run (`Arith.Expr.run`): a number of threads take
+  turns on its net for a number of actions, and if they are then at
+  rest the numeral on the free port is read by `Arith.readNum`, which
+  follows wires of several segments as a thread does.  What `readNum`
+  returns is a numeral of the net (`Arith.readNum_sound`), and a port
+  carries at most one (`Arith.IsNum.unique`), so whatever the run
+  returns is the value of the expression (`Arith.Expr.run_sound`).  That
+  the run returns something when given enough actions is checked on
+  examples, by evaluation in the kernel, and not proved in general.
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers
