@@ -41289,15 +41289,81 @@ example : ∀ (σ : Nat → Nat) (i : Nat),
 /-- The actions one thread takes to add `m` and `n`, as the runs show. -/
 def soloWork (m n : Nat) : Nat := if m = 0 then 6 * n + 13 else 22 * m + 3 * n + 13
 
+/-- The row `m = 0` of the table of `solo_work_checked`. -/
+theorem solo_work_row0 : ∀ n, n < 9 →
+    ((XMach.init (sum 0 n) 1).trace xsys (fun _ => 0) (soloWork 0 n)).1.resting = true ∧
+      (XMach.init (sum 0 n) 1).work xsys (fun _ => 0) (soloWork 0 n) = soloWork 0 n := by
+  decide +kernel
+
+/-- The row `m = 1` of the table of `solo_work_checked`. -/
+theorem solo_work_row1 : ∀ n, n < 9 →
+    ((XMach.init (sum 1 n) 1).trace xsys (fun _ => 0) (soloWork 1 n)).1.resting = true ∧
+      (XMach.init (sum 1 n) 1).work xsys (fun _ => 0) (soloWork 1 n) = soloWork 1 n := by
+  decide +kernel
+
+/-- The row `m = 2` of the table of `solo_work_checked`. -/
+theorem solo_work_row2 : ∀ n, n < 9 →
+    ((XMach.init (sum 2 n) 1).trace xsys (fun _ => 0) (soloWork 2 n)).1.resting = true ∧
+      (XMach.init (sum 2 n) 1).work xsys (fun _ => 0) (soloWork 2 n) = soloWork 2 n := by
+  decide +kernel
+
+/-- The row `m = 3` of the table of `solo_work_checked`. -/
+theorem solo_work_row3 : ∀ n, n < 9 →
+    ((XMach.init (sum 3 n) 1).trace xsys (fun _ => 0) (soloWork 3 n)).1.resting = true ∧
+      (XMach.init (sum 3 n) 1).work xsys (fun _ => 0) (soloWork 3 n) = soloWork 3 n := by
+  decide +kernel
+
+/-- The row `m = 4` of the table of `solo_work_checked`. -/
+theorem solo_work_row4 : ∀ n, n < 9 →
+    ((XMach.init (sum 4 n) 1).trace xsys (fun _ => 0) (soloWork 4 n)).1.resting = true ∧
+      (XMach.init (sum 4 n) 1).work xsys (fun _ => 0) (soloWork 4 n) = soloWork 4 n := by
+  decide +kernel
+
+/-- The row `m = 5` of the table of `solo_work_checked`. -/
+theorem solo_work_row5 : ∀ n, n < 9 →
+    ((XMach.init (sum 5 n) 1).trace xsys (fun _ => 0) (soloWork 5 n)).1.resting = true ∧
+      (XMach.init (sum 5 n) 1).work xsys (fun _ => 0) (soloWork 5 n) = soloWork 5 n := by
+  decide +kernel
+
+/-- The row `m = 6` of the table of `solo_work_checked`. -/
+theorem solo_work_row6 : ∀ n, n < 9 →
+    ((XMach.init (sum 6 n) 1).trace xsys (fun _ => 0) (soloWork 6 n)).1.resting = true ∧
+      (XMach.init (sum 6 n) 1).work xsys (fun _ => 0) (soloWork 6 n) = soloWork 6 n := by
+  decide +kernel
+
+/-- The row `m = 7` of the table of `solo_work_checked`. -/
+theorem solo_work_row7 : ∀ n, n < 9 →
+    ((XMach.init (sum 7 n) 1).trace xsys (fun _ => 0) (soloWork 7 n)).1.resting = true ∧
+      (XMach.init (sum 7 n) 1).work xsys (fun _ => 0) (soloWork 7 n) = soloWork 7 n := by
+  decide +kernel
+
+/-- The row `m = 8` of the table of `solo_work_checked`. -/
+theorem solo_work_row8 : ∀ n, n < 9 →
+    ((XMach.init (sum 8 n) 1).trace xsys (fun _ => 0) (soloWork 8 n)).1.resting = true ∧
+      (XMach.init (sum 8 n) 1).work xsys (fun _ => 0) (soloWork 8 n) = soloWork 8 n := by
+  decide +kernel
+
 /-- **One thread adds in `22 * m + 3 * n + 13` actions, on every size
 computed.**  For all `m` and `n` below nine the run of a single thread on
 the net for `m + n` is at rest after exactly that many actions, none of
 them a rest (`6 * n + 13` when `m` is zero).  This is a computation, size
-by size; it is not a proof for every size. -/
+by size; it is not a proof for every size.  The kernel computes the table
+one row at a time (`solo_work_row0` to `solo_work_row8`): one computation
+of all eighty-one runs needs about three times the memory of the largest
+row. -/
 theorem solo_work_checked : ∀ m, m < 9 → ∀ n, n < 9 →
     ((XMach.init (sum m n) 1).trace xsys (fun _ => 0) (soloWork m n)).1.resting = true ∧
-      (XMach.init (sum m n) 1).work xsys (fun _ => 0) (soloWork m n) = soloWork m n := by
-  decide +kernel
+      (XMach.init (sum m n) 1).work xsys (fun _ => 0) (soloWork m n) = soloWork m n
+  | 0, _ => solo_work_row0
+  | 1, _ => solo_work_row1
+  | 2, _ => solo_work_row2
+  | 3, _ => solo_work_row3
+  | 4, _ => solo_work_row4
+  | 5, _ => solo_work_row5
+  | 6, _ => solo_work_row6
+  | 7, _ => solo_work_row7
+  | 8, _ => solo_work_row8
+  | m + 9, h => absurd h (by omega)
 
 /-- **A run whose work is known has its count bounded by it.**  When one
 thread on the net for `m + n` is at rest after `B` actions of which `w`
