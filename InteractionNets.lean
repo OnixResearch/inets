@@ -40,6 +40,7 @@ import InteractionNets.Arith.AtRest
 import InteractionNets.Arith.Lists
 import InteractionNets.Arith.ListsAtRest
 import InteractionNets.Arith.AnyNets
+import InteractionNets.Plug
 import InteractionNets.LongRun
 import InteractionNets.Window
 import InteractionNets.Measure
@@ -54,7 +55,8 @@ and are used by the last reducer and by the memories of the program with
 threads.
 
 The development is in the modules under `InteractionNets/`, imported here
-in their order: each imports the one before it, so they read as one text.
+in an order in which each imports only earlier ones, so they read as one
+text.
 This file holds the overview.
 
 Main results, for an arbitrary interaction system `sys`:
@@ -1747,6 +1749,14 @@ Two threads.  A second thread can make the program slower.
                                 the reductions of the nets have steps,
                                 and the memory is made of their normal
                                 forms, each under its tag
+* `INet.Step.plug`, `INet.Steps.plug`, `INet.Net.WF.plug`,
+  `INet.Net.Conn.plug`
+                                free ports wired together: a reduction
+                                of a net is a reduction of the net with
+                                any of its free ports joined by new
+                                segments, in any system; the net stays
+                                well formed, and two wires that ended
+                                at joined ports are one wire
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -3036,7 +3046,16 @@ holds up to equality rather than up to renaming.
   end of both names can change the comparison; with such agents the
   whole would reach the normal forms up to a renaming only, and that is
   not proved.  The nets are side by side: no wire runs from one to
-  another.  For one
+  another.  Wires between nets are made by plugging: new segments join
+  free ports, which stop being free and become points of longer wires
+  (`Net.plug`).  A step of a net is a step of the plugged net, whatever
+  the system and the new segments (`Step.plug`, `Steps.plug`): the wire
+  of an active pair runs through no end, and plugging makes no new
+  ends.  The plugged net is well formed when the new segments are a
+  finite matching of free ports (`Net.WF.plug`), and two wires that
+  ended at joined ports are then one wire (`Net.Conn.plug`).  What a
+  plugged net reduces to once its parts have met is not said by this:
+  new active pairs can form across the new segments.  For one
   addition, the condition on the number of threads in
   `Arith.threads_exact` is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
