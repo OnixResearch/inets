@@ -1254,6 +1254,25 @@ Two threads.  A second thread can make the program slower.
                                 not rests, for `m` from four on and every
                                 `n`: 1,496 on `21 + 94`, 285 on `5 + 23`
                                 and 1,105 on `21 + 93` are theorems
+* `INet.Arith.RdAt.chain_turn`, `INet.Arith.RdAt.tops`,
+  `INet.Arith.turnAt`, `INet.Arith.turnRest`,
+  `INet.Arith.turn_reader_quiet`, `INet.Arith.turn_reader_zero`
+                                the thread numbered `t + 1` of any number,
+                                action by action: it comes to the zero of
+                                the first argument after exactly
+                                `turnAt m n t` actions and, outside the
+                                ten moments of the race, rests after
+                                exactly `turnRest m n t`; its `t + 1` top
+                                successors cost one action each
+* `INet.Arith.Quiet`, `INet.Arith.quiet_total_all`,
+  `INet.Arith.threads_total`    so `k + 1` threads in turn add `m + 1` and
+                                `n` in exactly the work of one thread and
+                                `turnRest m n t` for each other thread,
+                                for `k + 1 ≤ m`,
+                                `20 * k ≤ 3 * m + 3 * n + 21` and every
+                                size where no thread comes to that zero
+                                after `17 * m + 7` to `17 * m + 16`
+                                actions: 300 for three threads on `7 + 9`
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -2094,9 +2113,17 @@ holds up to equality rather than up to renaming.
   written, `twoAt m n + 8` when it finds the last adder gone,
   `twoAt m n + 5` when it finds the zero gone (1,105 on `21 + 93`, 1,136
   on `21 + 98`).  In every case at most `44 * m + 6 * n + 68` actions are
-  not rests (`Arith.two_threads_race`).  For three threads or more only
-  bounds are proved: the tight one outside about `k + 3` sizes for each
-  `m`, the one with the large constants inside.  The
+  not rests (`Arith.two_threads_race`).  For any number of threads the
+  count is exact outside the race (`Arith.threads_total`): with
+  `k + 1 ≤ m` and `20 * k ≤ 3 * m + 3 * n + 21`, the thread numbered
+  `t + 1` comes to the zero of the first argument after exactly
+  `Arith.turnAt m n t = 3 * (m - t) + 3 * n + 1 + (3 * (m - t) + 11) / 16`
+  actions; if for no thread that number is `17 * m + 7` to `17 * m + 16`,
+  every thread after the first only reads and rests after exactly
+  `Arith.turnRest m n t` actions, its `t + 1` top successors costing one
+  each, and the work is that of one thread and those actions (300 for
+  three threads on `7 + 9`, 580 for four on `6 + 31`).  Inside the race,
+  three threads or more have only the bound with the large constants.  The
   condition on the number of threads is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
   to each after the round that takes it.  The agents the first thread has
@@ -47745,6 +47772,390 @@ example : (XMach.init (sum 5 0) 2).Total xsys (fun i => i % 2) 144 :=
 
 example (i : Nat) : (XMach.init (sum 21 94) 2).work xsys (fun i => i % 2) i ≤ 1496 :=
   ((two_threads_total 20 94 (by decide)).cast (by decide)).le i
+
+/-- **The chain of the thread numbered `t + 1`**, which starts `t + 1`
+successors below the top: three actions for each successor. -/
+theorem RdAt.chain_turn {m n t : Nat} {T0 : XThread Arith} {tl : List (Id × Arith)} :
+    ∀ r, r + t ≤ m → RdAt m n T0 (3 * (m - t - r)) ⟨chainL n r ++ tl, .idle⟩ →
+      RdAt m n T0 (3 * (m - t)) ⟨tl, .idle⟩
+  | 0, _, h => h
+  | r + 1, hr, h => by
+    have h' : RdAt m n T0 (3 * (m - t - (r + 1)))
+        ⟨([n + 3 + r + 1], .succ) :: (chainL n r ++ tl), .idle⟩ := h
+    have hal := solo_alive m n (m - (r + 1)) (by omega) (n + 3 + r + 1) .succ
+      (3 * (m - t - (r + 1)) + 1) (by omega) (by omega) (by omega)
+      ((start_sum m n).chain.live (n + 3 + r + 1) (by omega) (by omega))
+    have h3 := h'.pass3 hal (solo_look_chain m n (by omega) (by omega) _)
+      (show ¬ (1 : Nat) = 0 by decide)
+      (solo_stop_chain m n (by omega) (by omega) (by omega))
+    exact RdAt.chain_turn r (by omega) (h3.cast (by omega))
+
+/-- A successor of the chain is gone once its round has taken it. -/
+theorem solo_gone_top (m n : Nat) {q u : Nat} (hq : q ≤ m) (hu : 17 * (m - q) + 5 ≤ u) :
+    assoc [n + 3 + q + 1] (XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ u).1.agents = none := by
+  by_cases e : q = m
+  · subst e
+    exact (solo_gone5 q n (by omega)).1
+  · have hg := solo_gone_succ m n (d := m - q) (by omega) (by omega) hu
+    rw [show n + 3 + m + 1 - (m - q) = n + 3 + q + 1 by omega] at hg
+    exact hg
+
+/-- **The top successors at the end of a list, one action for each**: a
+thread that comes to them after their rounds finds them gone, and is at
+rest after the last. -/
+theorem RdAt.tops {m n r : Nat} {T0 : XThread Arith} :
+    ∀ (s a : Nat), r + s ≤ m → 17 * (m - r) + 4 ≤ a →
+      RdAt m n T0 a ⟨(chainL n (r + (s + 1))).take (s + 1), .idle⟩ →
+      RdAt m n T0 (a + (s + 1)) ⟨[], .idle⟩ ∧ XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T0 (a + s) ≠ ⟨[], .idle⟩
+  | 0, a, hs, ha, h => by
+    have h' : RdAt m n T0 a ⟨[([n + 3 + r + 1], .succ)], .idle⟩ := h
+    refine ⟨h'.gone (solo_gone_top m n (by omega) (by omega)), fun e => ?_⟩
+    have e' : XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T0 a = ⟨[], .idle⟩ := e
+    rw [h'.1] at e'
+    cases e'
+  | s + 1, a, hs, ha, h => by
+    have h' : RdAt m n T0 a
+        ⟨([n + 3 + (r + (s + 1)) + 1], .succ) :: (chainL n (r + (s + 1))).take (s + 1),
+          .idle⟩ := h
+    have h1 := h'.gone (solo_gone_top m n (by omega) (by omega))
+    obtain ⟨k1, k2⟩ := RdAt.tops s (a + 1) (by omega) (by omega) h1
+    refine ⟨k1.cast (by omega), ?_⟩
+    rw [show a + (s + 1) = a + 1 + s by omega]
+    exact k2
+
+/-- The list of the thread numbered `t + 1` on the net for `(m + 1) + n`,
+`n` not zero. -/
+theorem turn_list_succ (m n' t : Nat) (ht : t ≤ m) :
+    (sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1) =
+      chainL (n' + 1) (m - t) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - t + (t + 1))).take (t + 1)))) := by
+  rw [turn_list m (n' + 1) t ht]
+  show chainL (n' + 1) (m - t) ++ (([n' + 1 + 3], Arith.succ) :: ((sndL n' ++
+    [([1], Arith.add), ([2], .zero), ([3], .zero)]) ++ (chainL (n' + 1) (m - t + (t + 1))).take (t + 1))) =
+    chainL (n' + 1) (m - t) ++ (([n' + 1 + 3], Arith.succ) :: (sndL n' ++
+      ([([1], Arith.add), ([2], .zero), ([3], .zero)] ++ (chainL (n' + 1) (m - t + (t + 1))).take (t + 1))))
+  rw [List.append_assoc]
+
+/-- The same when the second argument is zero. -/
+theorem turn_list_zero (m t : Nat) (ht : t ≤ m) :
+    (sum (m + 1) 0).agents.drop (t + 1) ++ (sum (m + 1) 0).agents.take (t + 1) =
+      chainL 0 (m - t) ++ (([1], .add) :: ([2], .zero) :: ([0 + 3], .zero) ::
+        (chainL 0 (m - t + (t + 1))).take (t + 1)) :=
+  (turn_list m 0 t ht).trans rfl
+
+/-- **The action after which the thread numbered `t + 1` comes to the zero
+of the first argument**, on the net for `(m + 1) + n` with `n` not zero. -/
+def turnAt (m n t : Nat) : Nat := 3 * (m - t) + 3 * n + 1 + (3 * (m - t) + 11) / 16
+
+/-- What the zero of the first argument costs a thread that comes to it
+after `A` actions, outside the race: three actions when it passes it before
+the segment to the last adder is written, four when it reads on to the last
+adder and finds it gone, one when the zero itself is gone. -/
+def zeroCost (m A : Nat) : Nat := if A ≤ 17 * m + 6 then 3 else if A ≤ 17 * m + 20 then 4 else 1
+
+/-- **The actions of the thread numbered `t + 1` before it rests**, when it
+only reads. -/
+def turnRest (m : Nat) : Nat → Nat → Nat
+  | 0, t => 3 * (m - t) + 8 + (3 * (m - t) + 15) / 16 + t
+  | n + 1, t => turnAt m (n + 1) t + zeroCost m (turnAt m (n + 1) t) + 3 + (t + 1)
+
+/-- Those of the `k` threads after the first. -/
+def turnSum (m n : Nat) : Nat → Nat
+  | 0 => 0
+  | k + 1 => turnSum m n k + turnRest m n k
+
+/-- **The thread numbered `t + 1` comes to the zero of the first argument
+after exactly `3 * (m - t) + 3 * n' + 5 + K` actions**, all of which
+read. -/
+theorem turn_reader_at_zero (m n' t K : Nat) (ht : t + 2 ≤ m)
+    (hK1 : 16 * K + 5 ≤ 3 * (m - t)) (hK2 : 3 * (m - t) < 16 * K + 21) :
+    RdAt m (n' + 1) ⟨chainL (n' + 1) (m - t) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - t + (t + 1))).take (t + 1)))), .idle⟩
+      (3 * (m - t) + 3 * n' + 5 + K)
+      ⟨([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - t + (t + 1))).take (t + 1), .idle⟩ := by
+  have h0 := RdAt.start m (n' + 1) ⟨chainL (n' + 1) (m - t) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - t + (t + 1))).take (t + 1)))), .idle⟩
+  have h1 := RdAt.chain_turn (t := t) (m - t) (by omega) (h0.cast (by omega))
+  have hx : assoc [n' + 1 + 3] (sum (m + 1) (n' + 1)).agents = some Arith.succ :=
+    sum_assoc_base m (n' + 1) (e := ([n' + 1 + 3], Arith.succ))
+      (List.mem_append_left _ (sndL_mem (n' + 1) n' (by omega)))
+  have h2 := RdAt.walk (by omega) hK1 hK2 (by omega) hx h1
+  have h3 := RdAt.snd n' (3 * (m - t) + 4 + K) (by omega) h2
+  have h4 := h3.gone (solo_gone5 m (n' + 1) (u := 3 * (m - t) + 4 + K + 3 * n' + 1)
+    (by omega)).2
+  exact h4.cast (by omega)
+
+/-- **The thread numbered `t + 1` only reads and comes to rest after
+exactly `turnRest m n t` actions**, when it does not come to the zero of the
+first argument at one of the ten moments of the race, and comes to its top
+successors after their rounds. -/
+theorem turn_reader_quiet (m n' t : Nat) (ht : t + 2 ≤ m)
+    (hw : turnAt m (n' + 1) t ≤ 17 * m + 6 ∨ 17 * m + 17 ≤ turnAt m (n' + 1) t)
+    (htop : 17 * t ≤ turnAt m (n' + 1) t) :
+    ∃ b, turnRest m (n' + 1) t = b + 1 ∧
+      RdAt m (n' + 1) ⟨chainL (n' + 1) (m - t) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - t + (t + 1))).take (t + 1)))), .idle⟩ (b + 1) ⟨[], .idle⟩ ∧
+      XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ⟨chainL (n' + 1) (m - t) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - t + (t + 1))).take (t + 1)))), .idle⟩ b ≠ ⟨[], .idle⟩ := by
+  obtain ⟨K, hK⟩ : ∃ K, (3 * (m - t) + 11) / 16 = K + 1 :=
+    ⟨(3 * (m - t) + 11) / 16 - 1, by omega⟩
+  have eA : turnAt m (n' + 1) t = 3 * (m - t) + 3 * n' + 5 + K := by
+    unfold turnAt
+    omega
+  rw [eA] at hw htop
+  have hrest : turnRest m (n' + 1) t =
+      turnAt m (n' + 1) t + zeroCost m (turnAt m (n' + 1) t) + 3 + (t + 1) := rfl
+  have r0 := turn_reader_at_zero m n' t K ht (by omega) (by omega)
+  have hx3 : assoc [3] (sum (m + 1) (n' + 1)).agents = some Arith.zero :=
+    sum_assoc_base m (n' + 1) (e := ([3], Arith.zero))
+      (List.mem_append_right _
+        (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self)))
+  have tail : ∀ a, 17 * t + 1 ≤ a →
+      RdAt m (n' + 1) ⟨chainL (n' + 1) (m - t) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - t + (t + 1))).take (t + 1)))), .idle⟩ a
+        ⟨([3], .zero) :: (chainL (n' + 1) (m - t + (t + 1))).take (t + 1), .idle⟩ →
+      RdAt m (n' + 1) ⟨chainL (n' + 1) (m - t) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - t + (t + 1))).take (t + 1)))), .idle⟩ (a + 3 + (t + 1)) ⟨[], .idle⟩ ∧
+        XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ⟨chainL (n' + 1) (m - t) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - t + (t + 1))).take (t + 1)))), .idle⟩ (a + 3 + t) ≠ ⟨[], .idle⟩ := fun a ha h => by
+    have r2 := h.pass3 (solo_snd_forever m (n' + 1) (j := 3) (by omega) (by omega) hx3 _)
+      (solo_look_snd m (n' + 1) (j := 3) (by omega) (by omega) _).1
+      (show ¬ (1 : Nat) = 0 by decide)
+      (solo_look_snd m (n' + 1) (j := 3) (by omega) (by omega) _).2
+    exact RdAt.tops (r := m - t) t (a + 3) (by omega) (by omega) r2
+  by_cases h1 : 3 * (m - t) + 3 * n' + 5 + K ≤ 17 * m + 6
+  · have hal := solo_alive_zero m (n' + 1) (j := 2) (u := 3 * (m - t) + 3 * n' + 5 + K + 1) (by omega) (by omega)
+      (by omega) (sum_zero_agent m (n' + 1))
+    have r1 := r0.pass3 hal (solo_look_two m (n' + 1) _) (show ¬ (1 : Nat) = 0 by decide)
+      ((solo_seek_two m (n' + 1) (by omega) _).2 (by omega))
+    obtain ⟨t1, t2⟩ := tail _ (by omega) r1
+    have ez : zeroCost m (turnAt m (n' + 1) t) = 3 := by
+      rw [eA]
+      unfold zeroCost
+      exact ite_pos' h1
+    exact ⟨3 * (m - t) + 3 * n' + 5 + K + 3 + 3 + t, by omega, t1, t2⟩
+  · by_cases h2 : 3 * (m - t) + 3 * n' + 5 + K ≤ 17 * m + 20
+    · have hal := solo_alive_zero m (n' + 1) (j := 2) (u := 3 * (m - t) + 3 * n' + 5 + K + 1) (by omega) (by omega)
+        (by omega) (sum_zero_agent m (n' + 1))
+      have s1 := r0.step (XMach.act_idle_pos (e := ([2], Arith.zero)) hal)
+      have s2 := s1.step (XMach.act_look (solo_look_two m (n' + 1) _))
+      have s3 := s2.step (XMach.act_seek_next (seek_aux_none _ _ 1 (by decide))
+        ((solo_seek_two m (n' + 1) (by omega) _).1 (by omega)))
+      have hg := solo_gone_adder m (n' + 1) (u := 3 * (m - t) + 3 * n' + 5 + K + 1 + 1 + 1 + 1) (by omega)
+      have s4 := s3.step (XMach.act_seek_stop ((ite_pos' rfl).trans hg)
+        (solo_stop_adder m (n' + 1) (by omega) _))
+      obtain ⟨t1, t2⟩ := tail _ (by omega) s4
+      have ez : zeroCost m (turnAt m (n' + 1) t) = 4 := by
+        rw [eA]
+        unfold zeroCost
+        exact (ite_neg' h1).trans (ite_pos' h2)
+      exact ⟨3 * (m - t) + 3 * n' + 5 + K + 1 + 1 + 1 + 1 + 3 + t, by omega, t1, t2⟩
+    · have r1 := r0.gone (solo_gone_zero m (n' + 1) (by omega))
+      obtain ⟨t1, t2⟩ := tail _ (by omega) r1
+      have ez : zeroCost m (turnAt m (n' + 1) t) = 1 := by
+        rw [eA]
+        unfold zeroCost
+        exact (ite_neg' h1).trans (ite_neg' h2)
+      exact ⟨3 * (m - t) + 3 * n' + 5 + K + 1 + 3 + t, by omega, t1, t2⟩
+
+/-- The same when the second argument is zero: the thread finds the first
+adder gone, passes the zero of the first argument, walks along the adders
+from the zero of the second, and finds its top successors gone. -/
+theorem turn_reader_zero (m t : Nat) (ht : t + 2 ≤ m) (htop : 20 * t ≤ 3 * m + 4) :
+    ∃ b, turnRest m 0 t = b + 1 ∧
+      RdAt m 0 ⟨chainL 0 (m - t) ++ (([1], .add) :: ([2], .zero) :: ([0 + 3], .zero) ::
+        (chainL 0 (m - t + (t + 1))).take (t + 1)), .idle⟩ (b + 1) ⟨[], .idle⟩ ∧
+      XMach.reader xsys (sum (m + 1) (0)) ⟨(sum (m + 1) (0)).agents, .idle⟩ ⟨chainL 0 (m - t) ++ (([1], .add) :: ([2], .zero) :: ([0 + 3], .zero) ::
+        (chainL 0 (m - t + (t + 1))).take (t + 1)), .idle⟩ b ≠ ⟨[], .idle⟩ := by
+  obtain ⟨K, hK⟩ : ∃ K, (3 * (m - t) + 15) / 16 = K + 1 :=
+    ⟨(3 * (m - t) + 15) / 16 - 1, by omega⟩
+  have h0 := RdAt.start m 0 ⟨chainL 0 (m - t) ++ (([1], .add) :: ([2], .zero) :: ([0 + 3], .zero) ::
+        (chainL 0 (m - t + (t + 1))).take (t + 1)), .idle⟩
+  have h1 := RdAt.chain_turn (t := t) (m - t) (by omega) (h0.cast (by omega))
+  have h2 := h1.gone (solo_gone5 m 0 (by omega)).2
+  have hal := solo_alive_zero m 0 (j := 2) (u := 3 * (m - t) + 1 + 1) (by omega) (by omega)
+    (by omega) (sum_zero_agent m 0)
+  have h3 := h2.pass3 hal (solo_look_two m 0 _) (show ¬ (1 : Nat) = 0 by decide)
+    ((solo_seek_two m 0 (by omega) _).2 (by omega))
+  have hx3 : assoc [0 + 3] (sum (m + 1) 0).agents = some Arith.zero :=
+    sum_assoc_base m 0 (e := ([3], Arith.zero))
+      (List.mem_append_right _
+        (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self)))
+  have h4 := RdAt.walk (K := K) (by omega) (by omega) (by omega) (by omega) hx3 h3
+  obtain ⟨t1, t2⟩ := RdAt.tops (r := m - t) t _ (by omega) (by omega) h4
+  exact ⟨3 * (m - t) + 1 + 3 + 4 + K + t, by
+    show 3 * (m - t) + 8 + (3 * (m - t) + 15) / 16 + t = _
+    omega, t1, t2⟩
+
+/-- `Quiet m n Ts W`: beside the first thread on the net for `(m + 1) + n`,
+each of the threads `Ts` only reads and comes to rest, and `W` is the
+number of their actions before they rest. -/
+inductive Quiet (m n : Nat) : List (XThread Arith) → Nat → Prop
+  | nil : Quiet m n [] 0
+  | cons {T : XThread Arith} {Ts : List (XThread Arith)} {b W W' : Nat} :
+      RdAt m n T (b + 1) ⟨[], .idle⟩ → XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T b ≠ ⟨[], .idle⟩ →
+      Quiet m n Ts W → W' = b + 1 + W → Quiet m n (T :: Ts) W'
+
+theorem Quiet.snoc {m n : Nat} {Ts : List (XThread Arith)} {W : Nat} {T : XThread Arith}
+    {b : Nat} (h : Quiet m n Ts W) (h1 : RdAt m n T (b + 1) ⟨[], .idle⟩)
+    (h2 : XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T b ≠ ⟨[], .idle⟩) : Quiet m n (Ts ++ [T]) (W + (b + 1)) := by
+  induction h with
+  | nil => exact .cons h1 h2 .nil (by omega)
+  | cons k1 k2 _ e ih => exact .cons k1 k2 ih (by omega)
+
+/-- Each of these threads reads at every action. -/
+theorem Quiet.reads {m n : Nat} {Ts : List (XThread Arith)} {W : Nat} (h : Quiet m n Ts W) :
+    ∀ T, T ∈ Ts → ∀ a,
+      (XMach.act xsys (XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ (a + 1)).1 (XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T a)).1 = (XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ (a + 1)).1 ∧
+      (XMach.act xsys (XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ (a + 1)).1 (XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T a)).2.2 = 0 := by
+  induction h with
+  | nil =>
+    intro T hT
+    cases hT
+  | @cons T' Ts' b W W' k1 _ _ _ ih =>
+    intro T hT a
+    rcases List.mem_cons.1 hT with e | hT'
+    · rw [e]
+      by_cases ha : a < b + 1
+      · exact k1.2 a ha
+      · obtain ⟨d, rfl⟩ : ∃ d, a = b + 1 + d := ⟨a - (b + 1), by omega⟩
+        exact (k1.rest (d + 1)).2 (b + 1 + d) (by omega)
+    · exact ih T hT' a
+
+/-- And their busy actions come to `W`. -/
+theorem Quiet.tally {m n : Nat} {Ts : List (XThread Arith)} {W : Nat} (h : Quiet m n Ts W) :
+    ∀ a, W ≤ a → total (fun T => seqTally XThread.busy (XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T) a) Ts = W := by
+  induction h with
+  | nil =>
+    intro a _
+    rfl
+  | @cons T' Ts' b W W' k1 k2 _ e ih =>
+    intro a ha
+    have hbusy : ∀ j, j < b + 1 → XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T' j ≠ ⟨[], .idle⟩ := fun j hj e' => by
+      have h' := reader_rest e' (b - j)
+      rw [show j + (b - j) = b by omega] at h'
+      exact k2 h'
+    have e2 : seqTally XThread.busy (XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T') a = b + 1 :=
+      (seqTally_exact (B := b + 1) (fun j hj => XThread.busy_of_ne_rest (hbusy j hj))
+        (fun j hj => by
+          obtain ⟨d, rfl⟩ : ∃ d, j = b + 1 + d := ⟨j - (b + 1), by omega⟩
+          exact (congrArg XThread.busy (k1.rest d).1).trans rfl) a).2 (by omega)
+    show seqTally XThread.busy (XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T') a +
+      total (fun T => seqTally XThread.busy (XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T) a) Ts' = W'
+    rw [e2, ih a (by omega), e]
+
+/-- **Threads that only read beside the first and come to rest: all of them
+in turn do exactly the work of the first alone and the actions of the
+others before they rest.** -/
+theorem quiet_total_all {m n : Nat} {Ts : List (XThread Arith)} {W : Nat}
+    (h : Quiet m n Ts W) :
+    (⟨sum (m + 1) n, ⟨(sum (m + 1) n).agents, .idle⟩ :: Ts⟩ : XMach Arith).Total xsys (fun i => i % (Ts.length + 1))
+      (soloWork (m + 1) n + W) := by
+  have even : ∀ a, soloWork (m + 1) n + W ≤ a →
+      (⟨sum (m + 1) n, ⟨(sum (m + 1) n).agents, .idle⟩ :: Ts⟩ : XMach Arith).work xsys (fun i => i % (Ts.length + 1))
+        ((Ts.length + 1) * a) = soloWork (m + 1) n + W := by
+    intro a ha
+    have ht := XMach.tally_readers XThread.busy (xs := xsys) (X := sum (m + 1) n)
+      (T₀ := ⟨(sum (m + 1) n).agents, .idle⟩) (Ts := Ts) (A := a)
+      (fun T hT a' _ => h.reads T hT a') a (Nat.le_refl a)
+    have e1 : seqTally XThread.busy (fun j => (XMach.solo xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ j).2) a = soloWork (m + 1) n := by
+      rw [← XMach.tally_one XThread.busy xsys (sum (m + 1) n)
+        ⟨(sum (m + 1) n).agents, .idle⟩ a]
+      obtain ⟨hr, hw, -⟩ := solo_work (m + 1) n
+      rw [XMach.init_one] at hr hw
+      obtain ⟨d, rfl⟩ : ∃ d, a = soloWork (m + 1) n + d := ⟨a - soloWork (m + 1) n, by omega⟩
+      exact (XMach.work_rest (fun _ => 0) hr d).trans hw
+    show (⟨sum (m + 1) n, ⟨(sum (m + 1) n).agents, .idle⟩ :: Ts⟩ : XMach Arith).tally XThread.busy xsys (fun i => i % (Ts.length + 1))
+      ((Ts.length + 1) * a) = _
+    rw [ht, e1, h.tally a (by omega)]
+  refine ⟨(Ts.length + 1) * (soloWork (m + 1) n + W), fun i hi => ?_⟩
+  have hc : 0 < Ts.length + 1 := Nat.succ_pos _
+  have lo := XMach.work_mono (xs := xsys) (fun i => i % (Ts.length + 1)) (⟨sum (m + 1) n, ⟨(sum (m + 1) n).agents, .idle⟩ :: Ts⟩ : XMach Arith)
+    (Nat.mul_div_le i (Ts.length + 1))
+  have up := XMach.work_mono (xs := xsys) (fun i => i % (Ts.length + 1)) (⟨sum (m + 1) n, ⟨(sum (m + 1) n).agents, .idle⟩ :: Ts⟩ : XMach Arith)
+    (Nat.le_of_lt (Nat.lt_mul_div_succ i hc))
+  have hd : soloWork (m + 1) n + W ≤ i / (Ts.length + 1) :=
+    (Nat.le_div_iff_mul_le hc).2 (by
+      rw [Nat.mul_comm]
+      exact hi)
+  rw [even (i / (Ts.length + 1)) hd] at lo
+  rw [even (i / (Ts.length + 1) + 1) (by omega)] at up
+  omega
+
+/-- The `k` threads after the first, `n` not zero. -/
+theorem quiet_turns (m n' : Nat) : ∀ k,
+    (∀ t, t < k → t + 2 ≤ m ∧
+      (turnAt m (n' + 1) t ≤ 17 * m + 6 ∨ 17 * m + 17 ≤ turnAt m (n' + 1) t) ∧
+      17 * t ≤ turnAt m (n' + 1) t) →
+    Quiet m (n' + 1) ((List.range k).map fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+      (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))
+      (turnSum m (n' + 1) k)
+  | 0, _ => .nil
+  | k + 1, h => by
+    have ih := quiet_turns m n' k (fun t ht => h t (by omega))
+    obtain ⟨h1, h2, h3⟩ := h k (Nat.lt_succ_self k)
+    obtain ⟨b, eb, r, hb⟩ := turn_reader_quiet m n' k h1 h2 h3
+    rw [List.range_succ, List.map_append]
+    show Quiet m (n' + 1) (_ ++ [(⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++
+      (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith)])
+      (turnSum m (n' + 1) k + turnRest m (n' + 1) k)
+    rw [turn_list_succ m n' k (by omega), eb]
+    exact ih.snoc r hb
+
+/-- The same when the second argument is zero. -/
+theorem quiet_turns_zero (m : Nat) : ∀ k,
+    (∀ t, t < k → t + 2 ≤ m ∧ 20 * t ≤ 3 * m + 4) →
+    Quiet m 0 ((List.range k).map fun t => (⟨(sum (m + 1) (0)).agents.drop (t + 1) ++
+      (sum (m + 1) (0)).agents.take (t + 1), .idle⟩ : XThread Arith))
+      (turnSum m 0 k)
+  | 0, _ => .nil
+  | k + 1, h => by
+    have ih := quiet_turns_zero m k (fun t ht => h t (by omega))
+    obtain ⟨h1, h2⟩ := h k (Nat.lt_succ_self k)
+    obtain ⟨b, eb, r, hb⟩ := turn_reader_zero m k h1 h2
+    rw [List.range_succ, List.map_append]
+    show Quiet m 0 (_ ++ [(⟨(sum (m + 1) 0).agents.drop (k + 1) ++
+      (sum (m + 1) 0).agents.take (k + 1), .idle⟩ : XThread Arith)])
+      (turnSum m 0 k + turnRest m 0 k)
+    rw [turn_list_zero m k (by omega), eb]
+    exact ih.snoc r hb
+
+/-- **Threads in turn, to the action, outside the race.**  On the net for
+`(m + 1) + n` take `k + 1` threads that act in turn, with `k + 1 ≤ m` and
+`20 * k ≤ 3 * m + 3 * n + 21`.  If none of the `k` threads after the first
+comes to the zero of the first argument at one of the ten moments of the
+race, that is after `17 * m + 7` to `17 * m + 16` actions, then each of
+them only reads, and the work of the whole run is exactly that of one
+thread and `turnRest m n t` for the thread numbered `t + 1`. -/
+theorem threads_total (m n k : Nat) (hm : k + 1 ≤ m) (hk : 20 * k ≤ 3 * m + 3 * n + 21)
+    (hw : ∀ t, t < k → turnAt m n t ≤ 17 * m + 6 ∨ 17 * m + 17 ≤ turnAt m n t) :
+    (XMach.init (sum (m + 1) n) (k + 1)).Total xsys (fun i => i % (k + 1))
+      (soloWork (m + 1) n + turnSum m n k) := by
+  rw [XMach.init_succ]
+  have q : Quiet m n ((List.range k).map fun t => (⟨(sum (m + 1) n).agents.drop (t + 1) ++
+      (sum (m + 1) n).agents.take (t + 1), .idle⟩ : XThread Arith)) (turnSum m n k) := by
+    cases n with
+    | zero => exact quiet_turns_zero m k (fun t ht => ⟨by omega, by omega⟩)
+    | succ n' =>
+      exact quiet_turns m n' k (fun t ht => ⟨by omega, hw t ht, by
+        unfold turnAt
+        omega⟩)
+  have tt := quiet_total_all q
+  have hl : ((List.range k).map fun t => (⟨(sum (m + 1) n).agents.drop (t + 1) ++
+      (sum (m + 1) n).agents.take (t + 1), .idle⟩ : XThread Arith)).length = k := by
+    rw [List.length_map, List.length_range]
+  rw [hl] at tt
+  exact tt
+
+example : (XMach.init (sum 7 9) 3).Total xsys (fun i => i % 3) 300 :=
+  (threads_total 6 9 2 (by decide) (by decide) (fun t ht => by
+    have h : t = 0 ∨ t = 1 := by omega
+    rcases h with rfl | rfl <;> decide)).cast (by decide)
+
+example : (XMach.init (sum 6 31) 4).Total xsys (fun i => i % 4) 580 :=
+  (threads_total 5 31 3 (by decide) (by decide) (fun t ht => by
+    have h : t = 0 ∨ t = 1 ∨ t = 2 := by omega
+    rcases h with rfl | rfl | rfl <;> decide)).cast (by decide)
 
 end Arith
 
