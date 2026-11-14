@@ -1781,6 +1781,12 @@ Two threads.  A second thread can make the program slower.
                                 the value of its first argument, and
                                 has the numeral of the value of the
                                 expression on its free port
+* `INet.Arith.Expr.assoc_rest`, `INet.Arith.Expr.cost_assoc`,
+  `INet.Arith.Expr.cost_comm`
+                                the two ways of bracketing three terms
+                                give the same numeral, and the left one
+                                makes exactly the value of the first
+                                term more claims, under any schedules
 * `INet.Arith.Expr.run_sound`, `INet.Arith.Expr.run_complete`,
   `INet.Arith.readNum_sound`, `INet.Arith.readNum_complete`,
   `INet.Arith.IsNum.unique`
@@ -3132,7 +3138,13 @@ holds up to equality rather than up to renaming.
   (`Arith.Expr.good`).  So with any number of threads and any schedule
   a run that ends at rest has made that many claims and has the numeral
   of the value on the free port, and a fair run comes to rest
-  (`Arith.Expr.rest`, `Arith.Expr.fair`).  The nets of expressions are
+  (`Arith.Expr.rest`, `Arith.Expr.fair`).  The count tells the two ways
+  of bracketing apart: `(e₁ + e₂) + e₃` costs the value of `e₁` more
+  than `e₁ + (e₂ + e₃)`, which on the machine is exactly that many more
+  claims, whatever the threads and the schedules
+  (`Arith.Expr.cost_assoc`, `Arith.Expr.assoc_rest`); and of the two
+  orders of an addition the one with the smaller term first is cheaper
+  (`Arith.Expr.cost_comm`).  The nets of expressions are
   not compact, a wire between two nets having three segments; that they
   are well formed comes from `Net.Made.wf` and `Net.WF.plug`, not from
   the validator, and the results about the list reducers, which ask for

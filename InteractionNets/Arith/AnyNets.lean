@@ -17,9 +17,12 @@ normal form made of the normal forms (`Net.Made.reduce`), and the thread
 machine, with any number of threads and any schedule, comes to rest on
 exactly that net (`XMach.made_rest`, `XMach.made_fair`).
 
-The second part is the addition system: any well-formed compact nets side
-by side (`Arith.besides_rest`, `Arith.besides_fair`), and what that says
-about numerals (`Arith.besides_rest_num`).
+A net made of well-formed nets under tags is well formed
+(`Net.Made.wf`); the parts need not be compact.
+
+The second part is the addition system: any well-formed nets side by side
+(`Arith.besides_rest`, `Arith.besides_fair`), and what that says about
+numerals (`Arith.besides_rest_num`).
 -/
 
 namespace INet
@@ -127,6 +130,66 @@ theorem Net.Made.paired (h : U.Made P) (ar : S → Nat) {c : Nat} {p q : Port}
     (hp : (P c).Paired ar p q) : U.Paired ar (tagPort c p) (tagPort c q) := by
   obtain ⟨e1, e2, v, x, w⟩ := hp
   exact ⟨(h.end_iff ar).2 e1, (h.end_iff ar).2 e2, tagPort c v, tagPort c x, h.walk ar w⟩
+
+/-- An end of the whole is an end of a part. -/
+theorem Net.Made.end_part (h : U.Made P) (ar : S → Nat) {p : Port} (hp : U.End ar p) :
+    ∃ c p', p = tagPort c p' ∧ (P c).End ar p' := by
+  rcases hp with hf | ⟨γ, hγ, hk⟩
+  · obtain ⟨c, p', e, hp'⟩ := h.free hf
+    exact ⟨c, p', e, .inl hp'⟩
+  · obtain ⟨c, i', e, hi⟩ := h.agent hγ
+    exact ⟨c, (i', p.2), Prod.ext e rfl, .inr ⟨γ, hi, hk⟩⟩
+
+/-- **A net made of well-formed nets under tags is well formed.** -/
+theorem Net.Made.wf (h : U.Made P) {ar : S → Nat} (hP : ∀ c, (P c).WF ar) : U.WF ar where
+  agent_fun := fun {i α β} h1 h2 => by
+    obtain ⟨c, i', e, hi⟩ := h.agent h1
+    rw [e] at h2
+    exact (hP c).agent_fun hi (h.agent_iff.1 h2)
+  symm := fun {p q} hl => by
+    obtain ⟨c, p', q', rfl, rfl, hl'⟩ := h.link hl
+    exact h.link' ((hP c).symm hl')
+  irrefl := fun {p} hl => by
+    obtain ⟨c, p', q', e1, e2, hl'⟩ := h.link hl
+    have e : p' = q' := tagPort_inj (e1.symm.trans e2)
+    rw [e] at hl'
+    exact (hP c).irrefl hl'
+  end_unique := fun {p q r} hp h1 h2 => by
+    obtain ⟨c, p', q', rfl, rfl, hl1⟩ := h.link h1
+    obtain ⟨r', rfl, hl2⟩ := h.link_from h2
+    rw [(hP c).end_unique ((h.end_iff ar).1 hp) hl1 hl2]
+  end_conn := fun {p} hp => by
+    obtain ⟨c, p', rfl, hp'⟩ := h.end_part ar hp
+    obtain ⟨q', hq', hne, v, x, w⟩ := (hP c).end_conn hp'
+    exact ⟨tagPort c q', (h.end_iff ar).2 hq', fun e => hne (tagPort_inj e), tagPort c v,
+      tagPort c x, h.walk ar w⟩
+  deg := fun {p x y z} h1 h2 h3 => by
+    obtain ⟨c, p', x', rfl, rfl, l1⟩ := h.link h1
+    obtain ⟨y', rfl, l2⟩ := h.link_from h2
+    obtain ⟨z', rfl, l3⟩ := h.link_from h3
+    rcases (hP c).deg l1 l2 l3 with e | e | e
+    · exact .inl (by rw [e])
+    · exact .inr (.inl (by rw [e]))
+    · exact .inr (.inr (by rw [e]))
+  free_agent := fun {i k α} hf ha => by
+    obtain ⟨c, p', e, hp'⟩ := h.free hf
+    obtain ⟨c', i', rfl, hi⟩ := h.agent ha
+    obtain ⟨p1, p2⟩ := p'
+    have e' : ((i' ++ [c'], k) : Port) = (p1 ++ [c], p2) := e
+    injection e' with e1 e2
+    obtain ⟨e3, e4⟩ := snoc_inj e1
+    rw [e3, e4] at hi
+    exact (hP c).free_agent hp' hi
+  fresh := fun {a α} l ha hu => by
+    obtain ⟨c, a', rfl, ha'⟩ := h.agent ha
+    refine (hP c).fresh l ha' ?_
+    have ea : l ++ (a' ++ [c]) = (l ++ a') ++ [c] := (List.append_assoc _ _ _).symm
+    rw [ea] at hu
+    rcases hu with ⟨γ, hγ⟩ | ⟨k, q, hl⟩ | ⟨k, hf⟩
+    · exact .inl ⟨γ, h.agent_iff.1 hγ⟩
+    · obtain ⟨q', -, hl'⟩ := h.link_from (c := c) (p := (l ++ a', k)) hl
+      exact .inr (.inl ⟨k, q', hl'⟩)
+    · exact .inr (.inr ⟨k, (h.free_iff (c := c) (p := (l ++ a', k))).1 hf⟩)
 
 theorem Net.Made.congr (h : U.Made P) {P' : Nat → Net S} (e : ∀ c, P c = P' c) :
     U.Made P' := by
@@ -507,6 +570,18 @@ theorem noNet_normal : Normal (Step system) noNet := by
   rintro N' ⟨a, b, α, β, R, r, -⟩
   exact r.ha
 
+/-- The parts of well-formed nets are well formed. -/
+theorem partOf_wf : ∀ {L : List (Nat × XNet Arith)}, (∀ e, e ∈ L → e.2.toNet.WF ar) →
+    ∀ c, (partOf L c).WF ar
+  | [], _, _ => noNet_matching.wf
+  | e :: L, h, c => by
+    show (if c = e.1 then e.2.toNet else partOf L c).WF ar
+    by_cases hc : c = e.1
+    · rw [ite_pos' hc]
+      exact h e List.mem_cons_self
+    · rw [ite_neg' hc]
+      exact partOf_wf (fun e' he' => h e' (List.mem_cons_of_mem _ he')) c
+
 /-- The normal forms `nf`, under the tags of `L`. -/
 def normalParts (L : List (Nat × XNet Arith)) (nf : Nat → Net Arith) : Nat → Net Arith :=
   partsAt (fun _ => noNet) nf (L.map Prod.fst)
@@ -548,13 +623,13 @@ theorem besides_reduce {L : List (Nat × XNet Arith)} (hnd : (L.map Prod.fst).No
     rw [partsAt_not_mem _ _ hc, partsAt_not_mem _ _ hc, partOf_none hc]
 
 /-- **Any nets side by side come out right, whatever the threads do.**
-Let well-formed compact nets be put side by side under different tags,
+Let well-formed nets be put side by side under different tags,
 and let the net with the tag `c` reduce in `cl c` steps to the normal
 form `nf c`.  Then, with any number of threads and any schedule, a run
 that ends at rest has made as many claims as the reductions have steps,
 and the memory is made of the normal forms, each under its tag. -/
 theorem besides_rest {L : List (Nat × XNet Arith)} (hnd : (L.map Prod.fst).Nodup)
-    (hOk : ∀ e, e ∈ L → e.2.Ok ar) (cl : Nat → Nat) (nf : Nat → Net Arith)
+    (hW : ∀ e, e ∈ L → e.2.toNet.WF ar) (cl : Nat → Nat) (nf : Nat → Net Arith)
     (hst : ∀ e, e ∈ L → Steps (Step system) (cl e.1) e.2.toNet (nf e.1))
     (hnf : ∀ e, e ∈ L → Normal (Step system) (nf e.1))
     {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
@@ -562,7 +637,7 @@ theorem besides_rest {L : List (Nat × XNet Arith)} (hnd : (L.map Prod.fst).Nodu
     ((XMach.init (besides L) nt).trace xsys σ i).2 = stepsOf cl (L.map Prod.fst) ∧
       ((XMach.init (besides L) nt).trace xsys σ i).1.mem.toNet.Made (normalParts L nf) := by
   obtain ⟨Z, s, hn', hm⟩ := besides_reduce hnd cl nf hst hnf
-  have hX := besides_wf hnd hOk
+  have hX := (made_besides hnd).wf (partOf_wf hW)
   have L' := XMach.trace_live σ (XMach.init_live (xs := xsys) hX hnt) i
   obtain ⟨q, hn⟩ := L'.rest hr
   have r := XMach.trace_run xsys σ (XMach.init (besides L) nt) i
@@ -579,7 +654,7 @@ every thread keeps being scheduled, from some action on every thread is
 at rest, the claims are the steps of the reductions, and the memory is
 made of the normal forms. -/
 theorem besides_fair {L : List (Nat × XNet Arith)} (hnd : (L.map Prod.fst).Nodup)
-    (hOk : ∀ e, e ∈ L → e.2.Ok ar) (cl : Nat → Nat) (nf : Nat → Net Arith)
+    (hW : ∀ e, e ∈ L → e.2.toNet.WF ar) (cl : Nat → Nat) (nf : Nat → Net Arith)
     (hst : ∀ e, e ∈ L → Steps (Step system) (cl e.1) e.2.toNet (nf e.1))
     (hnf : ∀ e, e ∈ L → Normal (Step system) (nf e.1))
     {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
@@ -589,7 +664,7 @@ theorem besides_fair {L : List (Nat × XNet Arith)} (hnd : (L.map Prod.fst).Nodu
       ((XMach.init (besides L) nt).trace xsys σ i).2 = stepsOf cl (L.map Prod.fst) ∧
       ((XMach.init (besides L) nt).trace xsys σ i).1.mem.toNet.Made (normalParts L nf) := by
   obtain ⟨Z, s, hn', hm⟩ := besides_reduce hnd cl nf hst hnf
-  obtain ⟨i₀, hh⟩ := XMach.fair_complete (xs := xsys) (besides_wf hnd hOk) hnt s hn' σ hfair
+  obtain ⟨i₀, hh⟩ := XMach.fair_complete (xs := xsys) ((made_besides hnd).wf (partOf_wf hW)) hnt s hn' σ hfair
   refine ⟨i₀, fun i hi => ?_⟩
   obtain ⟨hr, hc, e⟩ := hh i hi
   rw [e]
@@ -613,14 +688,14 @@ the situation of `besides_rest`, if the normal form of one of the nets
 has the numeral `k` on the port `p`, the memory has the numeral `k` on
 that port under the tag of the net. -/
 theorem besides_rest_num {L : List (Nat × XNet Arith)} (hnd : (L.map Prod.fst).Nodup)
-    (hOk : ∀ e, e ∈ L → e.2.Ok ar) (cl : Nat → Nat) (nf : Nat → Net Arith)
+    (hW : ∀ e, e ∈ L → e.2.toNet.WF ar) (cl : Nat → Nat) (nf : Nat → Net Arith)
     (hst : ∀ e, e ∈ L → Steps (Step system) (cl e.1) e.2.toNet (nf e.1))
     (hnf : ∀ e, e ∈ L → Normal (Step system) (nf e.1))
     {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (besides L) nt).trace xsys σ i).1.resting = true)
     {e : Nat × XNet Arith} (he : e ∈ L) {p : Port} {k : Nat} (hk : IsNum (nf e.1) p k) :
     IsNum ((XMach.init (besides L) nt).trace xsys σ i).1.mem.toNet (tagPort e.1 p) k := by
-  obtain ⟨-, hm⟩ := besides_rest hnd hOk cl nf hst hnf hnt σ hr
+  obtain ⟨-, hm⟩ := besides_rest hnd hW cl nf hst hnf hnt σ hr
   refine made_isNum hm (c := e.1) ?_
   have hc : e.1 ∈ L.map Prod.fst := List.mem_map_of_mem (f := Prod.fst) he
   show IsNum (partsAt (fun _ => noNet) nf (L.map Prod.fst) e.1) p k
@@ -645,12 +720,12 @@ example {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     have h' : (j, Arith.add) ∈
         [(([3] : Id), Arith.succ), ([4], Arith.zero), ([0, 0], Arith.succ)] := h
     simp at h'
-  have hOk : ∀ e, e ∈ [(0, sum 2 3), (1, two)] → e.2.Ok ar := by
+  have hOk : ∀ e, e ∈ [(0, sum 2 3), (1, two)] → e.2.toNet.WF ar := by
     intro e he
     rcases List.mem_cons.1 he with rfl | he
-    · exact sum_ok 2 3
+    · exact (sum_ok 2 3).1
     · rcases List.mem_cons.1 he with rfl | he
-      · exact (by decide : two.Ok ar)
+      · exact (by decide : two.Ok ar).1
       · exact absurd he List.not_mem_nil
   have hst : ∀ e, e ∈ [(0, sum 2 3), (1, two)] →
       Steps (Step system) ((fun c : Nat => if c = 0 then 3 else 0) e.1) e.2.toNet

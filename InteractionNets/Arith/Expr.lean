@@ -11,80 +11,13 @@ numerals and additions there is a net (`Expr.net`), and with any number
 of threads and any schedule that net comes out right (`Expr.rest`,
 `Expr.fair`).
 
-The first part is about any system: a net made of well-formed nets under
-tags is well formed (`Net.Made.wf`), without asking the parts to be
-compact.
+That the nets are well formed comes from `Net.Made.wf` and
+`Net.WF.plug`; their parts need not be compact.
 -/
 
 namespace INet
 
 open Arith (tagPort tagPort_inj tagPort_snoc snoc_inj)
-
-section Made
-
-variable {S : Type} {U : Net S} {P : Nat → Net S}
-
-/-- An end of the whole is an end of a part. -/
-theorem Net.Made.end_part (h : U.Made P) (ar : S → Nat) {p : Port} (hp : U.End ar p) :
-    ∃ c p', p = tagPort c p' ∧ (P c).End ar p' := by
-  rcases hp with hf | ⟨γ, hγ, hk⟩
-  · obtain ⟨c, p', e, hp'⟩ := h.free hf
-    exact ⟨c, p', e, .inl hp'⟩
-  · obtain ⟨c, i', e, hi⟩ := h.agent hγ
-    exact ⟨c, (i', p.2), Prod.ext e rfl, .inr ⟨γ, hi, hk⟩⟩
-
-/-- **A net made of well-formed nets under tags is well formed.** -/
-theorem Net.Made.wf (h : U.Made P) {ar : S → Nat} (hP : ∀ c, (P c).WF ar) : U.WF ar where
-  agent_fun := fun {i α β} h1 h2 => by
-    obtain ⟨c, i', e, hi⟩ := h.agent h1
-    rw [e] at h2
-    exact (hP c).agent_fun hi (h.agent_iff.1 h2)
-  symm := fun {p q} hl => by
-    obtain ⟨c, p', q', rfl, rfl, hl'⟩ := h.link hl
-    exact h.link' ((hP c).symm hl')
-  irrefl := fun {p} hl => by
-    obtain ⟨c, p', q', e1, e2, hl'⟩ := h.link hl
-    have e : p' = q' := tagPort_inj (e1.symm.trans e2)
-    rw [e] at hl'
-    exact (hP c).irrefl hl'
-  end_unique := fun {p q r} hp h1 h2 => by
-    obtain ⟨c, p', q', rfl, rfl, hl1⟩ := h.link h1
-    obtain ⟨r', rfl, hl2⟩ := h.link_from h2
-    rw [(hP c).end_unique ((h.end_iff ar).1 hp) hl1 hl2]
-  end_conn := fun {p} hp => by
-    obtain ⟨c, p', rfl, hp'⟩ := h.end_part ar hp
-    obtain ⟨q', hq', hne, v, x, w⟩ := (hP c).end_conn hp'
-    exact ⟨tagPort c q', (h.end_iff ar).2 hq', fun e => hne (tagPort_inj e), tagPort c v,
-      tagPort c x, h.walk ar w⟩
-  deg := fun {p x y z} h1 h2 h3 => by
-    obtain ⟨c, p', x', rfl, rfl, l1⟩ := h.link h1
-    obtain ⟨y', rfl, l2⟩ := h.link_from h2
-    obtain ⟨z', rfl, l3⟩ := h.link_from h3
-    rcases (hP c).deg l1 l2 l3 with e | e | e
-    · exact .inl (by rw [e])
-    · exact .inr (.inl (by rw [e]))
-    · exact .inr (.inr (by rw [e]))
-  free_agent := fun {i k α} hf ha => by
-    obtain ⟨c, p', e, hp'⟩ := h.free hf
-    obtain ⟨c', i', rfl, hi⟩ := h.agent ha
-    obtain ⟨p1, p2⟩ := p'
-    have e' : ((i' ++ [c'], k) : Port) = (p1 ++ [c], p2) := e
-    injection e' with e1 e2
-    obtain ⟨e3, e4⟩ := snoc_inj e1
-    rw [e3, e4] at hi
-    exact (hP c).free_agent hp' hi
-  fresh := fun {a α} l ha hu => by
-    obtain ⟨c, a', rfl, ha'⟩ := h.agent ha
-    refine (hP c).fresh l ha' ?_
-    have ea : l ++ (a' ++ [c]) = (l ++ a') ++ [c] := (List.append_assoc _ _ _).symm
-    rw [ea] at hu
-    rcases hu with ⟨γ, hγ⟩ | ⟨k, q, hl⟩ | ⟨k, hf⟩
-    · exact .inl ⟨γ, h.agent_iff.1 hγ⟩
-    · obtain ⟨q', -, hl'⟩ := h.link_from (c := c) (p := (l ++ a', k)) hl
-      exact .inr (.inl ⟨k, q', hl'⟩)
-    · exact .inr (.inr ⟨k, (h.free_iff (c := c) (p := (l ++ a', k))).1 hf⟩)
-
-end Made
 
 namespace Arith
 
@@ -368,17 +301,6 @@ theorem open2_spec : Open2 open2.toNet [1] ([2], 0) ([3], 0) ([0], 0) := by
   · show ([0], 0) ∈ open2.free
     decide
 
-theorem partOf_wf : ∀ {L : List (Nat × XNet Arith)}, (∀ e, e ∈ L → e.2.toNet.WF ar) →
-    ∀ c, (partOf L c).WF ar
-  | [], _, _ => noNet_matching.wf
-  | e :: L, h, c => by
-    show (if c = e.1 then e.2.toNet else partOf L c).WF ar
-    by_cases hc : c = e.1
-    · rw [ite_pos' hc]
-      exact h e List.mem_cons_self
-    · rw [ite_neg' hc]
-      exact partOf_wf (fun e' he' => h e' (List.mem_cons_of_mem _ he')) c
-
 /-! ### Expressions -/
 
 /-- **Expressions**: numerals and additions. -/
@@ -508,6 +430,50 @@ theorem Expr.fair (e : Expr) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
   obtain ⟨hr, hc, e'⟩ := h i hi
   rw [e']
   exact ⟨hr, hc, hA⟩
+
+/-- The two ways of bracketing three terms have the same value. -/
+theorem Expr.eval_assoc (e₁ e₂ e₃ : Expr) :
+    (Expr.add (.add e₁ e₂) e₃).eval = (Expr.add e₁ (.add e₂ e₃)).eval :=
+  Nat.add_assoc _ _ _
+
+/-- **Bracketing to the right is cheaper**, by the value of the first
+term: the left bracketing adds the first term twice. -/
+theorem Expr.cost_assoc (e₁ e₂ e₃ : Expr) :
+    (Expr.add (.add e₁ e₂) e₃).cost = (Expr.add e₁ (.add e₂ e₃)).cost + e₁.eval := by
+  show e₁.cost + e₂.cost + (e₁.eval + 1) + e₃.cost + (e₁.eval + e₂.eval + 1) =
+    e₁.cost + (e₂.cost + e₃.cost + (e₂.eval + 1)) + (e₁.eval + 1) + e₁.eval
+  omega
+
+/-- **The smaller term first is cheaper**: the two orders of an addition
+differ in cost as the values of the two terms do. -/
+theorem Expr.cost_comm (e₁ e₂ : Expr) :
+    (Expr.add e₁ e₂).cost + e₂.eval = (Expr.add e₂ e₁).cost + e₁.eval := by
+  show e₁.cost + e₂.cost + (e₁.eval + 1) + e₂.eval =
+    e₂.cost + e₁.cost + (e₂.eval + 1) + e₁.eval
+  omega
+
+/-- **The two bracketings on the machine.**  With any number of threads
+and any schedules, runs on the nets of `(e₁ + e₂) + e₃` and of
+`e₁ + (e₂ + e₃)` that end at rest have the same numeral on their free
+ports, and the first has made exactly the value of `e₁` more claims. -/
+theorem Expr.assoc_rest (e₁ e₂ e₃ : Expr) {nt nt' : Nat} (hnt : 0 < nt) (hnt' : 0 < nt')
+    (σ σ' : Nat → Nat) {i i' : Nat}
+    (hr : ((XMach.init (Expr.add (.add e₁ e₂) e₃).net nt).trace xsys σ i).1.resting = true)
+    (hr' : ((XMach.init (Expr.add e₁ (.add e₂ e₃)).net nt').trace xsys σ' i').1.resting = true) :
+    ((XMach.init (Expr.add (.add e₁ e₂) e₃).net nt).trace xsys σ i).2 =
+        ((XMach.init (Expr.add e₁ (.add e₂ e₃)).net nt').trace xsys σ' i').2 + e₁.eval ∧
+      IsNum ((XMach.init (Expr.add (.add e₁ e₂) e₃).net nt).trace xsys σ i).1.mem.toNet
+        ([0, 2], 0) (e₁.eval + e₂.eval + e₃.eval) ∧
+      IsNum ((XMach.init (Expr.add e₁ (.add e₂ e₃)).net nt').trace xsys σ' i').1.mem.toNet
+        ([0, 2], 0) (e₁.eval + e₂.eval + e₃.eval) := by
+  obtain ⟨c, hnum⟩ := Expr.rest (.add (.add e₁ e₂) e₃) hnt σ hr
+  obtain ⟨c', hnum'⟩ := Expr.rest (.add e₁ (.add e₂ e₃)) hnt' σ' hr'
+  refine ⟨?_, hnum, ?_⟩
+  · rw [c, c', Expr.cost_assoc]
+  · have e : e₁.eval + e₂.eval + e₃.eval = (Expr.add e₁ (.add e₂ e₃)).eval :=
+      Nat.add_assoc _ _ _
+    rw [e]
+    exact hnum'
 
 /-- `(2 + 3) + (1 + 4)`, with any number of threads and any schedule: a
 run that ends at rest has made eleven claims, and the memory has `10` on
