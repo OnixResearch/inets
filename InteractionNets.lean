@@ -39,6 +39,7 @@ import InteractionNets.Arith.Census
 import InteractionNets.Arith.AtRest
 import InteractionNets.Arith.Lists
 import InteractionNets.Arith.ListsAtRest
+import InteractionNets.Arith.AnyNets
 import InteractionNets.LongRun
 import InteractionNets.Window
 import InteractionNets.Measure
@@ -1734,6 +1735,18 @@ Two threads.  A second thread can make the program slower.
                                 successors of every sum and one zero
                                 for each, and every agent in it is an
                                 agent of the numeral of one of the sums
+* `INet.Arith.besides_rest`, `INet.Arith.besides_fair`,
+  `INet.Arith.besides_reduce`, `INet.Arith.besides_rest_num`,
+  `INet.XMach.made_rest`, `INet.XMach.made_fair`,
+  `INet.Net.Made.reduce`, `INet.Net.Made.step`, `INet.Net.Made.normal`
+                                any nets with normal forms side by
+                                side, in any system whose rules give
+                                every new agent a side: with any number
+                                of threads and any schedule, a run that
+                                ends at rest has made as many claims as
+                                the reductions of the nets have steps,
+                                and the memory is made of their normal
+                                forms, each under its tag
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -3003,7 +3016,27 @@ holds up to equality rather than up to renaming.
   (`Arith.NumList.tagc`, `Arith.tagged_unique`).  Their agents, all
   together, are as many as the memory holds (`Arith.numerals_all`), so
   every agent in memory is an agent of the numeral of one of the
-  additions (`Arith.sums_exact`).  For one
+  additions (`Arith.sums_exact`).
+  The side-by-side results above are proved from the run of one thread
+  on each net.  They also follow from reduction alone, and then for any
+  nets.  A net made of nets under different tags (`Net.Made`) takes a
+  step whenever a part does, and is then made of the same parts with
+  that one replaced (`Net.Made.step`); it is normal when its parts are
+  (`Net.Made.normal`).  So when the parts have normal forms the whole
+  reduces, in as many steps as the parts together, to the net made of
+  the normal forms (`Net.Made.reduce`), and since a well-formed net has
+  one normal form, the thread machine at rest holds exactly that net,
+  with any number of threads and any schedule (`XMach.made_rest`,
+  `XMach.made_fair`; for the addition system `Arith.besides_rest`,
+  `Arith.besides_fair`, and for the numerals of the normal forms
+  `Arith.besides_rest_num`).  This asks the rules to give every new
+  agent to one of the two agents that meet (`System.Sided`; true of
+  addition, `Arith.system_sided`).  An agent that belongs to neither is
+  named after one of the two by comparing their names, and a tag at the
+  end of both names can change the comparison; with such agents the
+  whole would reach the normal forms up to a renaming only, and that is
+  not proved.  The nets are side by side: no wire runs from one to
+  another.  For one
   addition, the condition on the number of threads in
   `Arith.threads_exact` is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
@@ -3031,7 +3064,7 @@ holds up to equality rather than up to renaming.
 ## Checking
 
 No dependencies beyond the `Std` library that ships with Lean.  Checked with
-Lean 4.35.0 by `lean InteractionNets.lean`.
+Lean 4.35.0 by `lake build`.
 The evaluated runs and checks (`Comb.xgg_run`, `Comb.xgd_normalize`,
 `Comb.xloop_normalize`, `Comb.xloop_runLoops`, `Solo.xaa_normalize`,
 `Comb.dsystem`, the parallel round on `Comb.xgg2`, the run on a renamed
