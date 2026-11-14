@@ -1663,6 +1663,14 @@ Two threads.  A second thread can make the program slower.
                                 the two numerals and the count of the
                                 agents at rest; two nets side by side
                                 reduce as each does alone
+* `INet.Arith.two_sums_exact`, `INet.Arith.numerals_cover`,
+  `INet.Arith.NumList`, `INet.Arith.NumList.nodup`,
+  `INet.Arith.nodup_cover`
+                                and nothing else is there: at rest
+                                every agent in memory is one of the
+                                `m + n + 1` agents of the first numeral
+                                or one of the `m' + n' + 1` of the
+                                second, each numeral in its own net
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -2884,7 +2892,24 @@ holds up to equality rather than up to renaming.
   ends at rest has made `(m + 1) + (m' + 1)` claims and has both
   numerals in memory (`Arith.two_sums_rest`), a fair run comes to rest
   (`Arith.two_sums_fair_all`), and the count of the agents at rest
-  holds too (`Arith.two_sums_memOk_all`, `Arith.two_sums_census`).  For one
+  holds too (`Arith.two_sums_memOk_all`, `Arith.two_sums_census`).
+  The numerals and the count together say that nothing else is in
+  memory.  The agents of a numeral, from its head down, are a list fixed
+  by the head, because an agent has one symbol and a wire one other end
+  (`Arith.NumList`, `Arith.NumList.det`); so no agent is in it twice
+  (`Arith.NumList.nodup`), and the numeral `k` has `k + 1` agents
+  (`Arith.Num.list`).  A wire stays in one net, since every segment
+  does, so the agents of the numeral on a free port are in the net of
+  that port (`Arith.paired_tag`, `Arith.NumList.tag`), and the two
+  numerals share no agent.  They have `(m + n + 1) + (m' + n' + 1)`
+  agents between them, all in memory, and the memory holds that many
+  agents; a list without repeats inside a list that is no longer holds
+  every member of it (`Arith.nodup_cover`).  So at rest every agent in
+  memory is an agent of one of the two numerals
+  (`Arith.numerals_cover`, `Arith.two_sums_exact`).  This is about the
+  agents.  The memory also keeps every segment that was ever written,
+  on a wire between two ends or not; the segments are not counted
+  here.  For one
   addition, the condition on the number of threads in
   `Arith.threads_exact` is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
@@ -67931,6 +67956,227 @@ example {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
       ((XMach.init (twoSums 0 7 3 0) nt).trace xsys σ i).1.mem.agents.length = 12 := by
   obtain ⟨-, h1, h2, -, -, h3⟩ := two_sums_census 0 7 3 0 hnt σ hr
   exact ⟨h1, h2, h3⟩
+
+/-- **A list without repeats, inside a list that is no longer, holds all
+the members of that list.** -/
+theorem nodup_cover {α : Type} [DecidableEq α] : ∀ (L M : List α), L.Nodup →
+    (∀ a, a ∈ L → a ∈ M) → M.length ≤ L.length → ∀ b, b ∈ M → b ∈ L
+  | [], M, _, _, hlen, b, hb => by
+    cases M with
+    | nil => cases hb
+    | cons x M' => exact absurd hlen (Nat.not_succ_le_zero _)
+  | a :: L, M, hnd, hsub, hlen, b, hb => by
+    obtain ⟨ha, hL⟩ := List.nodup_cons.1 hnd
+    have haM := hsub a List.mem_cons_self
+    by_cases e : b = a
+    · rw [e]
+      exact List.mem_cons_self
+    · have hsub' : ∀ c, c ∈ L → c ∈ M.erase a := fun c hc => by
+        have hca : c ≠ a := fun h => by
+          rw [h] at hc
+          exact ha hc
+        exact (List.mem_erase_of_ne hca).2 (hsub c (List.mem_cons_of_mem _ hc))
+      have hlen' : (M.erase a).length ≤ L.length := by
+        rw [List.length_erase_of_mem haM]
+        have h : M.length ≤ L.length + 1 := hlen
+        omega
+      exact List.mem_cons_of_mem _
+        (nodup_cover L (M.erase a) hL hsub' hlen' b ((List.mem_erase_of_ne e).2 hb))
+
+/-- **The agents of a numeral**, from its head down: successors, each
+with the next agent on its auxiliary port, and a zero last. -/
+inductive NumList (N : Net Arith) : Id → List Id → Prop
+  | last {i : Id} : N.agent i Arith.zero → NumList N i [i]
+  | next {i i' : Id} {l : List Id} : N.agent i Arith.succ → N.Paired ar (i, 1) (i', 0) →
+      NumList N i' l → NumList N i (i :: l)
+
+/-- The numeral `k` has `k + 1` agents. -/
+theorem Num.list {N : Net Arith} : ∀ {k : Nat} {i : Id}, Num N i k →
+    ∃ l, NumList N i l ∧ l.length = k + 1
+  | 0, _, h => ⟨_, .last h, rfl⟩
+  | _ + 1, _, ⟨hs, _, hp, hn⟩ => by
+    obtain ⟨l, hl, e⟩ := Num.list hn
+    exact ⟨_ :: l, .next hs hp hl, by rw [List.length_cons, e]⟩
+
+/-- A list of `k + 1` agents of a numeral is the numeral `k`. -/
+theorem NumList.num {N : Net Arith} {i : Id} {l : List Id} (h : NumList N i l) :
+    ∃ k, l.length = k + 1 ∧ Num N i k := by
+  induction h with
+  | last hz => exact ⟨0, rfl, hz⟩
+  | next hs hp _ ih =>
+    obtain ⟨k, e, hn⟩ := ih
+    exact ⟨k + 1, by rw [List.length_cons, e], ⟨hs, _, hp, hn⟩⟩
+
+theorem NumList.agent {N : Net Arith} {i : Id} {l : List Id} (h : NumList N i l) :
+    ∀ a, a ∈ l → ∃ γ, N.agent a γ := by
+  induction h with
+  | last hz =>
+    intro a ha
+    rw [List.mem_singleton.1 ha]
+    exact ⟨_, hz⟩
+  | next hs _ _ ih =>
+    intro a ha
+    rcases List.mem_cons.1 ha with rfl | ha'
+    · exact ⟨_, hs⟩
+    · exact ih a ha'
+
+/-- A numeral starts at each of its agents. -/
+theorem NumList.sub {N : Net Arith} {i : Id} {l : List Id} (h : NumList N i l) :
+    ∀ a, a ∈ l → ∃ l', NumList N a l' ∧ l'.length ≤ l.length := by
+  induction h with
+  | last hz =>
+    intro a ha
+    rw [List.mem_singleton.1 ha]
+    exact ⟨_, .last hz, Nat.le_refl _⟩
+  | next hs hp hl ih =>
+    intro a ha
+    rcases List.mem_cons.1 ha with rfl | ha'
+    · exact ⟨_, .next hs hp hl, Nat.le_refl _⟩
+    · obtain ⟨l', h', hle⟩ := ih a ha'
+      exact ⟨l', h', Nat.le_succ_of_le hle⟩
+
+/-- The agents of a numeral are fixed by its head. -/
+theorem NumList.det {N : Net Arith} (hN : N.WF ar) {i : Id} {l₁ : List Id}
+    (h₁ : NumList N i l₁) : ∀ {l₂ : List Id}, NumList N i l₂ → l₁ = l₂ := by
+  induction h₁ with
+  | last hz =>
+    intro l₂ h₂
+    cases h₂ with
+    | last _ => rfl
+    | next hs _ _ => exact absurd (hN.agent_fun hz hs) (by decide)
+  | @next i i' l hs hp _ ih =>
+    intro l₂ h₂
+    cases h₂ with
+    | last hz => exact absurd (hN.agent_fun hz hs) (by decide)
+    | @next _ i'' l'' _ hp' hl' =>
+      have e : i' = i'' :=
+        congrArg Prod.fst (Net.Conn.det hN hp.1 hp.2.1 hp'.2.1 hp.2.2 hp'.2.2)
+      subst e
+      rw [ih hl']
+
+/-- **No agent is twice in a numeral.** -/
+theorem NumList.nodup {N : Net Arith} (hN : N.WF ar) {i : Id} {l : List Id}
+    (h : NumList N i l) : l.Nodup := by
+  induction h with
+  | last _ => exact List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩
+  | @next i i' l hs hp hl ih =>
+    refine List.nodup_cons.2 ⟨fun hi => ?_, ih⟩
+    obtain ⟨l', h', hle⟩ := hl.sub i hi
+    have e := (NumList.next hs hp hl).det hN h'
+    rw [← e] at hle
+    exact Nat.not_succ_le_self _ hle
+
+/-- A wire of a memory whose segments stay in one net stays in one net. -/
+theorem walk_tag {N : Net Arith} (hT : ∀ p q, N.link p q → tagged 1 p.1 = tagged 1 q.1)
+    {u v x y : Port} (w : Walk N.link (N.End ar) u v x y) : tagged 1 u.1 = tagged 1 y.1 := by
+  induction w with
+  | single hl => exact hT _ _ hl
+  | cons hl _ _ _ ih => exact (hT _ _ hl).trans ih
+
+theorem paired_tag {N : Net Arith} (hT : ∀ p q, N.link p q → tagged 1 p.1 = tagged 1 q.1)
+    {p q : Port} (h : N.Paired ar p q) : tagged 1 p.1 = tagged 1 q.1 := by
+  obtain ⟨-, -, v, x, w⟩ := h
+  exact walk_tag hT w
+
+/-- The agents of a numeral are in the net of its head. -/
+theorem NumList.tag {N : Net Arith} (hT : ∀ p q, N.link p q → tagged 1 p.1 = tagged 1 q.1)
+    {i : Id} {l : List Id} (h : NumList N i l) : ∀ a, a ∈ l → tagged 1 a = tagged 1 i := by
+  induction h with
+  | last _ =>
+    intro a ha
+    rw [List.mem_singleton.1 ha]
+  | next _ hp _ ih =>
+    intro a ha
+    rcases List.mem_cons.1 ha with rfl | ha'
+    · rfl
+    · exact (ih a ha').trans (paired_tag hT hp).symm
+
+/-- **A memory with two numerals and no more agents than they have is
+those two numerals.**  Let no segment join the two nets, let the two
+free ports carry the numerals `k₀` and `k₁`, and let the memory hold at
+most `(k₀ + 1) + (k₁ + 1)` agents.  Then every agent of the memory is one
+of the `k₀ + 1` agents of the first numeral, which are in the first net,
+or one of the `k₁ + 1` agents of the second, which are in the second. -/
+theorem numerals_cover {M : XNet Arith} {k₀ k₁ : Nat} (hN : M.toNet.WF ar)
+    (hT : ∀ e, e ∈ M.wires → tagged 1 e.1.1 = tagged 1 e.2.1)
+    (h0 : IsNum M.toNet ([0, 0], 0) k₀) (h1 : IsNum M.toNet ([0, 1], 0) k₁)
+    (hlen : M.agents.length ≤ k₀ + 1 + (k₁ + 1)) :
+    ∃ (i₀ i₁ : Id) (l₀ l₁ : List Id),
+      M.toNet.Paired ar ([0, 0], 0) (i₀, 0) ∧ NumList M.toNet i₀ l₀ ∧ l₀.length = k₀ + 1 ∧
+      M.toNet.Paired ar ([0, 1], 0) (i₁, 0) ∧ NumList M.toNet i₁ l₁ ∧ l₁.length = k₁ + 1 ∧
+      (∀ a, a ∈ l₀ → tagged 1 a = false) ∧ (∀ a, a ∈ l₁ → tagged 1 a = true) ∧
+      ∀ e, e ∈ M.agents → e.1 ∈ l₀ ∨ e.1 ∈ l₁ := by
+  have hT' : ∀ p q, M.toNet.link p q → tagged 1 p.1 = tagged 1 q.1 := fun p q h => hT (p, q) h
+  obtain ⟨i₀, p0, n0⟩ := h0
+  obtain ⟨i₁, p1, n1⟩ := h1
+  obtain ⟨l₀, L0, e0⟩ := n0.list
+  obtain ⟨l₁, L1, e1⟩ := n1.list
+  have z0 : tagged 1 ([0, 0] : Id) = false := rfl
+  have z1 : tagged 1 ([0, 1] : Id) = true := rfl
+  have t0 : ∀ a, a ∈ l₀ → tagged 1 a = false := fun a ha =>
+    ((L0.tag hT' a ha).trans (paired_tag hT' p0).symm).trans z0
+  have t1 : ∀ a, a ∈ l₁ → tagged 1 a = true := fun a ha =>
+    ((L1.tag hT' a ha).trans (paired_tag hT' p1).symm).trans z1
+  have hnd : (l₀ ++ l₁).Nodup :=
+    List.nodup_append.2 ⟨L0.nodup hN, L1.nodup hN, fun a ha b hb e => by
+      have h := t0 a ha
+      rw [e, t1 b hb] at h
+      cases h⟩
+  have hsub : ∀ a, a ∈ l₀ ++ l₁ → a ∈ M.agents.map Prod.fst := fun a ha => by
+    have hag : ∃ γ, M.toNet.agent a γ := by
+      rcases List.mem_append.1 ha with h | h
+      · exact L0.agent a h
+      · exact L1.agent a h
+    obtain ⟨γ, hγ⟩ := hag
+    exact List.mem_map.2 ⟨(a, γ), hγ, rfl⟩
+  have hlen' : (M.agents.map Prod.fst).length ≤ (l₀ ++ l₁).length := by
+    rw [List.length_map, List.length_append, e0, e1]
+    exact hlen
+  have cov := nodup_cover (l₀ ++ l₁) (M.agents.map Prod.fst) hnd hsub hlen'
+  refine ⟨i₀, i₁, l₀, l₁, p0, L0, e0, p1, L1, e1, t0, t1, fun e he => ?_⟩
+  exact List.mem_append.1 (cov e.1 (List.mem_map_of_mem he))
+
+/-- **Two additions side by side at rest are their two sums and nothing
+else**, for all arguments, with any number of threads and any schedule.
+The free port of the first net is wired to a numeral of `m + n + 1`
+agents, all in the first net; the free port of the second to a numeral
+of `m' + n' + 1` agents, all in the second; and every agent in memory is
+one of them. -/
+theorem two_sums_exact (m n m' n' : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+    (hr : ((XMach.init (twoSums m n m' n') nt).trace xsys σ i).1.resting = true) :
+    ∃ (i₀ i₁ : Id) (l₀ l₁ : List Id),
+      ((XMach.init (twoSums m n m' n') nt).trace xsys σ i).1.mem.toNet.Paired ar
+        ([0, 0], 0) (i₀, 0) ∧
+      NumList ((XMach.init (twoSums m n m' n') nt).trace xsys σ i).1.mem.toNet i₀ l₀ ∧
+      l₀.length = m + n + 1 ∧
+      ((XMach.init (twoSums m n m' n') nt).trace xsys σ i).1.mem.toNet.Paired ar
+        ([0, 1], 0) (i₁, 0) ∧
+      NumList ((XMach.init (twoSums m n m' n') nt).trace xsys σ i).1.mem.toNet i₁ l₁ ∧
+      l₁.length = m' + n' + 1 ∧
+      (∀ a, a ∈ l₀ → tagged 1 a = false) ∧ (∀ a, a ∈ l₁ → tagged 1 a = true) ∧
+      ∀ e, e ∈ ((XMach.init (twoSums m n m' n') nt).trace xsys σ i).1.mem.agents →
+        e.1 ∈ l₀ ∨ e.1 ∈ l₁ := by
+  obtain ⟨-, h0, h1⟩ := two_sums_rest m n m' n' hnt σ hr
+  obtain ⟨-, -, -, -, -, hlen⟩ := two_sums_census m n m' n' hnt σ hr
+  have hX := two_sums_wf m n m' n'
+  have L := XMach.trace_live σ (XMach.init_live (xs := xsys) hX hnt) i
+  obtain ⟨q, -⟩ := L.rest hr
+  have r := XMach.trace_run xsys σ (XMach.init (twoSums m n m' n') nt) i
+  rw [XMach.init_toMach] at r
+  have hN : ((XMach.init (twoSums m n m' n') nt).trace xsys σ i).1.mem.toNet.WF ar :=
+    Steps.wf hX (MRun.quiet hX r q)
+  exact numerals_cover hN (two_sums_apart m n m' n' nt σ i) h0 h1 (by omega)
+
+/-- `0 + 7` beside `3 + 0`, with any number of threads and any schedule:
+at rest every agent in memory is one of the eight of the first numeral
+or one of the four of the second. -/
+example {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+    (hr : ((XMach.init (twoSums 0 7 3 0) nt).trace xsys σ i).1.resting = true) :
+    ∃ l₀ l₁ : List Id, l₀.length = 8 ∧ l₁.length = 4 ∧
+      ∀ e, e ∈ ((XMach.init (twoSums 0 7 3 0) nt).trace xsys σ i).1.mem.agents →
+        e.1 ∈ l₀ ∨ e.1 ∈ l₁ := by
+  obtain ⟨-, -, l₀, l₁, -, -, e0, -, -, e1, -, -, h⟩ := two_sums_exact 0 7 3 0 hnt σ hr
+  exact ⟨l₀, l₁, e0, e1, h⟩
 
 end Arith
 
