@@ -1646,6 +1646,15 @@ Two threads.  A second thread can make the program slower.
                                 its own net, one zero in each net, and
                                 nothing else; and no segment ever joins
                                 the two nets
+* `INet.Arith.two_sums_rest_num`, `INet.Arith.two_sums_fair`,
+  `INet.Arith.sum_rest_num`, `INet.Arith.rest_mem_eq`,
+  `INet.Arith.Within.isNum`
+                                and the two results are there: with any
+                                number of threads and any schedule, a
+                                memory at rest has the numeral `m + n`
+                                on the free port of the first net and
+                                `m' + n'` on that of the second; under a
+                                fair schedule the run comes to rest
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -2823,10 +2832,26 @@ holds up to equality rather than up to renaming.
   the memory then holds `m + n` successors and a zero in the first net,
   `m' + n'` successors and a zero in the second, and no other agent
   (`Arith.two_sums_rest_census`, for first arguments of one or more).
-  This counts the agents and does not say how they are wired; that the
-  memory at rest has no pair left to interact, and is reached from the
-  start by interactions, is in the general part (`XMach.Live.rest`,
-  `XMach.trace_run`).  For one
+  This counts the agents.  How they are wired is read off the run of
+  one thread.  Runs that end at rest hold the same net, whatever the
+  numbers of threads and the schedules (`Arith.rest_mem_eq`, from
+  `MRun.confluent`), so it is enough to look at the memory one thread
+  leaves.  For each addition that memory holds the cells that the rounds
+  on the addition alone leave (`Arith.two_sums_solo_final`).  The memory
+  one thread leaves on one addition has the numeral on its free port,
+  because it is the normal form (`Arith.sum_rest_num`,
+  `Arith.solo_final_num`).  And a numeral of a net whose cells are in a
+  larger memory under a tag is a numeral of that memory: the segments of
+  the net are there, and an agent or a free port with the tag is one of
+  the net, so the ends of its wires are ends and the points between are
+  not (`Arith.Within`, `Arith.Within.isNum`).  So a memory at rest has
+  the numeral `m + n` on the free port of the first net and `m' + n'` on
+  that of the second (`Arith.two_sums_rest_num`, for first arguments of
+  one or more), and under a schedule in which every thread keeps being
+  scheduled the run does come to rest (`Arith.two_sums_fair`).  A
+  numeral is a zero under successors joined by wires, and a wire is any
+  chain of segments: the memory keeps the segments of earlier rounds,
+  so `Arith.readNat`, which follows single segments, does not read it.  For one
   addition, the condition on the number of threads in
   `Arith.threads_exact` is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
@@ -67003,6 +67028,335 @@ example {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
       ((XMach.init (twoSums 6 32 6 32) nt).trace xsys σ i).1.mem.agents.length = 78 := by
   obtain ⟨-, h1, h2, -, -, h3⟩ := two_sums_rest_census 5 32 5 32 hnt σ hr
   exact ⟨h1, h2, h3⟩
+
+/-- **A net within a larger memory**: the segments of `X` are in `Y` with
+the tag `c` at the end of every name, and the agents and the free ports
+of `Y` with the tag are those of `X`. -/
+structure Within (c : Nat) (X Y : XNet Arith) : Prop where
+  link : ∀ p q, (p, q) ∈ X.wires → (tagPort c p, tagPort c q) ∈ Y.wires
+  agent : ∀ i γ, (i ++ [c], γ) ∈ Y.agents ↔ (i, γ) ∈ X.agents
+  free : ∀ p, tagPort c p ∈ Y.free ↔ p ∈ X.free
+
+theorem Within.end_iff {c : Nat} {X Y : XNet Arith} (h : Within c X Y) (p : Port) :
+    Y.toNet.End ar (tagPort c p) ↔ X.toNet.End ar p := by
+  show (tagPort c p ∈ Y.free ∨ ∃ γ, (p.1 ++ [c], γ) ∈ Y.agents ∧ p.2 ≤ ar γ) ↔
+    (p ∈ X.free ∨ ∃ γ, (p.1, γ) ∈ X.agents ∧ p.2 ≤ ar γ)
+  exact or_congr (h.free p) (exists_congr fun γ => and_congr (h.agent p.1 γ) Iff.rfl)
+
+/-- A wire of the net is a wire of the memory. -/
+theorem Within.walk {c : Nat} {X Y : XNet Arith} (h : Within c X Y) {u v x y : Port}
+    (w : Walk X.toNet.link (X.toNet.End ar) u v x y) :
+    Walk Y.toNet.link (Y.toNet.End ar) (tagPort c u) (tagPort c v) (tagPort c x)
+      (tagPort c y) := by
+  induction w with
+  | single hl => exact .single (h.link _ _ hl)
+  | cons hl hT hne _ ih =>
+    exact .cons (h.link _ _ hl) (fun he => hT ((h.end_iff _).1 he))
+      (fun e => hne (tagPort_inj e)) ih
+
+theorem Within.paired {c : Nat} {X Y : XNet Arith} (h : Within c X Y) {p q : Port}
+    (hp : X.toNet.Paired ar p q) : Y.toNet.Paired ar (tagPort c p) (tagPort c q) := by
+  obtain ⟨e1, e2, v, x, w⟩ := hp
+  exact ⟨(h.end_iff p).2 e1, (h.end_iff q).2 e2, tagPort c v, tagPort c x, h.walk w⟩
+
+theorem Within.num {c : Nat} {X Y : XNet Arith} (h : Within c X Y) :
+    ∀ {k : Nat} {i : Id}, Num X.toNet i k → Num Y.toNet (i ++ [c]) k
+  | 0, i, hz => (h.agent i zero).2 hz
+  | _ + 1, i, ⟨hs, i', hp, hn⟩ => ⟨(h.agent i succ).2 hs, i' ++ [c], h.paired hp, h.num hn⟩
+
+/-- **A numeral of the net is a numeral of the memory.** -/
+theorem Within.isNum {c : Nat} {X Y : XNet Arith} (h : Within c X Y) {p : Port} {k : Nat}
+    (hn : IsNum X.toNet p k) : IsNum Y.toNet (tagPort c p) k := by
+  obtain ⟨i, hp, hk⟩ := hn
+  exact ⟨i ++ [c], h.paired hp, h.num hk⟩
+
+/-- A memory whose cells with the tag are a net with the agents and the
+segments of `X` holds `X` within it. -/
+theorem Looks.within {c : Nat} {X X' Y : XNet Arith} (h : Looks c X' Y)
+    (ha : X.agents = X'.agents) (hw : ∀ e, e ∈ X.wires ↔ e ∈ X'.wires)
+    (hf : ∀ p, tagPort c p ∈ Y.free ↔ p ∈ X.free) : Within c X Y where
+  link := fun p q hl => by
+    have h1 : tagL c (p, q) ∈ X'.wires.map (tagL c) := List.mem_map_of_mem ((hw (p, q)).1 hl)
+    rw [← h.wires] at h1
+    exact (List.mem_filter.1 h1).1
+  agent := fun i γ => by
+    rw [ha]
+    constructor
+    · intro hy
+      have h1 : (i ++ [c], γ) ∈ Y.agents.filter (fun e => tagged c e.1) :=
+        List.mem_filter.2 ⟨hy, tagged_self c i⟩
+      rw [h.agents] at h1
+      obtain ⟨e, he, ee⟩ := List.mem_map.1 h1
+      have e1 : e.1 ++ [c] = i ++ [c] := congrArg Prod.fst ee
+      have e2 : e.2 = γ := congrArg Prod.snd ee
+      have e3 : e = (i, γ) := Prod.ext (List.append_cancel_right e1) e2
+      rw [← e3]
+      exact he
+    · intro hx
+      have h1 : tagA c (i, γ) ∈ X'.agents.map (tagA c) := List.mem_map_of_mem hx
+      rw [← h.agents] at h1
+      exact (List.mem_filter.1 h1).1
+  free := hf
+
+/-- The free ports are never written. -/
+theorem works_free {X X' : XNet Arith} {T T' : XThread Arith} {c k : Nat}
+    (w : Works xsys X T X' T' c k) : X'.free = X.free := by
+  induction w with
+  | refl X T => rfl
+  | @step X X₁ X' T T₁ T' c₁ c k hT h _ ih =>
+    have e : X₁.free = X.free := by
+      have a := XMach.act_free xsys X T
+      rw [h] at a
+      exact a
+    exact ih.trans e
+
+theorem free_tag0 (A B : List Port) (p : Port) :
+    tagPort 0 p ∈ A.map (tagPort 0) ++ B.map (tagPort 1) ↔ p ∈ A := by
+  constructor
+  · intro h
+    rcases List.mem_append.1 h with h | h
+    · obtain ⟨q, hq, e⟩ := List.mem_map.1 h
+      rw [← tagPort_inj e]
+      exact hq
+    · obtain ⟨q, -, e⟩ := List.mem_map.1 h
+      have e1 : q.1 ++ [1] = p.1 ++ [0] := congrArg Prod.fst e
+      exact absurd (snoc_inj e1).2 (by decide)
+  · intro h
+    exact List.mem_append_left _ (List.mem_map_of_mem h)
+
+theorem free_tag1 (A B : List Port) (p : Port) :
+    tagPort 1 p ∈ A.map (tagPort 0) ++ B.map (tagPort 1) ↔ p ∈ B := by
+  constructor
+  · intro h
+    rcases List.mem_append.1 h with h | h
+    · obtain ⟨q, -, e⟩ := List.mem_map.1 h
+      have e1 : q.1 ++ [0] = p.1 ++ [1] := congrArg Prod.fst e
+      exact absurd (snoc_inj e1).2 (by decide)
+    · obtain ⟨q, hq, e⟩ := List.mem_map.1 h
+      rw [← tagPort_inj e]
+      exact hq
+  · intro h
+    exact List.mem_append_right _ (List.mem_map_of_mem h)
+
+/-- **Runs that end at rest hold the same net**, whatever the numbers of
+threads and the schedules. -/
+theorem rest_mem_eq {X : XNet Arith} (hX : X.toNet.WF ar) {nt nt' : Nat} (hnt : 0 < nt)
+    (hnt' : 0 < nt') (σ σ' : Nat → Nat) {i j : Nat}
+    (h1 : ((XMach.init X nt).trace xsys σ i).1.resting = true)
+    (h2 : ((XMach.init X nt').trace xsys σ' j).1.resting = true) :
+    ((XMach.init X nt).trace xsys σ i).1.mem.toNet =
+      ((XMach.init X nt').trace xsys σ' j).1.mem.toNet := by
+  have L1 := XMach.trace_live σ (XMach.init_live (xs := xsys) hX hnt) i
+  have L2 := XMach.trace_live σ' (XMach.init_live (xs := xsys) hX hnt') j
+  obtain ⟨q1, n1⟩ := L1.rest h1
+  obtain ⟨q2, n2⟩ := L2.rest h2
+  have r1 := XMach.trace_run xsys σ (XMach.init X nt) i
+  have r2 := XMach.trace_run xsys σ' (XMach.init X nt') j
+  rw [XMach.init_toMach] at r1 r2
+  exact (MRun.confluent hX r1 r2 q1 q2 n1 n2).1
+
+/-- **One addition comes out right, whatever the threads do**: with any
+number of threads and any schedule, a memory at rest has the numeral
+`m + n` on the free port. -/
+theorem sum_rest_num (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+    (hr : ((XMach.init (sum m n) nt).trace xsys σ i).1.resting = true) :
+    IsNum ((XMach.init (sum m n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (m + n) := by
+  have g := good_sum m n
+  obtain ⟨N', hs, hn', hnum⟩ := add_correct g.config
+  have L := XMach.trace_live σ (XMach.init_live (xs := xsys) g.ok.1 hnt) i
+  obtain ⟨q, hn⟩ := L.rest hr
+  have r := XMach.trace_run xsys σ (XMach.init (sum m n) nt) i
+  rw [XMach.init_toMach] at r
+  obtain ⟨-, hu⟩ := MRun.final g.ok.1 r q hn
+  obtain ⟨e, -⟩ := (hu hs).2 hn'
+  have e' : N' = ((XMach.init (sum m n) nt).trace xsys σ i).1.mem.toNet := e
+  rw [← e']
+  exact hnum
+
+/-- **The memory one thread leaves on an addition carries the sum**: the
+memory described by `Final`, with the free port of the start and the
+numeral `(m + 1) + n` on it. -/
+theorem solo_final_num (m n : Nat) : ∃ Xf, Final n (sum (m + 1) n) Xf (n + 3 + m + 1) m ∧
+    Xf.free = (sum (m + 1) n).free ∧ IsNum Xf.toNet ([0], 0) (m + 1 + n) := by
+  obtain ⟨Xf, r, F⟩ := solo_rounds m n
+  have p := F.pass_stays (snd_sum (m + 1) n) (sum_fresh (m + 1) n)
+  have w := r.works.trans p.works
+  have t := w.trace.1
+  have h1 : ((XMach.init (sum (m + 1) n) 1).trace xsys (fun _ => 0)
+      (17 * m + 25 + (5 * m + 3 * n + 10))).1.resting = true := by
+    rw [XMach.init_one, t]
+    rfl
+  have hnum := sum_rest_num (m + 1) n (Nat.zero_lt_one) (fun _ => 0) h1
+  rw [XMach.init_one, t] at hnum
+  exact ⟨Xf, F, works_free w, hnum⟩
+
+/-- **One thread on two additions side by side: what it leaves.**  The
+memory at rest, and the memories that the rounds on each addition alone
+leave, seen in it. -/
+theorem two_sums_solo_final (m n m' n' : Nat) : ∃ Yf XAf XBf,
+    Works xsys (twoSums (m + 1) n (m' + 1) n')
+      ⟨(twoSums (m + 1) n (m' + 1) n').agents, .idle⟩ Yf ⟨[], .idle⟩ (m + m' + 4)
+      (twoSolo (m + 1) n (m' + 1) n') ∧
+    Final n (sum (m + 1) n) XAf (n + 3 + m + 1) m ∧ Looks 0 XAf Yf ∧
+    Final n' (sum (m' + 1) n') XBf (n' + 3 + m' + 1) m' ∧ Looks 1 XBf Yf := by
+  have hA0 : Looks 0 (sum (m + 1) n) (twoSums (m + 1) n (m' + 1) n') := looks_left _ _
+  have hB0 : Looks 1 (sum (m' + 1) n') (twoSums (m + 1) n (m' + 1) n') := looks_right _ _
+  have eY0 : (twoSums (m + 1) n (m' + 1) n').agents =
+      (sum (m + 1) n).agents.map (tagA 0) ++ (sum (m' + 1) n').agents.map (tagA 1) := rfl
+  have stA : Start n (sum (m + 1) n) (n + 3 + m) := by
+    have h := start_sum m n
+    have e : m + n + 3 = n + 3 + m := by omega
+    rw [e] at h
+    exact h
+  have stB : Start n' (sum (m' + 1) n') (n' + 3 + m') := by
+    have h := start_sum m' n'
+    have e : m' + n' + 3 = n' + 3 + m' := by omega
+    rw [e] at h
+    exact h
+  obtain ⟨restA, hAa⟩ := stA.head
+  obtain ⟨restB, hBa⟩ := stB.head
+  obtain ⟨XAf, Y1, wA, FA, hA1, mvA⟩ :=
+    hA0.rounds_all (restA.map (tagA 0) ++ (sum (m' + 1) n').agents.map (tagA 1))
+  have wA' : Works xsys (twoSums (m + 1) n (m' + 1) n')
+      ⟨(twoSums (m + 1) n (m' + 1) n').agents, .idle⟩ Y1 ⟨Y1.agents, .idle⟩ (m + 2)
+      (17 * m + 25) := by
+    rw [eY0, hAa]
+    exact wA
+  have hB1 : Looks 1 (sum (m' + 1) n') Y1 := mvA.other 1 _ (by decide) hB0
+  obtain ⟨N', hN', hNt⟩ := mvA.keep ((sum (m + 1) n).agents.map (tagA 0))
+    ((sum (m' + 1) n').agents.map (tagA 1)) eY0 (fun _ he => mem_tag_self he)
+    (fun _ he => mem_tag_other (by decide) he)
+  have eN : N' = XAf.agents.map (tagA 0) := by
+    have f := hA1.agents
+    rw [hN', List.filter_append,
+      (List.filter_eq_self (p := fun e : Id × Arith => tagged 0 e.1)).2 (fun e he => hNt e he),
+      filter_tag_none (by decide), List.append_nil] at f
+    exact f
+  have eY1 : Y1.agents =
+      XAf.agents.map (tagA 0) ++ (sum (m' + 1) n').agents.map (tagA 1) := by
+    rw [hN', eN]
+  have sA := FA.pass_stays (snd_sum (m + 1) n) (sum_fresh (m + 1) n)
+  obtain ⟨k1, k2, hk, sY1, sX1⟩ := hA1.pass sA rfl trivial XAf.agents []
+    ((sum (m' + 1) n').agents.map (tagA 1)) (List.append_nil _).symm
+  have ek2 := stays_rest_zero sX1
+  have pA : Works xsys Y1 ⟨Y1.agents, .idle⟩ Y1
+      ⟨(sum (m' + 1) n').agents.map (tagA 1), .idle⟩ 0 (5 * m + 3 * n + 10) := by
+    rw [eY1]
+    have e : k1 = 5 * m + 3 * n + 10 := by omega
+    rw [← e]
+    exact sY1.works
+  obtain ⟨XBf, Y2, wB, FB, hB2, mvB⟩ := hB1.rounds_all (restB.map (tagA 1))
+  have wB' : Works xsys Y1 ⟨(sum (m' + 1) n').agents.map (tagA 1), .idle⟩ Y2
+      ⟨Y2.agents, .idle⟩ (m' + 2) (17 * m' + 25) := by
+    rw [hBa]
+    exact wB
+  have hA2 : Looks 0 XAf Y2 := mvB.other 0 _ (by decide) hA1
+  have tg1 : ∀ e, e ∈ Y1.agents → tagged 0 e.1 = true ∨ tagged 1 e.1 = true := by
+    intro e he
+    rw [eY1] at he
+    rcases List.mem_append.1 he with he | he
+    · exact .inl (mem_tag_self he)
+    · exact .inr (mem_tag_self he)
+  have tg2 := mvB.tags (fun i => tagged 0 i = true ∨ tagged 1 i = true)
+    (fun i => .inr (tagged_self 1 i)) tg1
+  have sB := FB.pass_stays (snd_sum (m' + 1) n') (sum_fresh (m' + 1) n')
+  have pF := pass_two hA2 hB2 Y2.agents XAf.agents XBf.agents _ _ tg2 hA2.agents hB2.agents
+    sA sB
+  have w := ((wA'.trans pA).trans wB').trans pF.works
+  have e : 17 * m + 25 + (5 * m + 3 * n + 10) + (17 * m' + 25) +
+      (5 * m + 3 * n + 10 + (5 * m' + 3 * n' + 10)) = twoSolo (m + 1) n (m' + 1) n' := by
+    unfold twoSolo
+    rw [soloWork_succ, soloWork_succ]
+    omega
+  have ec : m + 2 + 0 + (m' + 2) + 0 = m + m' + 4 := by omega
+  rw [e, ec] at w
+  exact ⟨Y2, XAf, XBf, w, FA, hA2, FB, hB2⟩
+
+/-- **One thread on two additions leaves both sums.** -/
+theorem two_sums_solo_num (m n m' n' : Nat) : ∃ Yf,
+    Works xsys (twoSums (m + 1) n (m' + 1) n')
+      ⟨(twoSums (m + 1) n (m' + 1) n').agents, .idle⟩ Yf ⟨[], .idle⟩ (m + m' + 4)
+      (twoSolo (m + 1) n (m' + 1) n') ∧
+    IsNum Yf.toNet ([0, 0], 0) (m + 1 + n) ∧ IsNum Yf.toNet ([0, 1], 0) (m' + 1 + n') := by
+  obtain ⟨Yf, XAf, XBf, w, FA, hA, FB, hB⟩ := two_sums_solo_final m n m' n'
+  obtain ⟨XA, FA', fA, numA⟩ := solo_final_num m n
+  obtain ⟨XB, FB', fB, numB⟩ := solo_final_num m' n'
+  have hfY : Yf.free = (sum (m + 1) n).free.map (tagPort 0) ++
+      (sum (m' + 1) n').free.map (tagPort 1) := works_free w
+  have W0 : Within 0 XA Yf := hA.within (FA'.agents.trans FA.agents.symm)
+    (fun e => (FA'.wires e).trans (FA.wires e).symm) (fun p => by
+      rw [hfY, fA]
+      exact free_tag0 _ _ p)
+  have W1 : Within 1 XB Yf := hB.within (FB'.agents.trans FB.agents.symm)
+    (fun e => (FB'.wires e).trans (FB.wires e).symm) (fun p => by
+      rw [hfY, fB]
+      exact free_tag1 _ _ p)
+  exact ⟨Yf, w, W0.isNum numA, W1.isNum numB⟩
+
+/-- **Two additions side by side come out right, whatever the threads
+do.**  With any number of threads and any schedule, a memory at rest has
+the numeral `m + n` on the free port of the first net and the numeral
+`m' + n'` on the free port of the second. -/
+theorem two_sums_rest_num (m n m' n' : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+    (hr : ((XMach.init (twoSums (m + 1) n (m' + 1) n') nt).trace xsys σ i).1.resting = true) :
+    IsNum ((XMach.init (twoSums (m + 1) n (m' + 1) n') nt).trace xsys σ i).1.mem.toNet
+        ([0, 0], 0) (m + 1 + n) ∧
+      IsNum ((XMach.init (twoSums (m + 1) n (m' + 1) n') nt).trace xsys σ i).1.mem.toNet
+        ([0, 1], 0) (m' + 1 + n') := by
+  obtain ⟨Yf, w, hA, hB⟩ := two_sums_solo_num m n m' n'
+  have t := w.trace.1
+  have h1 : ((XMach.init (twoSums (m + 1) n (m' + 1) n') 1).trace xsys (fun _ => 0)
+      (twoSolo (m + 1) n (m' + 1) n')).1.resting = true := by
+    rw [XMach.init_one, t]
+    rfl
+  have e := rest_mem_eq (two_sums_wf (m + 1) n (m' + 1) n') hnt (Nat.zero_lt_one) σ
+    (fun _ => 0) hr h1
+  rw [XMach.init_one, t] at e
+  rw [e]
+  exact ⟨hA, hB⟩
+
+/-- **Two additions side by side by threads under a fair schedule.**  With
+any number of threads and any unending schedule in which every thread
+keeps being scheduled, from some action on every thread is at rest,
+`m + m' + 4` claims have been made, and the memory has the numeral
+`m + n` on the free port of the first net and `m' + n'` on that of the
+second. -/
+theorem two_sums_fair (m n m' n' : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
+    (hfair : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ σ j = u) :
+    ∃ i₀, ∀ i, i₀ ≤ i →
+      ((XMach.init (twoSums (m + 1) n (m' + 1) n') nt).trace xsys σ i).1.resting = true ∧
+      ((XMach.init (twoSums (m + 1) n (m' + 1) n') nt).trace xsys σ i).2 = m + m' + 4 ∧
+      IsNum ((XMach.init (twoSums (m + 1) n (m' + 1) n') nt).trace xsys σ i).1.mem.toNet
+        ([0, 0], 0) (m + 1 + n) ∧
+      IsNum ((XMach.init (twoSums (m + 1) n (m' + 1) n') nt).trace xsys σ i).1.mem.toNet
+        ([0, 1], 0) (m' + 1 + n') := by
+  obtain ⟨Yf, w⟩ := two_sums_solo_count m n m' n'
+  have t := w.trace.1
+  have hX := two_sums_wf (m + 1) n (m' + 1) n'
+  have L := XMach.trace_live (fun _ => 0)
+    (XMach.init_live (xs := xsys) hX (Nat.zero_lt_one)) (twoSolo (m + 1) n (m' + 1) n')
+  have r := XMach.trace_run xsys (fun _ => 0) (XMach.init (twoSums (m + 1) n (m' + 1) n') 1)
+    (twoSolo (m + 1) n (m' + 1) n')
+  rw [XMach.init_toMach] at r
+  have h1 : ((XMach.init (twoSums (m + 1) n (m' + 1) n') 1).trace xsys (fun _ => 0)
+      (twoSolo (m + 1) n (m' + 1) n')).1.resting = true := by
+    rw [XMach.init_one, t]
+    rfl
+  obtain ⟨q, hn⟩ := L.rest h1
+  have hs := (MRun.final hX r q hn).1
+  obtain ⟨i₀, h⟩ := XMach.fair_complete hX hnt hs hn σ hfair
+  refine ⟨i₀, fun i hi => ?_⟩
+  obtain ⟨hr, -, -⟩ := h i hi
+  obtain ⟨a, b⟩ := two_sums_rest_num m n m' n' hnt σ hr
+  exact ⟨hr, two_sums_claims m n m' n' hnt σ hr, a, b⟩
+
+/-- `6 + 32` twice, with any number of threads and any schedule: a memory
+at rest has `38` on each of the two free ports. -/
+example {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+    (hr : ((XMach.init (twoSums 6 32 6 32) nt).trace xsys σ i).1.resting = true) :
+    IsNum ((XMach.init (twoSums 6 32 6 32) nt).trace xsys σ i).1.mem.toNet ([0, 0], 0) 38 ∧
+      IsNum ((XMach.init (twoSums 6 32 6 32) nt).trace xsys σ i).1.mem.toNet ([0, 1], 0) 38 :=
+  two_sums_rest_num 5 32 5 32 hnt σ hr
 
 end Arith
 
