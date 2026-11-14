@@ -1471,6 +1471,22 @@ Two threads.  A second thread can make the program slower.
                                 three threads on `8 + 36`, 405 for six on
                                 `11 + 52`, where one thread takes 297 and
                                 411)
+* `INet.Arith.tagNet`, `INet.Arith.beside`, `INet.Arith.twoSums`
+                                two additions side by side in one net, the
+                                names of each tagged at the end, where a
+                                tag is kept by every interaction
+* `INet.Arith.twoSolo`, `INet.Arith.two_sums_one_thread`,
+  `INet.Arith.two_sums_two_threads`
+                                on that net, for the sizes computed, one
+                                thread takes the rounds of each addition
+                                and one more pass over what the first has
+                                left, and two threads in turn take fewer
+                                rounds, by two at least
+* `INet.Arith.two_sums_2_2`, `INet.Arith.two_sums_4_3`
+                                `2 + 2` twice: 147 rounds for one thread,
+                                106 for two, 86 for three, with 147, 191
+                                and 255 actions of work; `4 + 3` twice:
+                                254 rounds and 174
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -2412,7 +2428,23 @@ holds up to equality rather than up to renaming.
   of `Arith.threads_exact`: the rounds of one thread alone, less
   `raceSave d` when a thread races.  More threads in turn therefore save
   nine rounds at most and cost none (`Arith.threads_rounds_bounds`),
-  while each of them adds at least `3 * n + 4` actions of work.  The
+  while each of them adds at least `3 * n + 4` actions of work.  On a net
+  with two additions side by side (`Arith.twoSums`) threads do save time,
+  and that is computed, not proved for every size.  One thread takes
+  `Arith.twoSolo` rounds, those of each addition alone and one more pass
+  over what the first has left: checked by the kernel for `m` and `m'` up
+  to two and `n` and `n'` below three (`Arith.two_sums_one_thread`), and
+  computed for `m` and `m'` up to five and `n` and `n'` up to five.  Two
+  threads in turn are at rest sooner on each of these nets, by two rounds
+  at least (`Arith.two_sums_two_threads` for the first range); on two
+  equal additions up to `10 + 15` they take between 64 and 98 hundredths
+  of the rounds of one thread, and more work (`Arith.two_sums_4_3`: 174
+  rounds against 254, 327 actions against 254).  Their rounds follow no
+  simple law: a thread reloads the whole memory after each interaction
+  and takes pairs of either addition; on `6 + 10` twice the first thread
+  fires five pairs of each addition and the second two of each.  A proof
+  for every size needs first that a thread on one of two separate nets
+  acts as it does on that net alone, which is not in this file.  The
   condition on the number of threads is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
   to each after the round that takes it.  The agents the first thread has
@@ -57016,6 +57048,181 @@ example : Rounds 5 (XMach.init (sum 9 41) 5) 325 :=
 
 example : Rounds 6 (XMach.init (sum 11 52) 6) 405 :=
   (threads_rounds_exact 10 52 5 (by decide) (by decide) (by decide)).cast (by decide)
+
+/-- A port with `c` put at the end of the name of its agent. -/
+def tagPort (c : Nat) (p : Port) : Port := (p.1 ++ [c], p.2)
+
+/-- `tagNet c X`: the net `X` with `c` put at the end of every name.  A new
+agent is named by putting a number in front of the name of one of the two
+agents that make it, so a tag at the end is kept by every interaction. -/
+def tagNet (c : Nat) (X : XNet Arith) : XNet Arith :=
+  ⟨X.agents.map fun e => (e.1 ++ [c], e.2), X.free.map (tagPort c),
+    X.wires.map fun e => (tagPort c e.1, tagPort c e.2)⟩
+
+/-- Two nets side by side: the cells of the first, then those of the
+second, and no wire between them. -/
+def beside (X Y : XNet Arith) : XNet Arith :=
+  ⟨X.agents ++ Y.agents, X.free ++ Y.free, X.wires ++ Y.wires⟩
+
+/-- **Two additions side by side**: the net for `m + n` with its names
+tagged `0`, then the net for `m' + n'` with its names tagged `1`. -/
+def twoSums (m n m' n' : Nat) : XNet Arith :=
+  beside (tagNet 0 (sum m n)) (tagNet 1 (sum m' n'))
+
+/-- Both sums come out: `3 + 2` and `2 + 4` side by side reduce in seven
+steps to `5` and `6`. -/
+example : ((twoSums 3 2 2 4).normalize xsys 100).map
+    (fun r => (readNat r.1 20 ([0, 0], 0), readNat r.1 20 ([0, 1], 0), r.2)) =
+      some (some 5, some 6, 7) := by
+  decide +kernel
+
+/-- **The rounds one thread takes on two additions side by side, as the
+runs show**: those of each addition alone, and one more pass over what the
+first has left, `5 * m + 3 * n + 5` actions, at the very end. -/
+def twoSolo (m n m' n' : Nat) : Nat := soloWork m n + soloWork m' n' + (5 * m + 3 * n + 5)
+
+/-- A run that is at rest after `R` rounds and has done more work than
+`R - 1` rounds can hold takes exactly `R` rounds. -/
+theorem rounds_of_work {c : Nat} {M : XMach Arith} {R : Nat}
+    (hr : (M.trace xsys (fun i => i % c) (c * R)).1.resting = true)
+    (hw : c * (R - 1) < M.work xsys (fun i => i % c) (c * R)) : Rounds c M R := by
+  refine ⟨hr, fun R' hR' hrest => ?_⟩
+  obtain ⟨d, hd⟩ : ∃ d, c * R = c * R' + d := ⟨c * R - c * R', by
+    have h := Nat.mul_le_mul_left c (Nat.le_of_lt hR')
+    omega⟩
+  have e := XMach.work_rest (xs := xsys) (fun i => i % c) hrest d
+  have le := XMach.work_le_count xsys (fun i => i % c) M (c * R')
+  have h2 := Nat.mul_le_mul_left c (show R' ≤ R - 1 by omega)
+  rw [hd] at hw
+  omega
+
+/-- A run that is at rest after `R + 1` rounds and not after `R` takes
+exactly `R + 1`. -/
+theorem rounds_of_not {c : Nat} {M : XMach Arith} {R : Nat}
+    (hr : (M.trace xsys (fun i => i % c) (c * (R + 1))).1.resting = true)
+    (hn : ¬ (M.trace xsys (fun i => i % c) (c * R)).1.resting = true) :
+    Rounds c M (R + 1) := by
+  refine ⟨hr, fun R' hR' hrest => hn ?_⟩
+  obtain ⟨d, rfl⟩ : ∃ d, R = R' + d := ⟨R - R', by omega⟩
+  have h2 := XMach.resting_trace (xs := xsys) (fun i => i % c) hrest (c * d)
+  rw [← Nat.mul_add] at h2
+  exact h2
+
+/-- A run that is at rest after `R₀` rounds takes some number of rounds, at
+most `R₀`. -/
+theorem rounds_exists {c : Nat} {M : XMach Arith} : ∀ R₀,
+    (M.trace xsys (fun i => i % c) (c * R₀)).1.resting = true →
+    ∃ R, R ≤ R₀ ∧ Rounds c M R
+  | 0, h => ⟨0, Nat.le_refl 0, h, fun R' hR' => absurd hR' (Nat.not_lt_zero R')⟩
+  | R₀ + 1, h => by
+    by_cases h' : (M.trace xsys (fun i => i % c) (c * R₀)).1.resting = true
+    · obtain ⟨R, hR, r⟩ := rounds_exists R₀ h'
+      exact ⟨R, Nat.le_succ_of_le hR, r⟩
+    · exact ⟨R₀ + 1, Nat.le_refl _, rounds_of_not h h'⟩
+
+/-- The work of a run that is at rest. -/
+theorem total_of_rest {c : Nat} {M : XMach Arith} {N W : Nat}
+    (hr : (M.trace xsys (fun i => i % c) N).1.resting = true)
+    (hw : M.work xsys (fun i => i % c) N = W) : M.Total xsys (fun i => i % c) W :=
+  ⟨N, fun i hi => by
+    obtain ⟨d, rfl⟩ : ∃ d, i = N + d := ⟨i - N, by omega⟩
+    rw [XMach.work_rest (fun i => i % c) hr d, hw]⟩
+
+set_option maxRecDepth 100000 in
+/-- **One thread on two additions side by side, on every pair of sizes
+computed.**  For `m` and `m'` up to two and `n` and `n'` below three, the
+thread is at rest after exactly `twoSolo` actions, none of them a rest.
+This is a computation, size by size; it is not a proof for every size. -/
+theorem two_sums_one_checked : ∀ m, m < 2 → ∀ n, n < 3 → ∀ m', m' < 2 → ∀ n', n' < 3 →
+    ((XMach.init (twoSums (m + 1) n (m' + 1) n') 1).trace xsys (fun i => i % 1)
+        (1 * twoSolo (m + 1) n (m' + 1) n')).1.resting = true ∧
+      (XMach.init (twoSums (m + 1) n (m' + 1) n') 1).work xsys (fun i => i % 1)
+        (1 * twoSolo (m + 1) n (m' + 1) n') = twoSolo (m + 1) n (m' + 1) n' := by
+  decide +kernel
+
+set_option maxRecDepth 100000 in
+/-- **Two threads on the same nets are at rest two rounds sooner at
+least**, on every pair of sizes computed. -/
+theorem two_sums_two_checked : ∀ m, m < 2 → ∀ n, n < 3 → ∀ m', m' < 2 → ∀ n', n' < 3 →
+    ((XMach.init (twoSums (m + 1) n (m' + 1) n') 2).trace xsys (fun i => i % 2)
+      (2 * (twoSolo (m + 1) n (m' + 1) n' - 2))).1.resting = true := by
+  decide +kernel
+
+/-- **One thread takes `twoSolo` rounds on two additions side by side**,
+for the sizes computed. -/
+theorem two_sums_one_thread (m n m' n' : Nat) (hm : m < 2) (hn : n < 3) (hm' : m' < 2)
+    (hn' : n' < 3) :
+    Rounds 1 (XMach.init (twoSums (m + 1) n (m' + 1) n') 1) (twoSolo (m + 1) n (m' + 1) n') := by
+  obtain ⟨hr, hw⟩ := two_sums_one_checked m hm n hn m' hm' n' hn'
+  refine rounds_of_work hr ?_
+  rw [hw]
+  have h : 1 ≤ twoSolo (m + 1) n (m' + 1) n' := by
+    unfold twoSolo
+    omega
+  omega
+
+/-- **Two threads take fewer rounds than one on two additions side by
+side**, by two at least, for the sizes computed. -/
+theorem two_sums_two_threads (m n m' n' : Nat) (hm : m < 2) (hn : n < 3) (hm' : m' < 2)
+    (hn' : n' < 3) :
+    ∃ R, R + 2 ≤ twoSolo (m + 1) n (m' + 1) n' ∧
+      Rounds 2 (XMach.init (twoSums (m + 1) n (m' + 1) n') 2) R := by
+  obtain ⟨R, hR, r⟩ := rounds_exists _ (two_sums_two_checked m hm n hn m' hm' n' hn')
+  have h : 2 ≤ twoSolo (m + 1) n (m' + 1) n' := by
+    unfold twoSolo
+    omega
+  exact ⟨R, by omega, r⟩
+
+set_option maxRecDepth 100000 in
+/-- **`2 + 2` twice, side by side**: one thread takes 147 rounds, two
+threads 106 and three threads 86; the work is 147, 191 and 255 actions that
+are not rests. -/
+theorem two_sums_2_2 :
+    (Rounds 1 (XMach.init (twoSums 2 2 2 2) 1) 147 ∧
+      (XMach.init (twoSums 2 2 2 2) 1).Total xsys (fun i => i % 1) 147) ∧
+    (Rounds 2 (XMach.init (twoSums 2 2 2 2) 2) 106 ∧
+      (XMach.init (twoSums 2 2 2 2) 2).Total xsys (fun i => i % 2) 191) ∧
+    (Rounds 3 (XMach.init (twoSums 2 2 2 2) 3) 86 ∧
+      (XMach.init (twoSums 2 2 2 2) 3).Total xsys (fun i => i % 3) 255) := by
+  have a1 : ((XMach.init (twoSums 2 2 2 2) 1).trace xsys (fun i => i % 1) (1 * 147)).1.resting =
+      true ∧ (XMach.init (twoSums 2 2 2 2) 1).work xsys (fun i => i % 1) (1 * 147) = 147 := by
+    decide +kernel
+  have a2 : ((XMach.init (twoSums 2 2 2 2) 2).trace xsys (fun i => i % 2) (2 * 106)).1.resting =
+      true ∧ ¬ ((XMach.init (twoSums 2 2 2 2) 2).trace xsys (fun i => i % 2)
+        (2 * 105)).1.resting = true ∧
+      (XMach.init (twoSums 2 2 2 2) 2).work xsys (fun i => i % 2) (2 * 106) = 191 := by
+    decide +kernel
+  have a3 : ((XMach.init (twoSums 2 2 2 2) 3).trace xsys (fun i => i % 3) (3 * 86)).1.resting =
+      true ∧ ¬ ((XMach.init (twoSums 2 2 2 2) 3).trace xsys (fun i => i % 3)
+        (3 * 85)).1.resting = true ∧
+      (XMach.init (twoSums 2 2 2 2) 3).work xsys (fun i => i % 3) (3 * 86) = 255 := by
+    decide +kernel
+  exact ⟨⟨rounds_of_work a1.1 (by
+      rw [a1.2]
+      decide), total_of_rest a1.1 a1.2⟩,
+    ⟨rounds_of_not a2.1 a2.2.1, total_of_rest a2.1 a2.2.2⟩,
+    ⟨rounds_of_not a3.1 a3.2.1, total_of_rest a3.1 a3.2.2⟩⟩
+
+set_option maxRecDepth 100000 in
+/-- **`4 + 3` twice, side by side**: one thread takes 254 rounds, two
+threads 174; the work is 254 and 327. -/
+theorem two_sums_4_3 :
+    (Rounds 1 (XMach.init (twoSums 4 3 4 3) 1) 254 ∧
+      (XMach.init (twoSums 4 3 4 3) 1).Total xsys (fun i => i % 1) 254) ∧
+    (Rounds 2 (XMach.init (twoSums 4 3 4 3) 2) 174 ∧
+      (XMach.init (twoSums 4 3 4 3) 2).Total xsys (fun i => i % 2) 327) := by
+  have a1 : ((XMach.init (twoSums 4 3 4 3) 1).trace xsys (fun i => i % 1) (1 * 254)).1.resting =
+      true ∧ (XMach.init (twoSums 4 3 4 3) 1).work xsys (fun i => i % 1) (1 * 254) = 254 := by
+    decide +kernel
+  have a2 : ((XMach.init (twoSums 4 3 4 3) 2).trace xsys (fun i => i % 2) (2 * 174)).1.resting =
+      true ∧ ¬ ((XMach.init (twoSums 4 3 4 3) 2).trace xsys (fun i => i % 2)
+        (2 * 173)).1.resting = true ∧
+      (XMach.init (twoSums 4 3 4 3) 2).work xsys (fun i => i % 2) (2 * 174) = 327 := by
+    decide +kernel
+  exact ⟨⟨rounds_of_work a1.1 (by
+      rw [a1.2]
+      decide), total_of_rest a1.1 a1.2⟩,
+    ⟨rounds_of_not a2.1 a2.2.1, total_of_rest a2.1 a2.2.2⟩⟩
 
 end Arith
 
