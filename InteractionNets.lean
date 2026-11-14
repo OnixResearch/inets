@@ -1628,6 +1628,14 @@ Two threads.  A second thread can make the program slower.
                                 actions each among the threads: two
                                 threads in turn take at least
                                 `6 * n + 3 * n' + m + 9 * m' - 6` rounds
+* `INet.Arith.two_sums_rounds_late3`, `INet.Arith.two_sums_untouched2`,
+  `INet.Arith.phase1s`, `INet.Arith.two_sums_untouched_any`
+                                the same limit for up to `m + n + 2`
+                                threads, with three rounds less for each
+                                thread beyond `m + 2`; and under any
+                                schedule nothing of the second addition
+                                is touched before some thread has made
+                                `3 * n` actions of its own
 * `INet.Arith.round_robin_beats_turns`
                                 two threads acting in turn do less work
                                 than the same threads claiming in turn
@@ -2760,7 +2768,25 @@ holds up to equality rather than up to renaming.
   interactions among the threads, sixteen actions for all of them
   together; in the runs of the family one thread makes them all, at
   seventeen rounds each, and that is what is left between the limit and
-  the rounds proved.  For one
+  the rounds proved.  Looking at one addition alone would not make this
+  count better for two threads: by hand, an interaction needs a segment
+  that the one before writes as its fifth cell, and then three actions
+  more, so two interactions of one addition are some eight rounds apart,
+  which is what sixteen actions shared by two threads come to.  A proof
+  of that would help from three threads on; it is not in this file.  The
+  limit does hold for more threads.  A thread numbered above `m + 1`
+  starts further in the first addition, with fewer of the successors of
+  its second argument before the second addition, so with `c` threads
+  up to `m + n + 2` the first stretch is shorter by three rounds for
+  each thread beyond `m + 2` (`Arith.two_sums_init_pre3`,
+  `Arith.two_sums_untouched2`, `Arith.two_sums_rounds_late3`): on
+  `6 + 32` twice eight threads take 458 rounds in the run computed and
+  cannot take fewer than 287, and sixteen take 399 and cannot take fewer
+  than 249.  The first stretch itself does not need the threads to take
+  turns: under any schedule, as long as every action is made by a thread
+  that had made fewer than `3 * n` of its own, the cells of the second
+  addition are all in memory, in place (`Arith.phase1s`,
+  `Arith.two_sums_untouched_any`).  For one
   addition, the condition on the number of threads in
   `Arith.threads_exact` is a limit of the proof: the thread
   numbered `t` has the `t` top successors last in its list, and must come
@@ -65308,6 +65334,301 @@ than 1,844. -/
 example {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 200 6 200) 2) R) : 1844 ≤ R := by
   have h' := two_threads_late2 5 200 5 200 h
   omega
+
+theorem sndL_drop : ∀ (n j : Nat), j ≤ n → (sndL n).drop j = sndL (n - j)
+  | _, 0, _ => rfl
+  | 0, j + 1, h => absurd h (Nat.not_succ_le_zero j)
+  | n + 1, j + 1, h => by
+    have ih := sndL_drop n j (by omega)
+    have e : n + 1 - (j + 1) = n - j := by omega
+    rw [e]
+    exact ih
+
+/-- A thread numbered `m + 1 + j` starts with all but `j` of the `n`
+successors of the second argument of the first addition before the cells
+of the second. -/
+theorem two_sums_init_pre2 (m n m' n' : Nat) {j : Nat} (hj : j ≤ n) :
+    n - j ≤ pre (sideN n n') ((twoSums (m + 1) n (m' + 1) n').agents.drop (m + 1 + j) ++
+      (twoSums (m + 1) n (m' + 1) n').agents.take (m + 1 + j)) := by
+  obtain ⟨restB, hBa⟩ := (sum_start m' n').head
+  have eA : (twoSums (m + 1) n (m' + 1) n').agents =
+      (chainL n (m + 1)).map (tagA 0) ++ ((sndL n).map (tagA 0) ++
+        (base.agents.map (tagA 0) ++
+          (tagA 1 ([n' + 3 + m' + 1], Arith.succ) :: restB.map (tagA 1)))) := by
+    show (sum (m + 1) n).agents.map (tagA 0) ++ (sum (m' + 1) n').agents.map (tagA 1) = _
+    rw [sum_agents, hBa, List.map_append, List.map_append, List.append_assoc,
+      List.append_assoc]
+    rfl
+  have hlC : ((chainL n (m + 1)).map (tagA 0)).length = m + 1 := by
+    rw [List.length_map, chainL_length]
+  have hlS : ((sndL n).map (tagA 0)).length = n := by
+    rw [List.length_map]
+    exact sndL_length n
+  have e1 : ((chainL n (m + 1)).map (tagA 0)).drop (m + 1 + j) = [] :=
+    List.drop_eq_nil_of_le (by omega)
+  have e2 : m + 1 + j - ((chainL n (m + 1)).map (tagA 0)).length = j := by omega
+  have e3 : ((sndL n).map (tagA 0)).drop j = (sndL (n - j)).map (tagA 0) := by
+    rw [← List.map_drop, sndL_drop n j hj]
+  have e4 : ∀ (S Bs W Tk : List (Id × Arith)) (b : Id × Arith),
+      [] ++ (S ++ (Bs ++ b :: W)) ++ Tk = (S ++ Bs) ++ b :: (W ++ Tk) := by
+    intro S Bs W Tk b
+    simp
+  have hL : ∀ e, e ∈ (sndL (n - j)).map (tagA 0) ++ base.agents.map (tagA 0) →
+      tagged 1 e.1 = false := fun e he => by
+    rcases List.mem_append.1 he with h | h
+    · exact mem_tag_other (by decide) h
+    · exact mem_tag_other (by decide) h
+  rw [eA, List.drop_append, e1, e2, List.drop_append_of_le_length (by omega), e3, e4,
+    pre_front (sideN n n') (tagged_self 1 _) _ _ hL, sndCnt_append,
+    sndL_sndCnt (sideN n n') 0 (n - j) (Nat.sub_le n j), base_sndCnt]
+  omega
+
+/-- With `c` threads, `c` at most `m + n + 2`, every thread starts with
+`n - (c - (m + 2))` of those successors before the cells of the second
+addition. -/
+theorem two_sums_init_pre3 (m n m' n' : Nat) {c t : Nat} (hcn : c ≤ m + n + 2) (ht : t < c) :
+    n - (c - (m + 2)) ≤ pre (sideN n n') ((twoSums (m + 1) n (m' + 1) n').agents.drop t ++
+      (twoSums (m + 1) n (m' + 1) n').agents.take t) := by
+  by_cases h : t ≤ m + 1
+  · have h1 := two_sums_init_pre m n m' n' h
+    omega
+  · obtain ⟨j, rfl⟩ : ∃ j, t = m + 1 + j := ⟨t - (m + 1), by omega⟩
+    have h1 := two_sums_init_pre2 m n m' n' (j := j) (by omega)
+    omega
+
+/-- **Nothing of the second addition is touched in the first stretch,
+for more threads.**  With `c` threads in turn, `c` at most `m + n + 2`:
+after any number of actions up to `c * (3 * (n - (c - (m + 2))))` the
+cells of the second addition are all in memory, in place. -/
+theorem two_sums_untouched2 (m n m' n' : Nat) {c : Nat} (hc : 0 < c) (hcn : c ≤ m + n + 2)
+    {i : Nat} (hi : i ≤ c * (3 * (n - (c - (m + 2))))) :
+    ∃ L, ((XMach.init (twoSums (m + 1) n (m' + 1) n') c).trace xsys (fun i => i % c)
+          i).1.mem.agents = L ++ (sum (m' + 1) n').agents.map (tagA 1) ∧
+      ∀ e, e ∈ L → tagged 1 e.1 = false :=
+  (phase1 (n := n - (c - (m + 2))) hc (two_sums_memOk m n m' n') (two_sums_mem1 m n m' n')
+    (fun _ he => mem_tag_self he) (two_sums_b0 m' n')
+    (by
+      have h := two_sums_b0_cnt n m' n'
+      omega)
+    (fun _ ht => two_sums_init_pre3 m n m' n' hcn ht) i hi).mem.shape
+
+/-- **The limit for more threads.**  With `c` threads in turn, `c` at
+most `m + n + 2`, on two additions side by side: as for `m + 2` threads
+or fewer, but for three rounds for each thread beyond `m + 2`, which
+starts that much further in the first addition. -/
+theorem two_sums_rounds_late3 (m n m' n' : Nat) {c R : Nat} (hc : 0 < c) (hcn : c ≤ m + n + 2)
+    (h : Rounds c (XMach.init (twoSums (m + 1) n (m' + 1) n') c) R) :
+    c * (6 * n + 3 * n' + m + m' + 4) + 16 * (m' + 1) ≤
+      c * (R + c + 16 + 3 * (c - (m + 2))) := by
+  have hr := h.1
+  have hC := two_sums_claims m n m' n' hc (fun i => i % c) hr
+  have hb0 : n - (c - (m + 2)) + sndCnt (sideN n n') ((sum (m' + 1) n').agents.map (tagA 1)) ≤
+      n + n' := by
+    have h1 := two_sums_b0_cnt n m' n'
+    omega
+  by_cases hsmall : 16 * (m' + 2) ≤ 15 * c + 17
+  · have hF : fcnt (sideN n n') (twoSums (m + 1) n (m' + 1) n').agents <
+        fcnt (sideN n n') ((sum (m' + 1) n').agents.map (tagA 1)) + (m + m' + 4) := by
+      show fcnt (sideN n n') ((sum (m + 1) n).agents.map (tagA 0) ++
+        (sum (m' + 1) n').agents.map (tagA 1)) < _
+      rw [fcnt_append]
+      have h1 := sum_fcnt_le (sideN n n') 0 n rfl (m + 1)
+      omega
+    have hl := late_floor (n := n - (c - (m + 2))) hc (two_sums_wf (m + 1) n (m' + 1) n')
+      (two_sums_nodup (m + 1) n (m' + 1) n') (two_sums_memOk m n m' n')
+      (two_sums_mem1 m n m' n') (fun _ he => mem_tag_self he) (two_sums_b0 m' n') hb0
+      (fun _ ht => two_sums_init_pre3 m n m' n' hcn ht) hF hr hC
+    rw [succs_two_sums] at hl
+    have h2 : 6 * n + 3 * n' + m + m' + 4 ≤ R + c + 3 * (c - (m + 2)) := by omega
+    have h3 := Nat.mul_le_mul_left c h2
+    have e : c * (R + c + 16 + 3 * (c - (m + 2))) =
+        c * (R + c + 3 * (c - (m + 2))) + c * 16 := by
+      rw [← Nat.mul_add]
+      congr 1
+      omega
+    rw [e]
+    omega
+  · obtain ⟨D, hD⟩ : ∃ D, 16 * (m' + 2) = D + 15 * c + 17 :=
+      ⟨16 * (m' + 2) - 15 * c - 17, by omega⟩
+    have hF : 16 * fcnt (sideN n n') (twoSums (m + 1) n (m' + 1) n').agents + D + 15 * c +
+        8 * adders (twoSums (m + 1) n (m' + 1) n').agents <
+        16 * (fcnt (sideN n n') ((sum (m' + 1) n').agents.map (tagA 1)) + (m + m' + 4)) := by
+      rw [adders_two_sums]
+      show 16 * fcnt (sideN n n') ((sum (m + 1) n).agents.map (tagA 0) ++
+        (sum (m' + 1) n').agents.map (tagA 1)) + D + 15 * c + 8 * 2 < _
+      rw [fcnt_append]
+      have h1 := sum_fcnt_le (sideN n n') 0 n rfl (m + 1)
+      omega
+    have hl := late_floor2 (n := n - (c - (m + 2))) (D := D) hc
+      (two_sums_wf (m + 1) n (m' + 1) n') (two_sums_nodup (m + 1) n (m' + 1) n')
+      (two_sums_memOk m n m' n') (two_sums_mem1 m n m' n') (fun _ he => mem_tag_self he)
+      (two_sums_b0 m' n') hb0 (fun _ ht => two_sums_init_pre3 m n m' n' hcn ht) hF hr hC
+    rw [succs_two_sums] at hl
+    have hdm := Nat.div_add_mod D c
+    have hml := Nat.mod_lt D hc
+    have h2 : 6 * n + 3 * n' + m + m' + 4 + D / c ≤ R + c + 3 * (c - (m + 2)) := by omega
+    have h3 := Nat.mul_le_mul_left c h2
+    rw [Nat.mul_add c _ (D / c)] at h3
+    have e : c * (R + c + 16 + 3 * (c - (m + 2))) =
+        c * (R + c + 3 * (c - (m + 2))) + c * 16 := by
+      rw [← Nat.mul_add]
+      congr 1
+      omega
+    rw [e]
+    omega
+
+/-- `6 + 32` twice with eight threads in turn: they take 458 rounds in
+the run computed, and cannot take fewer than 287. -/
+example {R : Nat} (h : Rounds 8 (XMach.init (twoSums 6 32 6 32) 8) R) : 287 ≤ R := by
+  have h' := two_sums_rounds_late3 5 32 5 32 (by decide) (by decide) h
+  omega
+
+/-- With sixteen: 399 rounds in the run computed, and not fewer than
+249. -/
+example {R : Nat} (h : Rounds 16 (XMach.init (twoSums 6 32 6 32) 16) R) : 249 ≤ R := by
+  have h' := two_sums_rounds_late3 5 32 5 32 (by decide) (by decide) h
+  omega
+
+/-- The actions the thread numbered `t` has made among the first `i` of a
+schedule. -/
+def ownCnt (σ : Nat → Nat) (t : Nat) : Nat → Nat
+  | 0 => 0
+  | i + 1 => ownCnt σ t i + (if σ i = t then 1 else 0)
+
+/-- **The first stretch under any schedule**, after `i` actions: the
+second net is untouched, every thread works in the first net, and each
+thread has, with the actions it has made, still three to make for each
+of the `n` successors of the second argument of the first net before it
+comes to a cell of the second. -/
+structure Ph1s (N : Nat → Nat) (n : Nat) (B0 : List (Id × Arith)) (σ : Nat → Nat) (i : Nat)
+    (M : XMach Arith) : Prop where
+  mem : Mem1 B0 M.mem
+  guard : ∀ T, T ∈ M.ths → Guard T.st
+  pot : ∀ t T, M.ths[t]? = some T →
+    3 * n ≤ lam N (g1 N n) (3 * n) T + ownCnt σ t i
+
+theorem ph1s_step {N : Nat → Nat} {K n : Nat} {B0 : List (Id × Arith)} {σ : Nat → Nat}
+    {i : Nat} {M : XMach Arith} (hO : MachOk N K M) (hB : ∀ e, e ∈ B0 → tagged 1 e.1 = true)
+    (hb : ∃ b W, B0 = b :: W ∧ tagged 1 b.1 = true) (hB0 : n + sndCnt N B0 ≤ K)
+    (h : Ph1s N n B0 σ i M) (hi : ownCnt σ (σ i) i < 3 * n) :
+    Ph1s N n B0 σ (i + 1) (M.step xsys (σ i)).1 := by
+  have hR : 3 * n ≤ g1 N n M.mem.agents := by
+    have hp := mem1_pre hO.1 h.mem hb hB0
+    show 3 * n ≤ min (3 * pre N M.mem.agents) (3 * n)
+    omega
+  cases h0 : M.ths[σ i]? with
+  | none =>
+    have es : M.step xsys (σ i) = (M, 0) := by
+      unfold XMach.step
+      rw [h0]
+    rw [es]
+    refine ⟨h.mem, h.guard, fun t T hT => ?_⟩
+    have hp := h.pot t T hT
+    show 3 * n ≤ lam N (g1 N n) (3 * n) T + (ownCnt σ t i + (if σ i = t then 1 else 0))
+    omega
+  | some T0 =>
+    have hlt : σ i < M.ths.length := Nat.lt_of_not_le fun hle => by
+      rw [List.getElem?_eq_none_iff.2 hle] at h0
+      cases h0
+    have es := XMach.step_eq (M := M) (t := σ i) h0 (act_self M.mem T0)
+    have e2 : (M.step xsys (σ i)).1.ths =
+        M.ths.set (σ i) (XMach.act xsys M.mem T0).2.1 := by rw [es]
+    have e3 : (M.step xsys (σ i)).1.mem = (XMach.act xsys M.mem T0).1 := by rw [es]
+    have hp0 := h.pot (σ i) T0 h0
+    have hg0 := h.guard T0 (List.mem_of_getElem? h0)
+    have hdrop := act_lam (g1 N n) (3 * n) hO.1 (hO.2 T0 (List.mem_of_getElem? h0))
+      (g1_cons N n) (fun l => Nat.min_le_right _ _) hR
+    have hhead : ∀ e rest, T0.st = .idle → T0.todo = e :: rest → tagged 1 e.1 = false := by
+      intro e rest hst htd
+      obtain ⟨todo, st⟩ := T0
+      have hst' : st = .idle := hst
+      have htd' : todo = e :: rest := htd
+      subst hst'
+      subst htd'
+      have hp0' : 3 * n ≤ g1 N n (e :: rest) + 0 + ownCnt σ (σ i) i := hp0
+      have hpos : 0 < g1 N n (e :: rest) := by omega
+      exact g1_head N n hpos
+    have ha := act_phase1 h.mem hB hg0 hhead
+    refine ⟨?_, fun T hT => ?_, fun t T' hT' => ?_⟩
+    · rw [e3]
+      exact ha.1
+    · rw [e2] at hT
+      rcases List.mem_or_eq_of_mem_set hT with h1 | h1
+      · exact h.guard T h1
+      · rw [h1]
+        exact ha.2
+    · rw [e2] at hT'
+      by_cases e : σ i = t
+      · subst e
+        rw [List.getElem?_set_self hlt] at hT'
+        cases hT'
+        show 3 * n ≤ lam N (g1 N n) (3 * n) (XMach.act xsys M.mem T0).2.1 +
+          (ownCnt σ (σ i) i + (if σ i = σ i then 1 else 0))
+        rw [ite_pos' rfl]
+        omega
+      · rw [List.getElem?_set_ne e] at hT'
+        have hp := h.pot t T' hT'
+        show 3 * n ≤ lam N (g1 N n) (3 * n) T' + (ownCnt σ t i + (if σ i = t then 1 else 0))
+        omega
+
+/-- **Nothing of the second net is touched before some thread has made
+`3 * n` actions of its own, whatever the schedule.**  From a memory in
+order whose second net is in place, when each thread starts with the `n`
+successors of the second argument of the first net before the cells of
+the second: as long as every action is made by a thread that had made
+fewer than `3 * n` before it, the cells of the second net are all in
+memory, in place, and every thread works in the first net. -/
+theorem phase1s {N : Nat → Nat} {K n : Nat} {B0 : List (Id × Arith)} {X : XNet Arith}
+    (hO : MemOk N K X) (h1 : Mem1 B0 X) (hB : ∀ e, e ∈ B0 → tagged 1 e.1 = true)
+    (hb : ∃ b W, B0 = b :: W ∧ tagged 1 b.1 = true) (hB0 : n + sndCnt N B0 ≤ K) (nt : Nat)
+    (σ : Nat → Nat)
+    (hinit : ∀ t, t < nt → n ≤ pre N (X.agents.drop t ++ X.agents.take t)) :
+    ∀ i, (∀ j, j < i → ownCnt σ (σ j) j < 3 * n) →
+      Ph1s N n B0 σ i ((XMach.init X nt).trace xsys σ i).1
+  | 0, _ => by
+    refine ⟨h1, fun T hT => ?_, fun t T hT => ?_⟩
+    · obtain ⟨t, -, rfl⟩ := List.mem_map.1 hT
+      exact trivial
+    · have hT' : (XMach.init X nt).ths[t]? = some T := hT
+      have ht : t < nt := Nat.lt_of_not_le fun hle => by
+        have hn : (XMach.init X nt).ths[t]? = none :=
+          List.getElem?_eq_none_iff.2 (by
+            rw [init_length]
+            exact hle)
+        rw [hn] at hT'
+        cases hT'
+      have e : (XMach.init X nt).ths[t]? =
+          some ⟨X.agents.drop t ++ X.agents.take t, .idle⟩ := by
+        show ((List.range nt).map _)[t]? = _
+        rw [List.getElem?_map, List.getElem?_range ht]
+        rfl
+      rw [e] at hT'
+      cases hT'
+      have hi := hinit t ht
+      have h3 : 3 * n ≤ min (3 * pre N (X.agents.drop t ++ X.agents.take t)) (3 * n) + 0 := by
+        omega
+      exact Nat.le_trans h3 (Nat.le_add_right _ _)
+  | i + 1, hi =>
+    ph1s_step (trace_ok σ (init_ok hO nt) i) hB hb hB0
+      (phase1s hO h1 hB hb hB0 nt σ hinit i (fun j hj => hi j (by omega)))
+      (hi i (Nat.lt_succ_self i))
+
+/-- **Two additions side by side, any schedule**: with `nt` threads, `nt`
+at most `m + n + 2`, as long as every action is made by a thread that
+had made fewer than `3 * (n - (nt - (m + 2)))` before it, the cells of
+the second addition are all in memory, in place. -/
+theorem two_sums_untouched_any (m n m' n' : Nat) {nt : Nat} (hcn : nt ≤ m + n + 2)
+    (σ : Nat → Nat) {i : Nat}
+    (hi : ∀ j, j < i → ownCnt σ (σ j) j < 3 * (n - (nt - (m + 2)))) :
+    ∃ L, ((XMach.init (twoSums (m + 1) n (m' + 1) n') nt).trace xsys σ i).1.mem.agents =
+        L ++ (sum (m' + 1) n').agents.map (tagA 1) ∧
+      ∀ e, e ∈ L → tagged 1 e.1 = false :=
+  (phase1s (n := n - (nt - (m + 2))) (two_sums_memOk m n m' n') (two_sums_mem1 m n m' n')
+    (fun _ he => mem_tag_self he) (two_sums_b0 m' n')
+    (by
+      have h := two_sums_b0_cnt n m' n'
+      omega)
+    nt σ (fun _ ht => two_sums_init_pre3 m n m' n' hcn ht) i hi).mem.shape
 
 end Arith
 
