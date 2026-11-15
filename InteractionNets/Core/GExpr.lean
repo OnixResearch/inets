@@ -1,35 +1,31 @@
-import InteractionNets.PeanoRun
+import InteractionNets.Core.Run
 import InteractionNets.Union
 import InteractionNets.ReadBack
 
-/-! # Expressions over any operators that compute
+/-! # Expressions over any operators that compute, in any system with the core
 
-An operator is data (`Peano.Op1`, `Peano.Op2`): a symbol, the function it
+An operator is data (`Core.Op1`, `Core.Op2`): a symbol, the function it
 computes, its cost, and the proof that, alone with numerals as
 arguments, it reduces in that many steps to the numeral of the value.
-Any agent that computes (`Peano.Computes1`, `Peano.Computes2`) gives one
-(`Core.Op1.ofComputes`, `Core.Op2.ofComputes`), and so does the adder
-(`Peano.addOp`).
+Any agent that computes (`Core.Computes1`, `Core.Computes2`) gives one
+(`Core.Op1.ofComputes`, `Core.Op2.ofComputes`).
 
-Expressions (`Peano.GExpr`) are numerals and operators of one or two
+Expressions (`Core.GExpr`) are numerals and operators of one or two
 arguments applied to expressions.  Each has a net: the nets of the
 arguments and an operator that waits for them, side by side under tags,
 with the result of each argument wired to a port of the operator.  The
 argument nets reduce inside the whole as they do alone
-(`Net.Made.steps`, the rules of `Peano` giving every new agent a side,
-`Peano.system_sided`); their results are then the arguments of the
-operator (`Core.op_setup`, and `Core.op_setup1` for one argument), and
-the operator finishes.  So every expression has a net that is well
-formed and computes the value in exactly `GExpr.cost` interactions
-(`GExpr.good`); on the machine, with any number of threads and any
+(`Net.Made.steps`, the rules giving every new agent a side,
+`Core.sided`); their results are then the arguments of the operator
+(`Core.op_setup`, and `Core.op_setup1` for one argument), and the
+operator finishes.  So every expression has a net that is well formed
+and computes the value in exactly `GExpr.cost` interactions
+(`Core.GExpr.good`); on the machine, with any number of threads and any
 schedule, a run at rest has made that many interactions and holds the
-value (`GExpr.rest`), and a fair run comes to rest (`GExpr.fair`); the
-expression can be run and its result read (`GExpr.run_sound`,
-`GExpr.run_complete`).
-
-The theorems for the machine on a single operator are also stated for
-the operators (`Core.Op2.rest`, `Core.Op1.rest`), which brings in the
-adder (`Peano.sum_rest`).
+value (`Core.GExpr.rest`), and a fair run comes to rest
+(`Core.GExpr.fair`); the expression can be run and its result read
+(`Core.GExpr.run_sound`, `Core.GExpr.run_complete`).  One operator alone
+on the machine: `Core.Op2.rest`, `Core.Op1.rest`.
 -/
 
 namespace INet
@@ -1019,64 +1015,5 @@ theorem Op1.fair (o : Op1 xsys) (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat �
 
 
 end Core
-
-namespace Peano
-
-open Core
-
-/-- **The rules of `Peano` give every new agent a side.** -/
-theorem system_sided : system.Sided := by
-  intro α β R hR j
-  cases α <;> cases β <;> cases hR <;> rfl
-
-/-- A net of `Peano` that computes a number. -/
-abbrev Evals (N : Net Peano) (s v : Nat) (p : Port) : Prop := Core.Evals xsys N s v p
-
-/-- Expressions over operators of `Peano`. -/
-abbrev GExpr := Core.GExpr xsys
-
-/-- Operators of `Peano`. -/
-abbrev Op1 := Core.Op1 xsys
-abbrev Op2 := Core.Op2 xsys
-
-/-- A numeral of `Peano`. -/
-abbrev lit (n : Nat) : XNet Peano := Core.lit zero succ n
-
-/-- **The adder is an operator**, by its own theorem. -/
-def addOp : Op2 :=
-  ⟨add, fun m n => m + n, fun m _ => m + 1, rfl, by decide, by decide,
-    fun u => add_steps' rules ⟨u.wf, u.ha, u.fst, u.snd, u.out, u.free, u.only⟩⟩
-
-/-- The multiplier, through the theorem on recursion. -/
-def mulOp : Op2 := Op2.ofComputes mul_computes rfl (by decide) (by decide)
-
-/-- The power, through the theorem on recursion: the first argument is
-the exponent. -/
-def powOp : Op2 := Op2.ofComputes pow_computes rfl (by decide) (by decide)
-
-/-- The factorial, through the theorem on recursion. -/
-def facOp : Op1 := Op1.ofComputes fac_computes rfl (by decide) (by decide)
-
-/-- **Addition on the machine**, as a case: a run on the net for `m + n`
-that is at rest has made exactly `m + 1` interactions and holds
-`m + n`. -/
-theorem sum_rest (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
-    (hr : ((XMach.init (binaryNet add m n) nt).trace xsys σ i).1.resting = true) :
-    ((XMach.init (binaryNet add m n) nt).trace xsys σ i).2 = m + 1 ∧
-      IsNum ((XMach.init (binaryNet add m n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
-        (m + n) :=
-  addOp.rest m n hnt σ hr
-
-/-- **Addition under any fair schedule**, as a case. -/
-theorem sum_fair (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
-    (hfair : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ σ j = u) :
-    ∃ i₀, ∀ i, i₀ ≤ i →
-      ((XMach.init (binaryNet add m n) nt).trace xsys σ i).1.resting = true ∧
-      ((XMach.init (binaryNet add m n) nt).trace xsys σ i).2 = m + 1 ∧
-      IsNum ((XMach.init (binaryNet add m n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
-        (m + n) :=
-  addOp.fair m n hnt σ hfair
-
-end Peano
 
 end INet

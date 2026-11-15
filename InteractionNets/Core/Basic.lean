@@ -1,13 +1,12 @@
-import InteractionNets.PeanoCopy
+import InteractionNets.Core.Copy
 
-/-! # What the agents of `Peano` share
+/-! # The core: numerals, a copier and an eraser
 
-Small facts about names in nets of `Peano`, what it is for an agent to
-compute (`Peano.Computes1`, `Peano.Computes2`), the adder alone
-(`Core.add_steps'`), the costs of the multiplier, the power and the
-factorial, and the building of nets by putting successors on wires.
-The theorems that the agents compute are in `PeanoRec`, by recursion
-proved once.
+`Core` is a class over a system whose symbols `zero`, `succ`, `dup` and
+`era` are given by the system.  What it is for an agent to compute
+(`Core.Computes1`, `Core.Computes2`), small facts about names, the adder
+alone (`Core.add_steps'`), and the building of nets by putting
+successors on wires.
 -/
 
 namespace INet
@@ -97,6 +96,10 @@ class Core {S : Type} (system : System S) (zero succ dup era : outParam S) : Pro
 namespace Core
 
 open Addition (gone gone2)
+
+/-- The number of interactions of `m * n`. -/
+def prodCost (m n : Nat) : Nat := (m + 1) * (n + 2) + m * (n + 1)
+
 
 variable {S : Type}
 
@@ -210,63 +213,5 @@ theorem add_steps' {add : S} (HA : Addition.Rules system zero succ add) {a : Id}
 end
 
 end Core
-
-namespace Peano
-
-open Core
-open Addition (gone gone2)
-
-/-- The number of interactions of `m * n`. -/
-def prodCost (m n : Nat) : Nat := (m + 1) * (n + 2) + m * (n + 1)
-
-/-- The number of interactions of `b ^ e`: on the zero, one and the
-erasure of the base; on a successor, one, the copy of the base, the power
-for the rest and the multiplication. -/
-def powCost : Nat → Nat → Nat
-  | 0, b => b + 1 + 1
-  | e + 1, b => b + 1 + 1 + powCost e b + prodCost b (b ^ e)
-
-/-! ### `Peano` has the core -/
-
-/-- **`Peano` has numerals, a copier and an eraser.** -/
-instance core : Core system zero succ dup era :=
-  { copyRules with
-    numerals := by rintro α β (rfl | rfl) (rfl | rfl) <;> rfl
-    ar_zero := rfl
-    ar_succ := rfl
-    zero_ne_succ := by decide
-    sided := by
-      intro α β R hR j
-      cases α <;> cases β <;> cases hR <;> rfl }
-
-/-- **An agent of `Peano` that computes a function of two numerals.** -/
-abbrev Computes2 (op : Peano) (f c : Nat → Nat → Nat) : Prop := Core.Computes2 system op f c
-
-/-- **An agent of `Peano` that computes a function of one numeral.** -/
-abbrev Computes1 (op : Peano) (f c : Nat → Nat) : Prop := Core.Computes1 system op f c
-
-/-- The situation of an addition in `Peano`. -/
-abbrev Sum (N : Net Peano) (a : Id) (m n : Nat) (r : Port) : Prop := Core.Sum system add N a m n r
-
-/-- The factorial of a number. -/
-def fact : Nat → Nat
-  | 0 => 1
-  | n + 1 => fact n * (n + 1)
-
-/-- The number of interactions of `n!`: on the zero, one; on a successor,
-one, the copy of the rest, the factorial of the rest and the
-multiplication. -/
-def facCost : Nat → Nat
-  | 0 => 1
-  | n + 1 => n + 1 + 1 + facCost n + prodCost (fact n) (n + 1)
-
-theorem rule_mul_zero : system.rule mul zero = some mulZero.toX.toRhs := rfl
-theorem rule_mul_succ : system.rule mul succ = some mulSucc.toX.toRhs := rfl
-theorem rule_pow_zero : system.rule pow zero = some powZero.toX.toRhs := rfl
-theorem rule_pow_succ : system.rule pow succ = some powSucc.toX.toRhs := rfl
-theorem rule_fac_zero : system.rule fac zero = some facZero.toX.toRhs := rfl
-theorem rule_fac_succ : system.rule fac succ = some facSucc.toX.toRhs := rfl
-
-end Peano
 
 end INet

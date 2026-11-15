@@ -1,4 +1,4 @@
-import InteractionNets.PeanoBasic
+import InteractionNets.Core.Basic
 
 /-! # Recursion, proved once
 
@@ -26,7 +26,7 @@ a numeral `k` on the result, and for two arguments erases the second
 (`Core.zero1_const`, `Core.zero2_const`), given checks bounded by `k`
 that are evaluated for the rule (`Core.ConstRule`, `Core.EraRule`).
 
-The combiner is asked for less than `Peano.Computes2`: its result may
+The combiner is asked for less than `Core.Computes2`: its result may
 reuse the agents of its second argument (`Core.Combines2`).  The adder
 does that, and is a combiner (`Core.add_combines`); every agent that
 computes is one (`Core.Computes2.combines`).
@@ -52,7 +52,7 @@ local notation "IsNumQ" => Addition.IsNumQ system.ar zero succ
 
 /-! ### Combiners -/
 
-/-- **An agent that combines two numerals**: as `Peano.Computes2`, except
+/-- **An agent that combines two numerals**: as `Core.Computes2`, except
 that the result is made of agents that satisfy any property `Q` that the
 agents of the second argument and all names not in use satisfy.  The
 result may thus reuse the agents of the second argument. -/
@@ -153,7 +153,7 @@ structure Apart (zero succ dup op g : S) : Prop where
 /-! ### The rule on a zero, as a hypothesis -/
 
 /-- **An agent that computes a function of its second argument when its
-first is zero**: `Peano.Computes2` with the first argument `0`. -/
+first is zero**: `Core.Computes2` with the first argument `0`. -/
 def Zero2 (system : System S) {zero succ dup era : S} [Core system zero succ dup era]
     (op : S) (h c₀ : Nat → Nat) : Prop :=
   ∀ {N : Net S} {a z h₂ : Id} {l₂ : List Id} {r : Port} {n : Nat},
@@ -165,7 +165,7 @@ def Zero2 (system : System S) {zero succ dup era : S} [Core system zero succ dup
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ a)
 
 /-- **An agent that puts the numeral `k` on its result when its argument
-is zero**: `Peano.Computes1` with the argument `0`. -/
+is zero**: `Core.Computes1` with the argument `0`. -/
 def Zero1 (system : System S) {zero succ dup era : S} [Core system zero succ dup era]
     (op : S) (k c₀ : Nat) : Prop :=
   ∀ {N : Net S} {a z : Id} {r : Port},
@@ -267,7 +267,7 @@ theorem iterSucc_step {op g : S} (hs : system.rule op succ = some (iterSucc dup 
 /-- **Recursion on a parameter computes.**  If the system has the rule
 `Core.iterSucc dup op g` for `op` on a successor, `op` computes `h` when its
 first argument is zero, and `g` combines, then `op` computes the function
-`Peano.iter h fg`, in `Core.iterCost` steps.  On a successor the agent
+`Core.iter h fg`, in `Core.iterCost` steps.  On a successor the agent
 copies its parameter; the agent left on the rest computes by this theorem,
 on the second argument of the combiner; the combiner then combines. -/
 theorem iter_computes {op g : S} {h c₀ : Nat → Nat} {fg cg : Nat → Nat → Nat}
@@ -715,7 +715,7 @@ theorem primSucc_step {op g : S} (hs : system.rule op succ = some (primSucc succ
 /-- **Recursion on the predecessor computes.**  If the system has the
 rule `Core.primSucc succ dup op g` for `op` on a successor, `op` puts the numeral
 `k` on its result when its argument is zero, and `g` combines, then `op`
-computes the function `Peano.prim k fg`, in `Core.primCost` steps.  On a
+computes the function `Core.prim k fg`, in `Core.primCost` steps.  On a
 successor the agent copies the rest of its argument; the agent left on
 one copy computes by this theorem, on the first argument of the combiner;
 the combiner then combines it with the successor of the other copy. -/
@@ -865,42 +865,7 @@ theorem prim_computes {op g : S} {k c₀ : Nat} {fg cg : Nat → Nat → Nat}
               · exact absurd e1 hneM
               · exact absurd e1 hneF
 
-end Core
-
-namespace Peano
-
-open Core
-open Addition (gone gone2)
-
-/-- The multiplier recurses on its parameter, with the adder. -/
-theorem mulSucc_eq : mulSucc = iterSucc dup mul add := rfl
-
-/-- The power recurses on its parameter, with the multiplier. -/
-theorem powSucc_eq : powSucc = iterSucc dup pow mul := rfl
-
-/-- The factorial recurses on the predecessor, with the multiplier. -/
-theorem facSucc_eq : facSucc = primSucc succ dup fac mul := rfl
-
-/-! ### The three rules, again -/
-
-/-- The rule of the factorial on a zero, as a case. -/
-theorem zero1_facZero {op : Peano} (hr : system.rule op zero = some facZero.toX.toRhs)
-    (h0 : zero ≠ op) : Zero1 system op 1 1 :=
-  zero1_const hr h0 ⟨by decide, by decide, by decide, by decide⟩ (by decide)
-
-/-- The rule of the multiplier on a zero, as a case. -/
-theorem zero2_mulZero {op : Peano} (hr : system.rule op zero = some mulZero.toX.toRhs)
-    (h0 : zero ≠ op) (h1 : succ ≠ op) : Zero2 system op (fun _ => 0) (fun n => n + 1 + 1) :=
-  zero2_const hr h0 h1 ⟨by decide, by decide, by decide, by decide⟩ ⟨by decide, by decide⟩
-    (by decide)
-
-/-- The rule of the power on a zero, as a case. -/
-theorem zero2_powZero {op : Peano} (hr : system.rule op zero = some powZero.toX.toRhs)
-    (h0 : zero ≠ op) (h1 : succ ≠ op) : Zero2 system op (fun _ => 1) (fun n => n + 1 + 1) :=
-  zero2_const hr h0 h1 ⟨by decide, by decide, by decide, by decide⟩ ⟨by decide, by decide⟩
-    (by decide)
-
-/-! ### The three agents, again -/
+/-! ### The arithmetic of multiplication by recursion -/
 
 theorem iter_mul (m n : Nat) : iter (fun _ => 0) (fun n v => n + v) m n = m * n := by
   induction m with
@@ -925,59 +890,6 @@ theorem iterCost_mul (m n : Nat) :
     unfold prodCost
     omega
 
-/-- **The multiplier computes the product**, from the theorem on
-recursion: it recurses on its parameter with the adder. -/
-theorem mul_computes : Computes2 mul (fun m n => m * n) prodCost :=
-  (iter_computes rule_mul_succ ⟨by decide, by decide, by decide, by decide, by decide,
-    by decide, by decide⟩ (zero2_mulZero rule_mul_zero (by decide) (by decide))
-    (add_combines rules)).congr iter_mul iterCost_mul
-
-theorem iter_pow (e b : Nat) : iter (fun _ => 1) (fun n v => n * v) e b = b ^ e := by
-  induction e with
-  | zero => rfl
-  | succ e ih =>
-    show b * iter _ _ e b = b ^ (e + 1)
-    rw [ih, Nat.pow_succ, Nat.mul_comm]
-
-theorem iterCost_pow (e b : Nat) :
-    iterCost (fun n => n + 1 + 1) prodCost (fun _ => 1) (fun n v => n * v) e b =
-      powCost e b := by
-  induction e with
-  | zero => rfl
-  | succ e ih =>
-    show b + 1 + 1 + iterCost _ _ _ _ e b + prodCost b (iter _ _ e b) = powCost (e + 1) b
-    rw [ih, iter_pow]
-    rfl
-
-/-- **The power computes the power**, from the theorem on recursion: it
-recurses on its parameter, the base, with the multiplier. -/
-theorem pow_computes : Computes2 pow (fun e b => b ^ e) powCost :=
-  (iter_computes rule_pow_succ ⟨by decide, by decide, by decide, by decide, by decide,
-    by decide, by decide⟩ (zero2_powZero rule_pow_zero (by decide) (by decide))
-    mul_computes.combines).congr iter_pow iterCost_pow
-
-theorem prim_fac (n : Nat) : prim 1 (fun v n => v * n) n = fact n := by
-  induction n with
-  | zero => rfl
-  | succ n ih =>
-    show prim _ _ n * (n + 1) = fact n * (n + 1)
-    rw [ih]
-
-theorem primCost_fac (n : Nat) : primCost 1 prodCost 1 (fun v n => v * n) n = facCost n := by
-  induction n with
-  | zero => rfl
-  | succ n ih =>
-    show n + 1 + 1 + primCost _ _ _ _ n + prodCost (prim _ _ n) (n + 1) = facCost (n + 1)
-    rw [ih, prim_fac]
-    rfl
-
-/-- **The factorial computes the factorial**, from the theorem on
-recursion: it recurses on the predecessor with the multiplier. -/
-theorem fac_computes : Computes1 fac fact facCost :=
-  (prim_computes rule_fac_succ ⟨by decide, by decide, by decide, by decide, by decide,
-    by decide, by decide⟩ (zero1_facZero rule_fac_zero (by decide))
-    mul_computes.combines).congr prim_fac primCost_fac
-
-end Peano
+end Core
 
 end INet

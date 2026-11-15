@@ -1,4 +1,4 @@
-import InteractionNets.PeanoBound
+import InteractionNets.Core.Bound
 
 /-! # A system of its own: the lazy caterer and the triangular numbers
 
@@ -262,21 +262,21 @@ theorem tri_fair (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
 recursion on a parameter, with the theorem on constants for the zero and
 the adder as combiner.  Its rule on a successor, `S x * y = y + x * y`,
 is the template on a parameter. -/
-theorem mul_computes : Core.Computes2 system mul (fun m n => m * n) Peano.prodCost :=
+theorem mul_computes : Core.Computes2 system mul (fun m n => m * n) Core.prodCost :=
   (Core.iter_computes
     (show system.rule mul succ = some (Core.iterSucc dup mul add).toX.toRhs from rfl)
     ⟨by decide, by decide, by decide, by decide, by decide, by decide, by decide⟩
     (Core.zero2_const (show system.rule mul zero = some zeroEraData.toX.toRhs from rfl)
       (by decide) (by decide) ⟨by decide, by decide, by decide, by decide⟩
       ⟨by decide, by decide⟩ (by decide))
-    (Core.add_combines rules)).congr Peano.iter_mul Peano.iterCost_mul
+    (Core.add_combines rules)).congr Core.iter_mul Core.iterCost_mul
 
 /-- **Multiplication on the machine**: with any number of threads and any
 schedule, a run on the net for `m * n` that is at rest has made exactly
 `prodCost m n` interactions and holds the numeral `m * n`. -/
 theorem mul_rest (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (Core.binaryNet zero succ mul m n) nt).trace xsys σ i).1.resting = true) :
-    ((XMach.init (Core.binaryNet zero succ mul m n) nt).trace xsys σ i).2 = Peano.prodCost m n ∧
+    ((XMach.init (Core.binaryNet zero succ mul m n) nt).trace xsys σ i).2 = Core.prodCost m n ∧
       Addition.IsNum ar zero succ
         ((XMach.init (Core.binaryNet zero succ mul m n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
         (m * n) :=
@@ -287,7 +287,7 @@ steps on six successors and a zero. -/
 example : ((Core.binaryNet zero succ mul 2 3).normalize xsys 100).map
     (fun r => (r.2, (r.1.agents.filter (·.2 = succ)).length,
       (r.1.agents.filter (·.2 = zero)).length, r.1.agents.length)) =
-    some (Peano.prodCost 2 3, 6, 1, 7) := by
+    some (Core.prodCost 2 3, 6, 1, 7) := by
   decide +kernel
 
 /-! ### Expressions -/

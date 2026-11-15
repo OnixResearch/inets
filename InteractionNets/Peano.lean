@@ -16,7 +16,7 @@ of `Arith` is inside it (`Peano.embeds`), so what is proved for the nets
 of `Arith` holds for them here (`Peano.expr_rest`).
 
 One product is evaluated here.  That the multiplier multiplies, for all
-inputs, is `Peano.mul_computes`, in `PeanoRec`.
+inputs, is `Peano.mul_computes`, in `Peano.Rec`.
 -/
 
 namespace INet

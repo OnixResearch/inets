@@ -50,18 +50,23 @@ import InteractionNets.Arith.Run
 import InteractionNets.Embed
 import InteractionNets.Arith.Carry
 import InteractionNets.Peano
+import InteractionNets.Core.Copy
+import InteractionNets.Core.Basic
+import InteractionNets.Core.Rec
+import InteractionNets.Core.Run
+import InteractionNets.Core.GExpr
+import InteractionNets.Core.Bound
+import InteractionNets.Peano.Basic
+import InteractionNets.Peano.Rec
+import InteractionNets.Peano.Run
+import InteractionNets.Peano.GExpr
+import InteractionNets.Peano.Expr
+import InteractionNets.Peano.Bound
 import InteractionNets.Keeps
-import InteractionNets.PeanoCopy
-import InteractionNets.PeanoBasic
-import InteractionNets.PeanoRec
-import InteractionNets.PeanoRun
-import InteractionNets.PeanoGExpr
 import InteractionNets.RoundRobin
-import InteractionNets.PeanoBound
 import InteractionNets.Extra
 import InteractionNets.Union
 import InteractionNets.UnionExamples
-import InteractionNets.PeanoExpr
 import InteractionNets.LongRun
 import InteractionNets.Window
 import InteractionNets.Measure
@@ -3389,7 +3394,7 @@ holds up to equality rather than up to renaming.
   successors.  `Peano.Computes1` is the form for one argument.  The
   adder is not of this form: its result contains the agents of its
   second argument (`Addition.Adding.run` says what it is made of).
-* Recursion is proved once, in two shapes (`PeanoRec`).  On a
+* Recursion is proved once, in two shapes (`Core.Rec`).  On a
   parameter, `f (S x) y = g y (f x y)`: the agent copies its second
   argument for a new agent of its own symbol and a combiner `g`
   (`Core.iterSucc`, `Core.iter_computes`).  On the predecessor,
@@ -3419,7 +3424,7 @@ holds up to equality rather than up to renaming.
   (`Peano.fac_computes`).  `powCost` and `facCost` are recursions, not
   closed forms.
 * The theorems for the machine are proved once for every agent that
-  computes (`PeanoRun`).  For an agent of one argument, on the net
+  computes (`Core.Run`).  For an agent of one argument, on the net
   `Peano.unaryNet op n`, and of two, on `Peano.binaryNet op m n`: with
   any number of threads and any schedule, a run at rest has made exactly
   `c n` (or `c m n`) interactions and holds the numeral of the value
@@ -3430,7 +3435,7 @@ holds up to equality rather than up to renaming.
   `Peano.power e b` and `Peano.facNet n`, so the chain from their rules
   to the machine goes through the general theorems alone.  The adder is not a case of these: its result is not
   made of new agents only.  It is a case of the next item.
-* Expressions over any operators that compute (`PeanoGExpr`).  An
+* Expressions over any operators that compute (`Core.GExpr`).  An
   operator is data (`Peano.Op1`, `Peano.Op2`): a symbol, its function,
   its cost and the proof that alone with numerals it reduces in that
   cost to the numeral of the value.  Every agent that computes gives one
@@ -3484,7 +3489,7 @@ holds up to equality rather than up to renaming.
   it likes.  The measure of `XMach.time_bound`
   goes down at every action that is not free, and a round of free
   actions leaves every thread at rest (`XThread.rest_of_cost`).  For the
-  expressions over operators (`PeanoBound`), the rules of `Peano` write at
+  expressions over operators (`Core.Bound`, `Peano.Bound`), the rules of `Peano` write at
   most four agents and twelve ports (`Peano.xsys_bounded`) and the net
   lists no name twice (`Peano.GExpr.net_nodup`), so the threads are at
   rest with the value in memory after a number of actions given by the

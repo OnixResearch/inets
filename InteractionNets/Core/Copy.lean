@@ -1,26 +1,9 @@
-import InteractionNets.Peano
 import InteractionNets.Keeps
+import InteractionNets.Arith.Carry
 
-/-! # Erasing and copying a numeral
+/-! # Erasing and copying a numeral, in any system with a copier and an eraser
 
-The two helpers that multiplication needs, with any other agents in the
-net, in any system that has a zero, a successor, a copier and an eraser
-with their rules (`Copies.Rules`).
-
-An eraser on a numeral `n` runs for `n + 1` steps; the eraser and the
-agents of the numeral are then gone, nothing new is there, and what was
-away from them is as it was (`Copies.erase`).
-
-A copier on a numeral `n`, with its two copies wired to the ports `p₁`
-and `p₂`, runs for `n + 1` steps, after which both ports carry the
-numeral `n`, and what was away from the copier and the numeral is as it
-was (`Copies.copy`).  The ports may be free ports or ports of other
-agents.  The two copies are made of agents whose names were not in use
-(`Copies.copy_fresh`).
-
-The system `Peano` has them (`Peano.copyRules`), and the theorems are
-stated for it under the names `Peano.erase`, `Peano.copy_fresh` and
-`Peano.copy`.
+See `Copies.Rules`, `Copies.erase`, `Copies.copy_fresh`.
 -/
 
 namespace INet
@@ -424,93 +407,5 @@ theorem copy {N : Net S} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : Nat}
   exact ⟨N', sts, i₁.isNum, i₂.isNum, kp, hag⟩
 
 end Copies
-
-namespace Peano
-
-open Addition (gone)
-
-/-- The port `p` is wired to the numeral `k`. -/
-abbrev IsNum (N : Net Peano) (p : Port) (k : Nat) : Prop := Addition.IsNum ar zero succ N p k
-
-/-- The agents of a numeral, from its head down. -/
-abbrev NumList (N : Net Peano) (i : Id) (l : List Id) : Prop :=
-  Addition.NumList ar zero succ N i l
-
-/-- Above the port `x` there are `j` successors, the last of which has its
-principal port wired to `r`. -/
-abbrev Tower (N : Net Peano) (x : Port) (j : Nat) (r : Port) : Prop :=
-  Addition.Tower ar succ N x j r
-
-/-- The port `p` is wired to the numeral `k`, all of whose agents satisfy
-`Q`. -/
-abbrev IsNumQ (N : Net Peano) (Q : Id → Prop) (p : Port) (k : Nat) : Prop :=
-  Addition.IsNumQ ar zero succ N Q p k
-
-/-- A tower all of whose agents satisfy `Q`. -/
-abbrev TowerQ (N : Net Peano) (Q : Id → Prop) (x : Port) (j : Nat) (r : Port) : Prop :=
-  Addition.TowerQ ar succ N Q x j r
-
-theorem rule_era_zero : system.rule era zero = some eraZero.toX.toRhs := rfl
-theorem rule_era_succ : system.rule era succ = some eraSucc.toX.toRhs := rfl
-theorem rule_dup_zero : system.rule dup zero = some dupZero.toX.toRhs := rfl
-theorem rule_dup_succ : system.rule dup succ = some dupSucc.toX.toRhs := rfl
-
-/-- **`Peano` has a copier and an eraser.** -/
-theorem copyRules : Copies.Rules system zero succ dup era :=
-  ⟨by decide, by decide, by decide, by decide, rfl, rfl, rfl, rfl⟩
-
-/-- **Erasing a numeral**, in `Peano`. -/
-theorem erase : ∀ (l : List Id) {N : Net Peano} {e h : Id}, N.WF ar → N.agent e era →
-    N.Paired ar (e, 0) (h, 0) → NumList N h l →
-    ∃ N', Steps (Step system) l.length N N' ∧ N.Keeps ar (gone N e l) N' ∧
-      ∀ i γ, N'.agent i γ → N.agent i γ ∧ i ≠ e ∧ ¬ i ∈ l :=
-  Copies.erase copyRules
-
-/-- **Copying a numeral**, in `Peano`. -/
-theorem copy_fresh {N : Net Peano} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : Nat}
-    (hN : N.WF ar) (hd : N.agent d dup) (hp : N.Paired ar (d, 0) (h, 0)) (hl : NumList N h l)
-    (hlen : l.length = n + 1) (h₁ : N.Paired ar (d, 1) p₁) (h₂ : N.Paired ar (d, 2) p₂)
-    (hp₁ : p₁.1 ≠ d ∧ ¬ p₁.1 ∈ l) (hp₂ : p₂.1 ≠ d ∧ ¬ p₂.1 ∈ l) :
-    ∃ N', Steps (Step system) (n + 1) N N' ∧ IsNumQ N' (fun i => ¬ N.Used i) p₁ n ∧
-      IsNumQ N' (fun i => ¬ N.Used i) p₂ n ∧ N.Keeps ar (gone N d l) N' ∧
-      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d) :=
-  Copies.copy_fresh copyRules hN hd hp hl hlen h₁ h₂ hp₁ hp₂
-
-/-- The same, without the statement about the agents of the copies. -/
-theorem copy {N : Net Peano} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : Nat}
-    (hN : N.WF ar) (hd : N.agent d dup) (hp : N.Paired ar (d, 0) (h, 0)) (hl : NumList N h l)
-    (hlen : l.length = n + 1) (h₁ : N.Paired ar (d, 1) p₁) (h₂ : N.Paired ar (d, 2) p₂)
-    (hp₁ : p₁.1 ≠ d ∧ ¬ p₁.1 ∈ l) (hp₂ : p₂.1 ≠ d ∧ ¬ p₂.1 ∈ l) :
-    ∃ N', Steps (Step system) (n + 1) N N' ∧ IsNum N' p₁ n ∧ IsNum N' p₂ n ∧
-      N.Keeps ar (gone N d l) N' ∧
-      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d) :=
-  Copies.copy copyRules hN hd hp hl hlen h₁ h₂ hp₁ hp₂
-
-
-/-! ### Two small runs -/
-
-/-- An eraser on the numeral `2`, and nothing else. -/
-def eraseTwo : XNet Peano :=
-  XNet.ofWires [([1], era), ([2], succ), ([3], succ), ([4], zero)] []
-    [(([1], 0), ([2], 0)), (([2], 1), ([3], 0)), (([3], 1), ([4], 0))]
-
-/-- The reducer stops after three steps with no agent and no wire. -/
-example : (eraseTwo.normalize xsys 20).map
-    (fun r => (r.2, r.1.agents.length, r.1.wires.length)) = some (3, 0, 0) := by
-  decide +kernel
-
-/-- A copier on the numeral `2`, with its copies on two free ports. -/
-def copyTwo : XNet Peano :=
-  XNet.ofWires [([1], dup), ([2], succ), ([3], succ), ([4], zero)] [([0], 0), ([5], 0)]
-    [(([1], 0), ([2], 0)), (([2], 1), ([3], 0)), (([3], 1), ([4], 0)),
-      (([1], 1), ([0], 0)), (([1], 2), ([5], 0))]
-
-/-- The reducer stops after three steps with four successors and two
-zeros. -/
-example : (copyTwo.normalize xsys 20).map (fun r => (r.2, r.1.agents.map (·.2))) =
-    some (3, [succ, succ, succ, succ, zero, zero]) := by
-  decide +kernel
-
-end Peano
 
 end INet

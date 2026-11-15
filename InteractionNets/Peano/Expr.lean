@@ -1,4 +1,4 @@
-import InteractionNets.PeanoGExpr
+import InteractionNets.Peano.GExpr
 
 /-! # Every expression of additions, multiplications and powers
 
