@@ -80,6 +80,8 @@ import InteractionNets.Window
 import InteractionNets.Measure
 import InteractionNets.JoinWalk
 import InteractionNets.Peano.JoinWalk
+import InteractionNets.WorkRun
+import InteractionNets.Arith.WorkRun
 
 /-!
 # Interaction nets
@@ -3329,6 +3331,14 @@ holds up to equality rather than up to renaming.
   (`WMach.joined_le_census`), one per `+`, and every fair run on an
   expression of additions is at rest with its value after a bound in its
   size, its steps and its additions (`Arith.Expr.wfair`).
+  The run and the reading are carried over (`XNet.wrunRead`): whatever
+  `WMach` returns is the numeral of the normal form
+  (`XNet.wrunRead_sound`), and with threads taking turns it returns it
+  after `nt` times the bound of `WMach.fair_bound`
+  (`XNet.wrunRead_bound`, `XNet.wrunRead_complete`), where `XMach` needs
+  the square of the steps.  For an expression of additions that bound is
+  stated with no run evaluated (`Arith.Expr.wrun_sound`,
+  `Arith.Expr.wrun_by`); its square is in the additions only.
   The rescan after a joining claim is what `JMach` replaces.  The active
   pairs such a claim makes that have no new agent in them are the pairs
   of the old agents at the two ends of a joined wire, so `JMach` keeps
