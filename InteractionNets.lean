@@ -55,6 +55,7 @@ import InteractionNets.PeanoMul
 import InteractionNets.PeanoProd
 import InteractionNets.PeanoPow
 import InteractionNets.PeanoFact
+import InteractionNets.PeanoRec
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.PeanoExpr
@@ -2040,6 +2041,17 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              machine, a run on the net `Peano.facNet n`
                              that is at rest has made exactly `facCost n`
                              interactions and holds `n!`
+* `INet.Peano.iter_computes`, `INet.Peano.prim_computes`, `INet.Peano.Combines2`,
+  `INet.Peano.add_combines`, `INet.Peano.mul_computes'`,
+  `INet.Peano.pow_computes'`, `INet.Peano.fac_computes'`
+                             recursion proved once, in two shapes: an
+                             agent whose rule on a successor follows a
+                             template in it and a combiner computes the
+                             recursion, given what it does on a zero and
+                             that the combiner combines; the adder is a
+                             combiner; the theorems of the multiplier,
+                             the power and the factorial follow, with
+                             the same costs
 * `INet.Peano.PExpr.rest`, `INet.Peano.PExpr.fair`, `INet.Peano.PExpr.good`,
   `INet.Peano.add_evals`, `INet.Peano.mul_evals`, `INet.Peano.system_sided`
                              every expression built from numerals with
@@ -3435,6 +3447,25 @@ holds up to equality rather than up to renaming.
   second argument, so it is not made of new agents only
   (`Addition.Adding.run` says what it is made of).  The expressions of
   the next item do not have factorials.
+* The three proofs follow one course, and it is proved once, in two
+  shapes (`PeanoRec`).  On a parameter, `f (S x) y = g y (f x y)`: the
+  agent copies its second argument for a new agent of its own symbol and
+  a combiner `g` (`Peano.iterSucc`, `Peano.iter_computes`); the
+  multiplier and the power have this rule.  On the predecessor,
+  `f (S x) = g (f x) (S x)`: the agent copies the rest of its argument,
+  one copy for a new agent and the other under a new successor for the
+  combiner (`Peano.primSucc`, `Peano.prim_computes`); the factorial has
+  this rule.  The rule on a successor is a template in the two symbols;
+  what the agent does on a zero is a hypothesis (`Peano.Zero2`,
+  `Peano.Zero1`), met by the zero rules of the three agents for any
+  agent that has them.  The combiner need only combine
+  (`Peano.Combines2`): its result may reuse the agents of its second
+  argument, so the adder is one (`Peano.add_combines`), and so is every
+  agent that computes.  `Peano.mul_computes'`, `Peano.pow_computes'` and
+  `Peano.fac_computes'` derive the three theorems again from these two,
+  with the costs `prodCost`, `powCost` and `facCost`.  A new agent still
+  needs a symbol and its rules in the system, and its own theorems for
+  the machine.
 * Expressions built from numerals with `+`, `*` and `^` (`Peano.PExpr`)
   have nets (`PExpr.net`): the nets of the two arguments and an adder, a
   multiplier or a power that waits, side by side under the tags `0`,
