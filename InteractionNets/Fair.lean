@@ -1666,9 +1666,10 @@ noncomputable def potIn (H : Net S) (K A : Nat) (T : XThread S) : Nat :=
 /-- A bound on the actions of one pass of a thread over the agents, in a
 run from the net `X` whose normal form is `n` steps away, when no rule
 writes more than `C` agents or `D` segments: seven for each agent there can
-be, and one for each segment. -/
+be (a claim takes two out and writes at most `C`), and one for each
+segment. -/
 def XNet.passBound (X : XNet S) (n C D : Nat) : Nat :=
-  7 * (X.agents.length + C * n) + (X.wires.length + D * n)
+  7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n)
 
 /-- Before the program starts there is nothing to write. -/
 theorem XMach.init_sizes (X : XNet S) (nt : Nat) :
@@ -1748,12 +1749,13 @@ theorem window_settles (Ψ : Nat → Nat) (still rest : Nat → Prop) (F : Nat)
 
 variable [DecidableEq S] {xs : XSys S}
 
-/-- An action adds at most `D` segments to the goal and `C` agents to the
-memory, and only when it is a claim. -/
+/-- An action adds at most `D` segments to the goal and, since a claim
+takes the two agents of its pair out of the memory, at most `C - 2` agents
+to it, and only when it is a claim. -/
 theorem XMach.step_sizes {M : XMach S} (hL : M.Live xs) {C D : Nat} (hb : xs.Bounded C D)
     (t : Nat) :
     (M.step xs t).1.segs ≤ M.segs + D * (M.step xs t).2 ∧
-      (M.step xs t).1.heads ≤ M.heads + C * (M.step xs t).2 := by
+      (M.step xs t).1.heads ≤ M.heads + (C - 2) * (M.step xs t).2 := by
   rcases XMach.step_progress hL t with ⟨e, -⟩ | ⟨h1, todo, a, b, α, β, R, hR, ht, hbm, e⟩ |
     ⟨h0, -, hs, hh⟩
   · rw [e]
@@ -1778,19 +1780,19 @@ theorem XMach.step_sizes {M : XMach S} (hL : M.Live xs) {C D : Nat} (hb : xs.Bou
       omega
     · show (M.mem.takeAgent b).agents.length + total XThread.owes (M.ths.set t
           ⟨todo, .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β)⟩) ≤
-        M.mem.agents.length + total XThread.owes M.ths + C
+        M.mem.agents.length + total XThread.owes M.ths + (C - 2)
       omega
   · rw [h0, hs]
     exact ⟨Nat.le_add_right _ _, Nat.le_trans hh (Nat.le_add_right _ _)⟩
 
 /-- Along a sequence of actions, every claim adds at most `D` segments to
-the goal and `C` agents to the memory. -/
+the goal and `C - 2` agents to the memory. -/
 theorem XMach.seq_sizes (tr : Nat → XMach S × Nat) (σ : Nat → Nat) {W A₀ C D : Nat}
     (hsucc : ∀ i, tr (i + 1) =
       (((tr i).1.step xs (σ i)).1, (tr i).2 + ((tr i).1.step xs (σ i)).2))
     (live : ∀ i, (tr i).1.Live xs) (hb : xs.Bounded C D)
-    (h₀ : (tr 0).1.segs ≤ W + D * (tr 0).2 ∧ (tr 0).1.heads ≤ A₀ + C * (tr 0).2) :
-    ∀ i, (tr i).1.segs ≤ W + D * (tr i).2 ∧ (tr i).1.heads ≤ A₀ + C * (tr i).2
+    (h₀ : (tr 0).1.segs ≤ W + D * (tr 0).2 ∧ (tr 0).1.heads ≤ A₀ + (C - 2) * (tr 0).2) :
+    ∀ i, (tr i).1.segs ≤ W + D * (tr i).2 ∧ (tr i).1.heads ≤ A₀ + (C - 2) * (tr i).2
   | 0 => h₀
   | i + 1 => by
     obtain ⟨h₁, h₂⟩ := XMach.seq_sizes tr σ hsucc live hb h₀ i
@@ -1802,7 +1804,7 @@ theorem XMach.seq_sizes (tr : Nat → XMach S × Nat) (σ : Nat → Nat) {W A₀
       rw [Nat.mul_add]
       omega
     · show ((tr i).1.step xs (σ i)).1.heads ≤
-        A₀ + C * ((tr i).2 + ((tr i).1.step xs (σ i)).2)
+        A₀ + (C - 2) * ((tr i).2 + ((tr i).1.step xs (σ i)).2)
       rw [Nat.mul_add]
       omega
 
@@ -2340,9 +2342,9 @@ theorem XMach.fair_bound {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
     live hb (W := X.wires.length) (A₀ := X.agents.length)
     ⟨Nat.le_trans (Nat.le_of_eq is) (Nat.le_add_right _ _),
       Nat.le_trans (Nat.le_of_eq ih) (Nat.le_add_right _ _)⟩
-  have hA : ∀ i, ((XMach.init X nt).trace xs σ i).1.heads ≤ X.agents.length + C * n :=
+  have hA : ∀ i, ((XMach.init X nt).trace xs σ i).1.heads ≤ X.agents.length + (C - 2) * n :=
     fun i => Nat.le_trans (sizes i).2
-      (Nat.add_le_add_left (Nat.mul_le_mul_left C (bound i)) _)
+      (Nat.add_le_add_left (Nat.mul_le_mul_left (C - 2) (bound i)) _)
   have nd : ∀ i, (((XMach.init X nt).trace xs σ i).1.mem.agents.map Prod.fst).Nodup := by
     intro i
     induction i with
@@ -2364,13 +2366,13 @@ theorem XMach.fair_bound {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
         hX.end_unique (.inr ⟨e.2, hag e he, Nat.zero_le _⟩) (pr (.inl ⟨e.2, hag e he⟩) h)
           (pr (.inl ⟨e.2, hag e he⟩) h')
     have hp : 7 * X.agents.length + (X.wires.length + D * n) ≤ X.passBound n C D := by
-      show _ ≤ 7 * (X.agents.length + C * n) + (X.wires.length + D * n)
+      show _ ≤ 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n)
       omega
-    have e1 : C + D + 7 * (X.agents.length + C * n) + (X.wires.length + D * n) + 1 =
+    have e1 : C + D + 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + 1 =
         X.passBound n C D + (C + D + 1) := by
-      show _ = 7 * (X.agents.length + C * n) + (X.wires.length + D * n) + (C + D + 1)
+      show _ = 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + (C + D + 1)
       omega
-    have ep : (XMach.init X nt).potAt N' (X.wires.length + D * n) (X.agents.length + C * n) t =
+    have ep : (XMach.init X nt).potAt N' (X.wires.length + D * n) (X.agents.length + (C - 2) * n) t =
         N'.scan (X.wires.length + D * n) X.agents := by
       rw [XMach.potAt_eq (XMach.init_thread X ht)]
       show N'.scan (X.wires.length + D * n) (X.agents.drop t ++ X.agents.take t) = _
@@ -2380,8 +2382,8 @@ theorem XMach.fair_bound {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
         rw [← Net.scan_append, List.take_append_drop]
       rw [Net.scan_append, e]
       exact Nat.add_comm _ _
-    show (XMach.init X nt).potAt N' (X.wires.length + D * n) (X.agents.length + C * n) t +
-        (n - 0) * (C + D + 7 * (X.agents.length + C * n) + (X.wires.length + D * n) + 1) ≤
+    show (XMach.init X nt).potAt N' (X.wires.length + D * n) (X.agents.length + (C - 2) * n) t +
+        (n - 0) * (C + D + 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + 1) ≤
       (n + 1) * X.passBound n C D + n * (C + D + 1)
     rw [ep, Nat.sub_zero, e1, Nat.mul_add n (X.passBound n C D) (C + D + 1),
       Nat.add_mul n 1 (X.passBound n C D), Nat.one_mul]

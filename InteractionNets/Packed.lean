@@ -1166,6 +1166,7 @@ theorem PMach.skips_le {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
         have e : ((PMach.init X nt).trace xs σ i).1.mem.mem.toX =
             ((XMach.init X nt).trace xs σ i).1.mem := congrArg XMach.mem a
         rw [e] at h₂
+        have := Nat.mul_le_mul_right n (Nat.sub_le C 2)
         omega
       have hm := Nat.mul_le_mul_left
         (threadOf ((XMach.init X nt).trace xs σ i).1.ths (σ i)).fin hlive

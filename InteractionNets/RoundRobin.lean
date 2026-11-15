@@ -120,7 +120,7 @@ theorem XMach.window_rest {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
   have bound : ∀ i, ((XMach.init X nt).trace xs σ i).2 ≤ n :=
     fun i => (run i).claims_le hX hs hn
   let K := X.wires.length + D * n
-  let A := X.agents.length + C * n
+  let A := X.agents.length + (C - 2) * n
   obtain ⟨is, ih⟩ := XMach.init_sizes X nt
   have sizes := XMach.seq_sizes (xs := xs) ((XMach.init X nt).trace xs σ)
     σ (fun _ => rfl) live hb (W := X.wires.length) (A₀ := X.agents.length)
@@ -128,7 +128,7 @@ theorem XMach.window_rest {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
       Nat.le_trans (Nat.le_of_eq ih) (Nat.le_add_right _ _)⟩
   have hA : ∀ i, ((XMach.init X nt).trace xs σ i).1.heads ≤ A :=
     fun i => Nat.le_trans (sizes i).2
-      (Nat.add_le_add_left (Nat.mul_le_mul_left C (bound i)) _)
+      (Nat.add_le_add_left (Nat.mul_le_mul_left (C - 2) (bound i)) _)
   have nd : ∀ i, (((XMach.init X nt).trace xs σ i).1.mem.agents.map
       Prod.fst).Nodup := by
     intro i
@@ -205,11 +205,11 @@ theorem XMach.window_rest {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
     have hsc : nt * N'.scan K X.agents ≤ nt * X.passBound n C D :=
       Nat.mul_le_mul_left nt (Nat.le_trans hscan (by
         show 7 * X.agents.length + (X.wires.length + D * n) ≤
-          7 * (X.agents.length + C * n) + (X.wires.length + D * n)
+          7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n)
         omega))
     have e1 : Kc = X.passBound n C D + (C + D + 1) := by
-      show C + D + 7 * (X.agents.length + C * n) + (X.wires.length + D * n) + 1 =
-        7 * (X.agents.length + C * n) + (X.wires.length + D * n) + (C + D + 1)
+      show C + D + 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + 1 =
+        7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + (C + D + 1)
       omega
     show (XMach.init X nt).energyIn N' K A + (n - 0) * Kc ≤ _
     rw [Nat.sub_zero, e1, Nat.mul_add n (X.passBound n C D) (C + D + 1),

@@ -2636,6 +2636,8 @@ theorem ZMach.ftime_le_work {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
     obtain ⟨g, hr, -⟩ := YMach.trace_rel (xs := xs) hX hnt σ i
     obtain ⟨tsim, -, -⟩ := TMach.init_sim (xs := xs) hX hnd hnt σ i
     obtain ⟨hAg, -, -⟩ := hΦ i
+    replace hAg := Nat.le_trans hAg
+      (Nat.add_le_add_left (Nat.mul_le_mul_right n (Nat.sub_le C 2)) _)
     have hW := XMach.wires_le (xs := xs) hX hnt hb hs hn σ i
     have hNm := ZMach.names_le (xs := xs) hX hnd hnt hL σ i
     have sz := ZMach.trace_sized xs σ (M := ZMach.init X nt) (OMem.ofX_sized X) i

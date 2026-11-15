@@ -1256,6 +1256,8 @@ theorem TMach.todo_le {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
     intro T hT
     have hcs := TMach.cells_size (xs := xs) hX hnd hnt σ i
     obtain ⟨hA, -, -⟩ := hΦ i
+    replace hA := Nat.le_trans hA
+      (Nat.add_le_add_left (Nat.mul_le_mul_right n (Nat.sub_le C 2)) _)
     cases ht : ((TMach.init X nt).trace xs σ i).1.ths[σ i]? with
     | none =>
       have e : ((TMach.init X nt).trace xs σ i).1.step xs (σ i) =
@@ -1601,6 +1603,8 @@ theorem TMach.lgtime_le_work {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
   | succ i ih =>
     obtain ⟨a, -, ok⟩ := TMach.init_sim (xs := xs) hX hnd hnt σ i
     obtain ⟨hA, -, -⟩ := hΦ i
+    replace hA := Nat.le_trans hA
+      (Nat.add_le_add_left (Nat.mul_le_mul_right n (Nat.sub_le C 2)) _)
     have hm : ((XMach.init X nt).trace xs σ i).1.ths[σ i]? =
         (((TMach.init X nt).trace xs σ i).1.ths[σ i]?).map TThread.toX := by
       rw [← a]
@@ -1827,6 +1831,8 @@ theorem TMach.lgtime_le_time {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
   | succ i ih =>
     obtain ⟨a, -, ok⟩ := TMach.init_sim (xs := xs) hX hnd hnt σ i
     obtain ⟨hA, -, -⟩ := hΦ i
+    replace hA := Nat.le_trans hA
+      (Nat.add_le_add_left (Nat.mul_le_mul_right n (Nat.sub_le C 2)) _)
     have emem : ((TMach.init X nt).trace xs σ i).1.mem.toX =
         ((XMach.init X nt).trace xs σ i).1.mem := congrArg XMach.mem a
     have hstep : ((TMach.init X nt).trace xs σ i).1.stepLgcost xs (σ i) ≤
@@ -2257,6 +2263,8 @@ theorem TMach.dtime_le_work {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
   | succ i ih =>
     obtain ⟨a, -, ok⟩ := TMach.init_sim (xs := xs) hX hnd hnt σ i
     obtain ⟨hA, -, -⟩ := hΦ i
+    replace hA := Nat.le_trans hA
+      (Nat.add_le_add_left (Nat.mul_le_mul_right n (Nat.sub_le C 2)) _)
     have hm : ((XMach.init X nt).trace xs σ i).1.ths[σ i]? =
         (((TMach.init X nt).trace xs σ i).1.ths[σ i]?).map TThread.toX := by
       rw [← a]

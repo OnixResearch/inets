@@ -1335,17 +1335,17 @@ the run never takes more time than
 actions that are not rests, one pass for each thread, one more for each
 claim, and the writes, times
 
-    2 * (X.agents.length + C * n) + (X.wires.length + D * n) + C + D + 1
+    2 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + C + D + 1
 
-the most an action can cost in a memory that never holds more than the net
-and `n` right-hand sides.  A window stretches the run, not the work. -/
+the most an action can cost in a memory that never holds more than the
+agents of the net and `C - 2` more for each of the `n` claims.  A window stretches the run, not the work. -/
 theorem XMach.time_bound {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
     (hnd : (X.agents.map Prod.fst).Nodup) {nt : Nat} (hnt : 0 < nt) {C D : Nat}
     (hb : xs.Bounded C D) {n : Nat} {N' : Net S} (hs : Steps (Step xs.sys) n X.toNet N')
     (hn : Normal (Step xs.sys) N') (σ : Nat → Nat) :
     ∀ i, (XMach.init X nt).time xs σ i ≤
       ((nt + n) * X.passBound n C D + n * (C + D + 1)) *
-        (2 * (X.agents.length + C * n) + (X.wires.length + D * n) + C + D + 1) := by
+        (2 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + C + D + 1) := by
   have live := XMach.trace_live (xs := xs) σ (XMach.init_live hX hnt)
   have run : ∀ i, MRun xs.sys ((XMach.init X nt).trace xs σ i).2 (Mach.init X.toNet)
       ((XMach.init X nt).trace xs σ i).1.toMach := by
@@ -1360,9 +1360,9 @@ theorem XMach.time_bound {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
     live hb (W := X.wires.length) (A₀ := X.agents.length)
     ⟨Nat.le_trans (Nat.le_of_eq is) (Nat.le_add_right _ _),
       Nat.le_trans (Nat.le_of_eq ih) (Nat.le_add_right _ _)⟩
-  have hA : ∀ i, ((XMach.init X nt).trace xs σ i).1.heads ≤ X.agents.length + C * n :=
+  have hA : ∀ i, ((XMach.init X nt).trace xs σ i).1.heads ≤ X.agents.length + (C - 2) * n :=
     fun i => Nat.le_trans (sizes i).2
-      (Nat.add_le_add_left (Nat.mul_le_mul_left C (bound i)) _)
+      (Nat.add_le_add_left (Nat.mul_le_mul_left (C - 2) (bound i)) _)
   have hK : ∀ i, ((XMach.init X nt).trace xs σ i).1.segs ≤ X.wires.length + D * n :=
     fun i => Nat.le_trans (sizes i).1
       (Nat.add_le_add_left (Nat.mul_le_mul_left D (bound i)) _)
@@ -1375,7 +1375,7 @@ theorem XMach.time_bound {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
   have ahead : ∀ i, ((XMach.init X nt).trace xs σ i).1.Ahead N' :=
     fun i => XMach.ahead_of_run (live i).inv hX (run i) hs hn
   have hc : ∀ i, ((XMach.init X nt).trace xs σ i).1.stepCost xs (σ i) ≤
-      2 * (X.agents.length + C * n) + (X.wires.length + D * n) + C + D + 1 := by
+      2 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + C + D + 1 := by
     intro i
     have h := XMach.stepCost_le hb ((XMach.init X nt).trace xs σ i).1 (σ i)
     have a₁ : ((XMach.init X nt).trace xs σ i).1.mem.agents.length ≤
@@ -1387,37 +1387,37 @@ theorem XMach.time_bound {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
     omega
   have key := paid_le (fun i => (XMach.init X nt).time xs σ i)
     (fun i => ((XMach.init X nt).trace xs σ i).1.energyIn N' (X.wires.length + D * n)
-        (X.agents.length + C * n) +
+        (X.agents.length + (C - 2) * n) +
       (n - ((XMach.init X nt).trace xs σ i).2) *
-        (C + D + 7 * (X.agents.length + C * n) + (X.wires.length + D * n) + 1))
-    (2 * (X.agents.length + C * n) + (X.wires.length + D * n) + C + D + 1) (fun i => by
+        (C + D + 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + 1))
+    (2 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + C + D + 1) (fun i => by
       have hb1 : ((XMach.init X nt).trace xs σ i).2 +
           (((XMach.init X nt).trace xs σ i).1.step xs (σ i)).2 ≤ n := bound (i + 1)
       show ((XMach.init X nt).time xs σ i +
             ((XMach.init X nt).trace xs σ i).1.stepCost xs (σ i) =
               (XMach.init X nt).time xs σ i ∧
           (((XMach.init X nt).trace xs σ i).1.step xs (σ i)).1.energyIn N'
-              (X.wires.length + D * n) (X.agents.length + C * n) +
+              (X.wires.length + D * n) (X.agents.length + (C - 2) * n) +
             (n - (((XMach.init X nt).trace xs σ i).2 +
               (((XMach.init X nt).trace xs σ i).1.step xs (σ i)).2)) *
-              (C + D + 7 * (X.agents.length + C * n) + (X.wires.length + D * n) + 1) =
+              (C + D + 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + 1) =
             ((XMach.init X nt).trace xs σ i).1.energyIn N' (X.wires.length + D * n)
-              (X.agents.length + C * n) +
+              (X.agents.length + (C - 2) * n) +
             (n - ((XMach.init X nt).trace xs σ i).2) *
-              (C + D + 7 * (X.agents.length + C * n) + (X.wires.length + D * n) + 1)) ∨
+              (C + D + 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + 1)) ∨
         ((XMach.init X nt).time xs σ i +
             ((XMach.init X nt).trace xs σ i).1.stepCost xs (σ i) ≤
               (XMach.init X nt).time xs σ i +
-                (2 * (X.agents.length + C * n) + (X.wires.length + D * n) + C + D + 1) ∧
+                (2 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + C + D + 1) ∧
           (((XMach.init X nt).trace xs σ i).1.step xs (σ i)).1.energyIn N'
-              (X.wires.length + D * n) (X.agents.length + C * n) +
+              (X.wires.length + D * n) (X.agents.length + (C - 2) * n) +
             (n - (((XMach.init X nt).trace xs σ i).2 +
               (((XMach.init X nt).trace xs σ i).1.step xs (σ i)).2)) *
-              (C + D + 7 * (X.agents.length + C * n) + (X.wires.length + D * n) + 1) <
+              (C + D + 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + 1) <
             ((XMach.init X nt).trace xs σ i).1.energyIn N' (X.wires.length + D * n)
-              (X.agents.length + C * n) +
+              (X.agents.length + (C - 2) * n) +
             (n - ((XMach.init X nt).trace xs σ i).2) *
-              (C + D + 7 * (X.agents.length + C * n) + (X.wires.length + D * n) + 1))
+              (C + D + 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + 1))
       rcases XMach.step_work (live i) (nd i) hb hH (ahead i) (hA i) (σ i) with
         ⟨e, hz⟩ | ⟨h1, hce⟩ | ⟨h0, hlt⟩
       · refine .inl ⟨by rw [hz]; rfl, ?_⟩
@@ -1434,7 +1434,7 @@ theorem XMach.time_bound {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
         exact Nat.add_lt_add_right hlt _)
   intro i
   have k := key i
-  have e0 := XMach.init_energyIn X nt N' (X.wires.length + D * n) (X.agents.length + C * n)
+  have e0 := XMach.init_energyIn X nt N' (X.wires.length + D * n) (X.agents.length + (C - 2) * n)
   obtain ⟨-, pr⟩ := Steps.links hX hs
   have hag : ∀ e : Id × S, e ∈ X.agents → X.toNet.agent e.1 e.2 := fun _ he => he
   have hscan : N'.scan (X.wires.length + D * n) X.agents ≤
@@ -1445,26 +1445,26 @@ theorem XMach.time_bound {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
   have hsc : nt * N'.scan (X.wires.length + D * n) X.agents ≤ nt * X.passBound n C D :=
     Nat.mul_le_mul_left nt (Nat.le_trans hscan (by
       show 7 * X.agents.length + (X.wires.length + D * n) ≤
-        7 * (X.agents.length + C * n) + (X.wires.length + D * n)
+        7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n)
       omega))
-  have e1 : C + D + 7 * (X.agents.length + C * n) + (X.wires.length + D * n) + 1 =
+  have e1 : C + D + 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + 1 =
       X.passBound n C D + (C + D + 1) := by
-    show _ = 7 * (X.agents.length + C * n) + (X.wires.length + D * n) + (C + D + 1)
+    show _ = 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + (C + D + 1)
     omega
-  have hΦ : (XMach.init X nt).energyIn N' (X.wires.length + D * n) (X.agents.length + C * n) +
-      (n - 0) * (C + D + 7 * (X.agents.length + C * n) + (X.wires.length + D * n) + 1) ≤
+  have hΦ : (XMach.init X nt).energyIn N' (X.wires.length + D * n) (X.agents.length + (C - 2) * n) +
+      (n - 0) * (C + D + 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + 1) ≤
       (nt + n) * X.passBound n C D + n * (C + D + 1) := by
     rw [Nat.sub_zero, e1, Nat.mul_add n (X.passBound n C D) (C + D + 1),
       Nat.add_mul nt n (X.passBound n C D)]
     omega
   have h₂ := Nat.mul_le_mul_left
-    (2 * (X.agents.length + C * n) + (X.wires.length + D * n) + C + D + 1) hΦ
+    (2 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + C + D + 1) hΦ
   rw [Nat.mul_comm ((nt + n) * X.passBound n C D + n * (C + D + 1))]
   have k' : (XMach.init X nt).time xs σ i ≤
-      0 + (2 * (X.agents.length + C * n) + (X.wires.length + D * n) + C + D + 1) *
-        ((XMach.init X nt).energyIn N' (X.wires.length + D * n) (X.agents.length + C * n) +
+      0 + (2 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + C + D + 1) *
+        ((XMach.init X nt).energyIn N' (X.wires.length + D * n) (X.agents.length + (C - 2) * n) +
           (n - 0) *
-            (C + D + 7 * (X.agents.length + C * n) + (X.wires.length + D * n) + 1)) :=
+            (C + D + 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + 1)) :=
     Nat.le_trans (Nat.le_add_right _ _) k
   rw [Nat.zero_add] at k'
   exact Nat.le_trans k' h₂

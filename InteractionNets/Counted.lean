@@ -1165,6 +1165,8 @@ theorem OMach.ftime_le_work {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
     obtain ⟨⟨am, at'⟩, -⟩ := OMach.trace_agree xs σ (OMach.init_agree X nt) i
     obtain ⟨a, -, ok⟩ := TMach.init_sim (xs := xs) hX hnd hnt σ i
     obtain ⟨hA, -, -⟩ := hΦ i
+    replace hA := Nat.le_trans hA
+      (Nat.add_le_add_left (Nat.mul_le_mul_right n (Nat.sub_le C 2)) _)
     have hW := XMach.wires_le (xs := xs) hX hnt hb hs hn σ i
     have hNm := XMach.names_le (xs := xs) hX hL nt hs hn σ i
     have sz := OMach.trace_sized xs σ (M := OMach.init X nt) (OMem.ofX_sized X) i

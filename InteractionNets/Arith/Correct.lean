@@ -696,7 +696,7 @@ theorem sum_passBound_le (m n : Nat) :
     (sum m n).passBound (m + 1) 2 8 ≤ 33 * m + 11 * n + 49 := by
   have ha := sum_agents_length_le m n
   have hw := sum_wires_length_le m n
-  show 7 * ((sum m n).agents.length + 2 * (m + 1)) + ((sum m n).wires.length + 8 * (m + 1)) ≤ _
+  show 7 * ((sum m n).agents.length + (2 - 2) * (m + 1)) + ((sum m n).wires.length + 8 * (m + 1)) ≤ _
   omega
 
 /-- **Addition in a bounded number of actions.**  With any number of
@@ -819,7 +819,7 @@ theorem sum_itime (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) :
   · show 2 * (m + 1) + 1 ≤ 2 * m + 3
     omega
   · have ha := sum_agents_length_le m n
-    show (sum m n).agents.length + 2 * (m + 1) ≤ 3 * m + n + 5
+    show (sum m n).agents.length + (2 - 2) * (m + 1) ≤ 3 * m + n + 5
     omega
 
 /-- `2 + 3` on three threads on the indexed memory, however they are
@@ -2032,7 +2032,7 @@ theorem solo_work_succ (m n : Nat) (i : Nat) :
   have hA' : X'.agents.length ≤ (sum (m + 1) n).agents.length + 2 * (m + 1 + 1) := by
     have h := (hΦ (16 + 17 * m)).1
     rw [hK] at h
-    exact h
+    exact Nat.le_trans h (Nat.add_le_add_left (Nat.mul_le_mul_right _ (Nat.sub_le 2 2)) _)
   have hW' : X'.wires.length ≤ (sum (m + 1) n).wires.length + 8 * (m + 1 + 1) := by
     have h := XMach.wires_le (xs := xsys) hX Nat.zero_lt_one xsys_bounded hs hn'
       (fun _ => 0) (16 + 17 * m)
@@ -2044,7 +2044,7 @@ theorem solo_work_succ (m n : Nat) (i : Nat) :
   have tail : ∀ j, (XMach.init X' 1).work xsys (fun _ => 0) j ≤ 66 * m + 22 * n + 219 := by
     intro j
     have h := XMach.work_le hX' hnd' Nat.zero_lt_one xsys_bounded rest hn' (fun _ => 0) j
-    have hp : X'.passBound 1 2 8 = 7 * (X'.agents.length + 2 * 1) + (X'.wires.length + 8 * 1) :=
+    have hp : X'.passBound 1 2 8 = 7 * (X'.agents.length + (2 - 2) * 1) + (X'.wires.length + 8 * 1) :=
       rfl
     rw [hp] at h
     omega
@@ -2080,7 +2080,7 @@ theorem solo_work_le (m n : Nat) (i : Nat) :
     have ha := sum_agents_length_le 0 n
     have hw := sum_wires_length_le 0 n
     have hp : (sum 0 n).passBound (0 + 1) 2 8 =
-        7 * ((sum 0 n).agents.length + 2 * (0 + 1)) + ((sum 0 n).wires.length + 8 * (0 + 1)) :=
+        7 * ((sum 0 n).agents.length + (2 - 2) * (0 + 1)) + ((sum 0 n).wires.length + 8 * (0 + 1)) :=
       rfl
     rw [hp] at h
     omega
