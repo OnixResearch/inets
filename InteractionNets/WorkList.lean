@@ -15,9 +15,15 @@ principal wires ran into the fired pair may come to face each other.  After
 a claim of such a rule (one that *joins*) the thread takes a fresh copy of
 the list of agents, as `XMach` does after every claim.
 
-The program only reads memory where `XMach` does, so it is still an
-execution of the machine `Mach` (`WMach.act_sim`, `WMach.exec_run`), and the
-evaluable test of `XMach.exec_agrees` carries over (`WMach.exec_agrees`).
+A thread writes the segments that reach the principal port of a new agent
+last (`XRhs.orderedLinks`): until then no new agent can be taken, so another
+thread that finds a segment missing finds it at a new agent that is still
+there.  The program only reads memory where `XMach` does and writes the
+same right-hand side, so it is still an execution of the machine `Mach`
+(`WMach.act_sim`, `WMach.exec_run`), and the evaluable test of
+`XMach.exec_agrees` carries over (`WMach.exec_agrees`).  That every active
+pair a firing makes is an old one or has a new agent in it, when the rule
+joins no interface ports, is `Redex.of_fire`.
 
 What it buys, measured by evaluation with one thread (actions until rest):
 
@@ -61,6 +67,29 @@ def XRhs.joins (R : XRhs S) (ar : S → Nat) (α β : S) : Bool :=
 
 variable [DecidableEq S]
 
+/-- The segment reaches the principal port of one of the agents listed. -/
+def reachesPrincipal (ids : List Id) (e : Port × Port) : Bool :=
+  (e.1.2 == 0 && ids.contains e.1.1) || (e.2.2 == 0 && ids.contains e.2.1)
+
+/-- The segments to write when `a` and `b` fire, those that reach the
+principal port of a new agent last.  Until the last of them is written no
+new agent can be taken, so a segment still to be written always has a new
+agent that is still there at one of its ends. -/
+def XRhs.orderedLinks (R : XRhs S) (ar : S → Nat) (a b : Id) (α β : S) : List (Port × Port) :=
+  (R.newLinks ar a b α β).filter (fun e => !reachesPrincipal ((R.newAgents a b).map Prod.fst) e) ++
+    (R.newLinks ar a b α β).filter (reachesPrincipal ((R.newAgents a b).map Prod.fst))
+
+omit [DecidableEq S] in
+theorem mem_filter_not_append {A : Type} (f : A → Bool) (l : List A) (x : A) :
+    x ∈ l.filter (fun e => !f e) ++ l.filter f ↔ x ∈ l := by
+  rw [List.mem_append, List.mem_filter, List.mem_filter]
+  cases f x <;> simp
+
+omit [DecidableEq S] in
+theorem XRhs.mem_orderedLinks (R : XRhs S) (ar : S → Nat) (a b : Id) (α β : S) (e : Port × Port) :
+    e ∈ R.orderedLinks ar a b α β ↔ e ∈ R.newLinks ar a b α β :=
+  mem_filter_not_append _ _ _
+
 /-- One action of a thread on the memory `X`: the new memory, the new
 thread, and `1` if the action completed a claim. -/
 def WMach.act (xs : XSys S) (X : XNet S) (T : WThread S) : XNet S × WThread S × Nat :=
@@ -69,7 +98,7 @@ def WMach.act (xs : XSys S) (X : XNet S) (T : WThread S) : XNet S × WThread S �
     match (if assoc b X.agents = some β ∧ a ≠ b then xs.rule α β else none) with
     | some R =>
       (X.takeAgent b, ⟨R.newAgents a b ++ T.todo,
-        .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β),
+        .write (R.newAgents a b) (R.orderedLinks xs.sys.ar a b α β),
         T.again || R.joins xs.sys.ar α β⟩, 1)
     | none => (X.putAgent a α, ⟨T.todo, .idle, T.again⟩, 0)
   | .write [] [] =>
@@ -79,9 +108,10 @@ def WMach.act (xs : XSys S) (X : XNet S) (T : WThread S) : XNet S × WThread S �
       ⟨(XMach.act xs X T.toX).2.1.todo, (XMach.act xs X T.toX).2.1.st, T.again⟩,
       (XMach.act xs X T.toX).2.2)
 
-/-- An action of the program does to the memory and to the state of the
-thread what an action of `XMach` does. -/
-theorem WMach.act_agree (xs : XSys S) (X : XNet S) (T : WThread S) :
+/-- Away from a claim, an action of the program does to the memory and to
+the state of the thread what an action of `XMach` does. -/
+theorem WMach.act_agree (xs : XSys S) (X : XNet S) (T : WThread S)
+    (hT : ∀ a b α β, T.st ≠ .half a b α β) :
     (WMach.act xs X T).1 = (XMach.act xs X T.toX).1 ∧
       (WMach.act xs X T).2.1.st = (XMach.act xs X T.toX).2.1.st ∧
       (WMach.act xs X T).2.2 = (XMach.act xs X T.toX).2.2 := by
@@ -91,11 +121,7 @@ theorem WMach.act_agree (xs : XSys S) (X : XNet S) (T : WThread S) :
   | look a α => exact ⟨rfl, rfl, rfl⟩
   | seek a α p c => exact ⟨rfl, rfl, rfl⟩
   | ready a b α β => exact ⟨rfl, rfl, rfl⟩
-  | half a b α β =>
-    unfold WMach.act XMach.act
-    dsimp only [WThread.toX]
-    cases (if assoc b X.agents = some β ∧ a ≠ b then xs.rule α β else none) <;>
-      exact ⟨rfl, rfl, rfl⟩
+  | half a b α β => exact absurd rfl (hT a b α β)
   | write as ls =>
     cases as with
     | cons e as => exact ⟨rfl, rfl, rfl⟩
@@ -115,9 +141,37 @@ theorem WMach.act_sim (xs : XSys S) (X : XNet S) (T : WThread S) (th : Nat → T
         (WMach.act xs X T).2.2 = 0) ∨
       MStep xs.sys (WMach.act xs X T).2.2 ⟨X.toNet, th⟩
         ⟨(WMach.act xs X T).1.toNet, upd th t (WMach.act xs X T).2.1.st⟩ := by
-  obtain ⟨e₁, e₂, e₃⟩ := WMach.act_agree xs X T
-  rw [e₁, e₂, e₃]
-  exact XMach.act_sim xs X T.toX th t hs
+  by_cases hT : ∀ a b α β, T.st ≠ .half a b α β
+  · obtain ⟨e₁, e₂, e₃⟩ := WMach.act_agree xs X T hT
+    rw [e₁, e₂, e₃]
+    exact XMach.act_sim xs X T.toX th t hs
+  · obtain ⟨a, b, α, β, hh⟩ : ∃ a b α β, T.st = .half a b α β := by
+      apply Classical.byContradiction
+      intro hn
+      exact hT fun a b α β e => hn ⟨a, b, α, β, e⟩
+    obtain ⟨todo, st, again⟩ := T
+    dsimp only at hh
+    subst hh
+    have hs' : th t = .half a b α β := hs
+    unfold WMach.act
+    dsimp only
+    split
+    · rename_i R hR
+      split at hR
+      · rename_i hc
+        obtain ⟨hsys, hw⟩ := xs.writes hc.2 hR
+        have hw' : Writes a b R.toRhs (R.newAgents a b) (R.orderedLinks xs.sys.ar a b α β) :=
+          ⟨hw.agent, hw.nodup, fun {p q} => (R.mem_orderedLinks _ a b α β (p, q)).trans hw.link⟩
+        refine .inr ?_
+        show MStep xs.sys 1 ⟨X.toNet, th⟩ ⟨(X.takeAgent b).toNet,
+          upd th t (.write (R.newAgents a b) (R.orderedLinks xs.sys.ar a b α β))⟩
+        rw [XNet.takeAgent_toNet]
+        exact .cas₂ (M := ⟨X.toNet, th⟩) hs' (assoc_mem hc.1) hc.2 hsys hw'
+      · cases hR
+    · refine .inr ?_
+      show MStep xs.sys 0 ⟨X.toNet, th⟩ ⟨(X.putAgent a α).toNet, upd th t .idle⟩
+      rw [XNet.putAgent_toNet]
+      exact .undo (M := ⟨X.toNet, th⟩) hs'
 
 omit [DecidableEq S] in
 theorem threadOf_map_eq {ths : List (WThread S)} {t : Nat} {T : WThread S}
@@ -259,5 +313,126 @@ theorem WMach.exec_le {xs : XSys S} {X : XNet S} (hX : X.Ok xs.sys.ar) {f : Nat}
   exact ((XNet.run_normal hX f stop).2 cs).1
 
 end WMachine
+
+/-! ### The active pairs a firing makes
+
+When a rule wires no two of its interface ports together, every active pair
+after the firing was an active pair before, or has a new agent in it: a
+wire between two old principal ports cannot run through the fired pair, for
+it would have to enter an interface port by an old segment and leave it by
+a new one, and a new segment that leaves an interface port goes to a port
+of a new agent, which ends the wire. -/
+
+section NewPairs
+
+variable {sys : System S}
+
+/-- The rule wires no two of its interface ports together. -/
+def Rhs.NoJoin (R : Rhs S) : Prop := ∀ x y, R.link x y → x.IsNew ∨ y.IsNew
+
+/-- A walk of the net after a firing by a rule that joins no interface
+ports, which starts and ends away from the new agents and does not start at
+a port of the fired pair, is a walk of the net before. -/
+theorem walk_of_fire {G : Net S} {c d : Id} {γ δ : S} {R : Rhs S}
+    (site : Site sys.ar G c d γ δ) (hR : R.NoJoin) (hRwf : R.WF sys.ar γ δ) :
+    ∀ {u v x y : Port}, Walk (G.fire c d R).link ((G.fire c d R).End sys.ar) u v x y →
+      (∀ o j, u.1 ≠ child c d o j) → ¬ (G.End sys.ar u ∧ (u.1 = c ∨ u.1 = d)) →
+      (∀ o j, y.1 ≠ child c d o j) →
+      Walk G.link (G.End sys.ar) u v x y := by
+  have hG := site.wf
+  -- a segment leaving a port that is not one of the fired pair's or a new
+  -- agent's is old
+  have old : ∀ {u v : Port}, (G.fire c d R).link u v → (∀ o j, u.1 ≠ child c d o j) →
+      ¬ (G.End sys.ar u ∧ (u.1 = c ∨ u.1 = d)) → G.link u v := by
+    intro u v h h1 h2
+    rcases h with h | ⟨x', y', hxy, rfl, rfl⟩
+    · exact h
+    · cases x' with
+      | ifc s k =>
+        have hk : k < sys.ar (sel γ δ s) := hRwf.valid hxy
+        refine absurd ⟨.inr ⟨sel γ δ s, site.agent_sel s, hk⟩, ?_⟩ h2
+        cases s
+        · exact .inl rfl
+        · exact .inr rfl
+      | new o j k => exact absurd rfl (h1 o j)
+  -- a port of a new agent at the end of a new segment is an end
+  have newEnd : ∀ {x' : LPort} {o : Option Bool} {j k : Nat}, R.link x' (.new o j k) →
+      (G.fire c d R).End sys.ar (emb c d (.new o j k)) := by
+    intro x' o j k h
+    obtain ⟨γ', hl, hk⟩ := (hRwf.valid (hRwf.symm h) : R.Valid sys.ar γ δ (.new o j k))
+    exact .inr ⟨γ', .inr ⟨o, j, rfl, hl⟩, hk⟩
+  intro u v x y w
+  induction w with
+  | single h =>
+    intro h1 h2 _
+    exact .single (old h h1 h2)
+  | cons h hT hne w ih =>
+    rename_i u v w' x y
+    intro h1 h2 hy
+    have hl := old h h1 h2
+    have hv1 : ∀ o j, v.1 ≠ child c d o j := by
+      intro o j e
+      apply site.not_used_child o j
+      rw [← e]
+      exact .inr (.inl ⟨v.2, u, hG.symm hl⟩)
+    have hv2 : ¬ (G.End sys.ar v ∧ (v.1 = c ∨ v.1 = d)) := by
+      rintro ⟨hE, -⟩
+      -- the walk goes on from `v` by a segment to `w'`
+      have next : (G.fire c d R).link v w' ∧
+          ((G.fire c d R).End sys.ar w' → (∃ o j, w'.1 = child c d o j) → False) := by
+        cases w with
+        | single h' =>
+          exact ⟨h', fun _ ⟨o, j, e⟩ => hy o j e⟩
+        | cons h' hT' _ _ => exact ⟨h', fun hE' _ => hT' hE'⟩
+      obtain ⟨hn, stop⟩ := next
+      rcases hn with hn | ⟨x', y', hxy, ev, ew⟩
+      · exact hne (hG.end_unique hE hn (hG.symm hl))
+      · rcases hR x' y' hxy with hx | hy'
+        · cases x' with
+          | ifc s k => exact hx
+          | new o j k => exact hv1 o j (congrArg Prod.fst ev)
+        · cases y' with
+          | ifc s k => exact hy'
+          | new o j k =>
+            rw [ew] at stop
+            exact stop (newEnd hxy) ⟨o, j, rfl⟩
+    have hTG : ¬ G.End sys.ar v := by
+      intro hE
+      rcases hE with hf | ⟨γ', hag, hk⟩
+      · exact hT (.inl hf)
+      · by_cases hcd : v.1 = c ∨ v.1 = d
+        · exact hv2 ⟨.inr ⟨γ', hag, hk⟩, hcd⟩
+        · refine hT (.inr ⟨γ', .inl ⟨hag, fun e => hcd (.inl e), fun e => hcd (.inr e)⟩, hk⟩)
+    exact .cons hl hTG hne (ih hv1 hv2 hy)
+
+/-- **After a firing by a rule that joins no interface ports, an active
+pair was already one, or has a new agent in it.** -/
+theorem Redex.of_fire {G : Net S} {c d a b : Id} {γ δ α β : S} {R R' : Rhs S}
+    (hG : G.WF sys.ar) (r : Redex sys G c d γ δ R) (hR : R.NoJoin)
+    (r' : Redex sys (G.fire c d R) a b α β R') :
+    Redex sys G a b α β R' ∨ (∃ o j, a = child c d o j) ∨ ∃ o j, b = child c d o j := by
+  have site : Site sys.ar G c d γ δ := ⟨hG, r.ha, r.hb, r.ne, r.conn⟩
+  have hRwf := sys.rule_wf r.rule
+  by_cases ha : ∃ o j, a = child c d o j
+  · exact .inr (.inl ha)
+  by_cases hb : ∃ o j, b = child c d o j
+  · exact .inr (.inr hb)
+  refine .inl ?_
+  have oldAgent : ∀ {i : Id} {ε : S}, (G.fire c d R).agent i ε → ¬ (∃ o j, i = child c d o j) →
+      G.agent i ε ∧ i ≠ c ∧ i ≠ d := by
+    intro i ε h hi
+    rcases h with h | ⟨o, j, e, -⟩
+    · exact h
+    · exact absurd ⟨o, j, e⟩ hi
+  obtain ⟨hga, hac, had⟩ := oldAgent r'.ha ha
+  obtain ⟨hgb, -, -⟩ := oldAgent r'.hb hb
+  obtain ⟨v, x, w⟩ := r'.conn
+  refine ⟨hga, hgb, r'.ne, ⟨v, x, walk_of_fire site hR hRwf w
+    (fun o j e => ha ⟨o, j, e⟩) ?_ (fun o j e => hb ⟨o, j, e⟩)⟩, r'.rule⟩
+  rintro ⟨-, e | e⟩
+  · exact hac e
+  · exact had e
+
+end NewPairs
 
 end INet
