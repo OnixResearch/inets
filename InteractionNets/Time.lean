@@ -1338,7 +1338,8 @@ claim, and the writes, times
     2 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + C + D + 1
 
 the most an action can cost in a memory that never holds more than the
-agents of the net and `C - 2` more for each of the `n` claims.  A window stretches the run, not the work. -/
+agents of the net and `C - 2` more for each of the `n` claims.  A window
+stretches the run, not the work. -/
 theorem XMach.time_bound {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
     (hnd : (X.agents.map Prod.fst).Nodup) {nt : Nat} (hnt : 0 < nt) {C D : Nat}
     (hb : xs.Bounded C D) {n : Nat} {N' : Net S} (hs : Steps (Step xs.sys) n X.toNet N')

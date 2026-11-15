@@ -1828,7 +1828,8 @@ theorem XMach.run_facts {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
       Nat.le_trans (Nat.le_of_eq ih) (Nat.le_add_right _ _)⟩
   have hA : ∀ i, ((XMach.init X nt).trace xs σ i).1.heads ≤ X.agents.length + C * n :=
     fun i => Nat.le_trans (sizes i).2
-      (Nat.add_le_add_left (Nat.le_trans (Nat.mul_le_mul_left (C - 2) (bound i)) (Nat.mul_le_mul_right n (Nat.sub_le C 2))) _)
+      (Nat.add_le_add_left (Nat.le_trans (Nat.mul_le_mul_left (C - 2) (bound i))
+        (Nat.mul_le_mul_right n (Nat.sub_le C 2))) _)
   have nd : ∀ i, (((XMach.init X nt).trace xs σ i).1.mem.agents.map Prod.fst).Nodup := by
     intro i
     induction i with

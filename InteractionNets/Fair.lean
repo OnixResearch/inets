@@ -2372,7 +2372,8 @@ theorem XMach.fair_bound {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
         X.passBound n C D + (C + D + 1) := by
       show _ = 7 * (X.agents.length + (C - 2) * n) + (X.wires.length + D * n) + (C + D + 1)
       omega
-    have ep : (XMach.init X nt).potAt N' (X.wires.length + D * n) (X.agents.length + (C - 2) * n) t =
+    have ep : (XMach.init X nt).potAt N' (X.wires.length + D * n)
+        (X.agents.length + (C - 2) * n) t =
         N'.scan (X.wires.length + D * n) X.agents := by
       rw [XMach.potAt_eq (XMach.init_thread X ht)]
       show N'.scan (X.wires.length + D * n) (X.agents.drop t ++ X.agents.take t) = _

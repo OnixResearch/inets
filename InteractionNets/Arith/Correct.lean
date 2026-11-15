@@ -696,7 +696,8 @@ theorem sum_passBound_le (m n : Nat) :
     (sum m n).passBound (m + 1) 2 8 ≤ 33 * m + 11 * n + 49 := by
   have ha := sum_agents_length_le m n
   have hw := sum_wires_length_le m n
-  show 7 * ((sum m n).agents.length + (2 - 2) * (m + 1)) + ((sum m n).wires.length + 8 * (m + 1)) ≤ _
+  show 7 * ((sum m n).agents.length + (2 - 2) * (m + 1)) +
+    ((sum m n).wires.length + 8 * (m + 1)) ≤ _
   omega
 
 /-- **Addition in a bounded number of actions.**  With any number of
@@ -2044,7 +2045,8 @@ theorem solo_work_succ (m n : Nat) (i : Nat) :
   have tail : ∀ j, (XMach.init X' 1).work xsys (fun _ => 0) j ≤ 66 * m + 22 * n + 219 := by
     intro j
     have h := XMach.work_le hX' hnd' Nat.zero_lt_one xsys_bounded rest hn' (fun _ => 0) j
-    have hp : X'.passBound 1 2 8 = 7 * (X'.agents.length + (2 - 2) * 1) + (X'.wires.length + 8 * 1) :=
+    have hp : X'.passBound 1 2 8 =
+        7 * (X'.agents.length + (2 - 2) * 1) + (X'.wires.length + 8 * 1) :=
       rfl
     rw [hp] at h
     omega
@@ -2080,7 +2082,8 @@ theorem solo_work_le (m n : Nat) (i : Nat) :
     have ha := sum_agents_length_le 0 n
     have hw := sum_wires_length_le 0 n
     have hp : (sum 0 n).passBound (0 + 1) 2 8 =
-        7 * ((sum 0 n).agents.length + (2 - 2) * (0 + 1)) + ((sum 0 n).wires.length + 8 * (0 + 1)) :=
+        7 * ((sum 0 n).agents.length + (2 - 2) * (0 + 1)) +
+          ((sum 0 n).wires.length + 8 * (0 + 1)) :=
       rfl
     rw [hp] at h
     omega

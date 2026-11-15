@@ -66,6 +66,8 @@ import InteractionNets.Keeps
 import InteractionNets.RoundRobin
 import InteractionNets.Extra
 import InteractionNets.Arith.Bound
+import InteractionNets.WorkList
+import InteractionNets.Peano.WorkList
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.LongRun
@@ -3284,6 +3286,17 @@ holds up to equality rather than up to renaming.
   normal form with the numeral `v` on a port, whatever the run returns
   for that port is `v` (`XNet.runRead_sound`), and with enough actions
   it returns `v` (`XNet.runRead_complete`).
+  The bound on actions grows as the square of the steps because a thread
+  takes a fresh list of all agents after every claim, and that is not
+  slack in the proof: with a numeral listed first and `k` eraser-zero
+  pairs behind it one thread takes 423, 1443 and 5283 actions for `k` =
+  10, 20, 40, checked in the kernel (`Peano.inertThenPairs`).  `WMach`
+  keeps its list after a claim and puts the agents the rule wrote in
+  front of it, and takes a fresh list only after a rule that wires two
+  of its interface ports together; it takes 103, 203 and 403.  It is an
+  execution of the machine like `XMach` (`WMach.exec_run`), with the same
+  evaluable test (`WMach.exec_agrees`); its completeness and bound are
+  not yet proved.
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers
