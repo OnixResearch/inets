@@ -83,6 +83,8 @@ import InteractionNets.Peano.JoinWalk
 import InteractionNets.WorkRun
 import InteractionNets.Arith.WorkRun
 import InteractionNets.JoinLive
+import InteractionNets.JoinRun
+import InteractionNets.Arith.JoinRun
 
 /-!
 # Interaction nets
@@ -3378,8 +3380,18 @@ holds up to equality rather than up to renaming.
   the joined segment, and a wire that closes on itself has no end
   (`Walk.cycle_false`).  When both sides reach principal ports, the
   agent at the first is the agent of every pair through the wire
-  (`prin_end`, `JMach.Live.advance_found`).  A bound on its actions is
-  not proved.
+  (`prin_end`, `JMach.Live.advance_found`).  So a run at rest has
+  reached a normal form, in as many steps as it made claims, with no
+  normal form known beforehand (`JMach.exec_rest_steps`,
+  `JMach.rest_steps`), and the run with threads taking turns and the
+  reading are carried over: whatever `XNet.jrunRead` returns is the
+  numeral of the normal form (`XNet.jrunRead_sound`,
+  `Arith.Expr.jrun_sound`).  That a fair run comes to rest, and a bound
+  on its actions, are not proved.  A bound in the shape of
+  `WMach.fair_bound`, a walk of at most every segment for each joined
+  segment, would not be smaller than the rescan it replaces, and would
+  not show what is measured; what would is a bound on the walks over a
+  whole run, which is not attempted here.
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers
