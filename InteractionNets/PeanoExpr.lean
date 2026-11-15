@@ -1,20 +1,20 @@
-import InteractionNets.PeanoProd
+import InteractionNets.PeanoPow
 import InteractionNets.Union
 import InteractionNets.ReadBack
 
-/-! # Every expression of additions and multiplications
+/-! # Every expression of additions, multiplications and powers
 
-Expressions built from numerals with `+` and `*` (`Peano.PExpr`).  Each
-has a net (`PExpr.net`): the nets of the two arguments and an adder or a
-multiplier that waits for them, side by side under tags, with the result
-of each argument wired to a port of the operator.
+Expressions built from numerals with `+`, `*` and `^` (`Peano.PExpr`).
+Each has a net (`PExpr.net`): the nets of the two arguments and an adder,
+a multiplier or a power that waits for them, side by side under tags,
+with the result of each argument wired to a port of the operator.
 
 The two argument nets reduce inside the whole as they do alone
 (`Net.Made.steps`, the rules of `Peano` giving every new agent a side,
 `Peano.system_sided`).  Their results are then, across the two new
 segments, the arguments of the operator (`Peano.op_setup`), and the
 theorem for the operator finishes: `Peano.add_steps'` for the adder,
-`Peano.mul_steps` for the multiplier.  What the whole computes is again a
+`Peano.mul_steps` for the multiplier, `Peano.pow_steps` for the power.  What the whole computes is again a
 numeral on a free port, in a net of successors and zeros, so this
 repeats (`PExpr.good`).
 
@@ -369,6 +369,25 @@ theorem mul_evals {U : Net Peano} {P : Nat → Net Peano} (hU : U.WF ar) (hm : U
   obtain ⟨N', sts', hnum, hag⟩ := mul_steps ⟨hW, hd, h1, h2, hout, hfr, honly⟩
   exact ⟨hW0, fr0, N', sts.trans sts', hnum, hag⟩
 
+/-- **A power on two nets that compute**, the first the exponent and the
+second the base, computes the power, in the steps of the two nets and
+`powCost v₁ v₂` more. -/
+theorem pow_evals {U : Net Peano} {P : Nat → Net Peano} (hU : U.WF ar) (hm : U.Made P)
+    {cA cB cD : Nat} (hAB : cA ≠ cB) (hAD : cA ≠ cD) (hBD : cB ≠ cD)
+    {d : Id} {s₁ v₁ s₂ v₂ : Nat} {p₁ p₂ q₁ q₂ r : Port}
+    (eA : Evals (P cA) s₁ v₁ p₁) (eB : Evals (P cB) s₂ v₂ p₂)
+    (hD : OpenOp (P cD) pow d q₁ q₂ r)
+    (hO : ∀ c, c ≠ cA → c ≠ cB → c ≠ cD → ∀ i γ, ¬ (P c).agent i γ) :
+    ((U.plug (joinRel (tagPort cA p₁) (tagPort cD q₁))).plug
+        (joinRel (tagPort cB p₂) (tagPort cD q₂))).WF ar ∧
+      Evals ((U.plug (joinRel (tagPort cA p₁) (tagPort cD q₁))).plug
+          (joinRel (tagPort cB p₂) (tagPort cD q₂)))
+        (s₁ + s₂ + powCost v₁ v₂) (v₂ ^ v₁) (tagPort cD r) := by
+  obtain ⟨hW0, fr0, W, sts, hW, hd, h1, h2, hout, hfr, honly⟩ :=
+    op_setup hU hm hAB hAD hBD eA eB hD hO
+  obtain ⟨N', sts', hnum, hag⟩ := pow_steps ⟨hW, hd, h1, h2, hout, hfr, honly⟩
+  exact ⟨hW0, fr0, N', sts.trans sts', hnum, hag⟩
+
 /-! ### The nets -/
 
 /-- The numeral `0` on the free port `([0], 0)`. -/
@@ -474,6 +493,24 @@ theorem openMul_spec : OpenOp (openOp mul).toNet mul [1] ([2], 0) ([3], 0) ([0],
   · show ([0], 0) ∈ (openOp mul).free
     decide
 
+theorem openPow_ok : (openOp pow).Ok ar := by decide
+
+theorem openPow_spec : OpenOp (openOp pow).toNet pow [1] ([2], 0) ([3], 0) ([0], 0) := by
+  have hX := openPow_ok
+  refine ⟨?_, ?_, hX.link_iff.1 (by decide), hX.link_iff.1 (by decide),
+    hX.link_iff.1 (by decide), ?_, ?_, ?_, by decide, by decide, by decide⟩
+  · show ([1], pow) ∈ (openOp pow).agents
+    decide
+  · intro i γ hi
+    have hi' : (i, γ) ∈ [(([1] : Id), pow)] := hi
+    exact (Prod.mk.inj (List.mem_singleton.1 hi')).1
+  · show ([2], 0) ∈ (openOp pow).free
+    decide
+  · show ([3], 0) ∈ (openOp pow).free
+    decide
+  · show ([0], 0) ∈ (openOp pow).free
+    decide
+
 /-- The net of an operator on two nets: the two nets and the operator
 that waits, side by side under the tags `0`, `1` and `2`, with the result
 port of each net wired to a port of the operator. -/
@@ -492,40 +529,47 @@ theorem opNet_toNet (γ : Peano) (X₁ X₂ : XNet Peano) (p₁ p₂ : Port) :
 
 /-! ### Expressions -/
 
-/-- **Expressions**: numerals, additions and multiplications. -/
+/-- **Expressions**: numerals, additions, multiplications and powers.
+`pow b e` is `b` to the power `e`. -/
 inductive PExpr
   | lit (n : Nat)
   | add (e₁ e₂ : PExpr)
   | mul (e₁ e₂ : PExpr)
+  | pow (b e : PExpr)
 
 /-- The value of an expression. -/
 def PExpr.eval : PExpr → Nat
   | .lit n => n
   | .add e₁ e₂ => e₁.eval + e₂.eval
   | .mul e₁ e₂ => e₁.eval * e₂.eval
+  | .pow b e => b.eval ^ e.eval
 
 /-- The interactions of an expression: for each addition, one more than
 the value of its first argument; for each multiplication, `prodCost` of
-the values of its two arguments. -/
+the values of its two arguments; for each power, `powCost` of the values
+of the exponent and the base. -/
 def PExpr.cost : PExpr → Nat
   | .lit _ => 0
   | .add e₁ e₂ => e₁.cost + e₂.cost + (e₁.eval + 1)
   | .mul e₁ e₂ => e₁.cost + e₂.cost + prodCost e₁.eval e₂.eval
+  | .pow b e => e.cost + b.cost + powCost e.eval b.eval
 
 /-- The free port that carries the result. -/
 def PExpr.res : PExpr → Port
   | .lit _ => ([0], 0)
   | .add _ _ => ([0, 2], 0)
   | .mul _ _ => ([0, 2], 0)
+  | .pow _ _ => ([0, 2], 0)
 
-/-- **The net of an expression.**  A numeral is its net.  An addition or
-a multiplication is the nets of its two arguments and an operator that
-waits, side by side, with the result of each argument wired to a port of
-the operator. -/
+/-- **The net of an expression.**  A numeral is its net.  An addition, a
+multiplication or a power is the nets of its two arguments and an
+operator that waits, side by side, with the result of each argument wired
+to a port of the operator; for a power the exponent is the first. -/
 def PExpr.net : PExpr → XNet Peano
   | .lit n => Peano.lit n
   | .add e₁ e₂ => opNet Peano.add e₁.net e₂.net e₁.res e₂.res
   | .mul e₁ e₂ => opNet Peano.mul e₁.net e₂.net e₁.res e₂.res
+  | .pow b e => opNet Peano.pow e.net b.net e.res b.res
 
 theorem parts3_none {A B D : Net Peano} : ∀ c, c ≠ 0 → c ≠ 1 → c ≠ 2 → ∀ i γ,
     ¬ (parts3 A B D c).agent i γ
@@ -565,6 +609,17 @@ theorem PExpr.good : ∀ e : PExpr, e.net.toNet.WF ar ∧ Evals e.net.toNet e.co
     rw [opNet_toNet]
     exact mul_evals (hm.wf hP) hm (cA := 0) (cB := 1) (cD := 2) (by decide) (by decide)
       (by decide) ev₁ ev₂ openMul_spec parts3_none
+  | .pow b e => by
+    obtain ⟨w₁, ev₁⟩ := PExpr.good e
+    obtain ⟨w₂, ev₂⟩ := PExpr.good b
+    have hm := XNet.three_made e.net b.net (openOp Peano.pow)
+    have hP := parts3_wf w₁ w₂ openPow_ok.1
+    show (opNet Peano.pow e.net b.net e.res b.res).toNet.WF ar ∧
+      Evals (opNet Peano.pow e.net b.net e.res b.res).toNet
+        (e.cost + b.cost + powCost e.eval b.eval) (b.eval ^ e.eval) (tagPort 2 ([0], 0))
+    rw [opNet_toNet]
+    exact pow_evals (hm.wf hP) hm (cA := 0) (cB := 1) (cD := 2) (by decide) (by decide)
+      (by decide) ev₁ ev₂ openPow_spec parts3_none
 
 /-- **Every expression comes out right, whatever the threads do.**  With
 any number of threads and any schedule, a run on the net of an expression
@@ -653,6 +708,12 @@ set_option maxRecDepth 100000 in
 /-- `2 * (1 + 2)` run by three threads taking turns: after 1500 actions
 they are at rest and the result read is `6`. -/
 example : (PExpr.mul (.lit 2) (.add (.lit 1) (.lit 2))).run 3 1500 = some 6 := by
+  decide +kernel
+
+set_option maxRecDepth 100000 in
+/-- `2 ^ (1 + 1)` run by two threads taking turns: after 2500 actions
+they are at rest and the result read is `4`. -/
+example : (PExpr.pow (.lit 2) (.add (.lit 1) (.lit 1))).run 2 2500 = some 4 := by
   decide +kernel
 
 end Peano

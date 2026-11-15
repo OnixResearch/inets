@@ -2031,7 +2031,8 @@ An executable reducer.  `XNet` is a finite net without history, as data;
 * `INet.Peano.PExpr.rest`, `INet.Peano.PExpr.fair`, `INet.Peano.PExpr.good`,
   `INet.Peano.add_evals`, `INet.Peano.mul_evals`, `INet.Peano.system_sided`
                              every expression built from numerals with
-                             `+` and `*` comes out right on the machine:
+                             `+`, `*` and `^` comes out right on the
+                             machine:
                              with any number of threads and any schedule,
                              a run on its net that is at rest has made
                              exactly `PExpr.cost` interactions and holds
@@ -3398,30 +3399,31 @@ holds up to equality rather than up to renaming.
   (`Peano.power_rest`), and a fair run comes to rest
   (`Peano.power_fair`).  The count is given by a recursion, not in
   closed form: `powCost 0 b = b + 2`, and `powCost (e + 1) b` is
-  `b + 2`, `powCost e b` and `prodCost b (b ^ e)` together.  The
-  expressions of the next item do not have powers.
-* Expressions built from numerals with `+` and `*` (`Peano.PExpr`) have
-  nets (`PExpr.net`): the nets of the two arguments and an adder or a
-  multiplier that waits, side by side under the tags `0`, `1` and `2`
+  `b + 2`, `powCost e b` and `prodCost b (b ^ e)` together.
+* Expressions built from numerals with `+`, `*` and `^` (`Peano.PExpr`)
+  have nets (`PExpr.net`): the nets of the two arguments and an adder, a
+  multiplier or a power that waits, side by side under the tags `0`,
+  `1` and `2`
   (`XNet.three`), with the result port of each argument wired to a port
   of the operator.  The rules of `Peano` give every new agent a side
   (`Peano.system_sided`), so the argument nets reduce inside the whole
   as they do alone (`Net.Made.steps`); the operator then has two
   numerals as arguments in a net of successors and zeros
-  (`Peano.op_setup`), which is the situation of `Peano.add_steps'` and
-  `Peano.mul_steps`.  Hence every such net is well formed and computes
+  (`Peano.op_setup`), which is the situation of `Peano.add_steps'`,
+  `Peano.mul_steps` and `Peano.pow_steps`.  Hence every such net is well formed and computes
   the value of its expression in exactly `PExpr.cost` interactions
   (`PExpr.good`), and on the machine, with any number of threads and any
   schedule, a run at rest has made that many interactions and holds the
   numeral of the value on its free port (`PExpr.rest`); a fair run comes
-  to rest (`PExpr.fair`).  The cost counts `e₁ + 1` for an addition and
-  `prodCost e₁ e₂` for a multiplication, on the values of the arguments.
+  to rest (`PExpr.fair`).  The cost counts `e₁ + 1` for an addition,
+  `prodCost e₁ e₂` for a multiplication and `powCost e b` for a power,
+  on the values of the arguments.
   The proof evaluates the operators on numerals, which is one order of
   reduction; the count is the same for every order because the system
   is confluent.  These expressions can be run too (`PExpr.run`):
   whatever the run returns is the value (`PExpr.run_sound`), and with
-  enough actions it returns the value (`PExpr.run_complete`); two runs
-  are evaluated in the kernel.  How many actions are enough is not
+  enough actions it returns the value (`PExpr.run_complete`); three
+  runs are evaluated in the kernel, one of them `2 ^ (1 + 1)`.  How many actions are enough is not
   bounded.
 * An executable system (`XSys`) carries proofs: that its rules are the rules
   of a `System`, and that the slots of each right-hand side are listed.  For

@@ -419,13 +419,12 @@ structure Power (N : Net Peano) (p : Id) (e b : Nat) (r : Port) : Prop where
   free : N.free r
   only : ∀ i γ, N.agent i γ → γ = zero ∨ γ = succ ∨ i = p
 
-/-- **Powers are correct, for all inputs.**  A net whose agent `pow` has
-the numerals `e` and `b` as exponent and base and the free port `r` as
-result reduces, in `powCost e b` steps, to a normal form in which `r`
-carries the numeral `b ^ e`. -/
-theorem pow_correct {p : Id} {e b : Nat} (c : Power N p e b r) :
-    ∃ N', Steps (Step system) (powCost e b) N N' ∧ Normal (Step system) N' ∧
-      IsNum N' r (b ^ e) := by
+/-- **The run of a power**: in `powCost e b` steps the net becomes one
+that has the numeral `b ^ e` on the result port and whose agents are
+successors and zeros. -/
+theorem pow_steps {p : Id} {e b : Nat} (c : Power N p e b r) :
+    ∃ N', Steps (Step system) (powCost e b) N N' ∧ IsNum N' r (b ^ e) ∧
+      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ := by
   have hN := c.wf
   obtain ⟨h₁, hp₁, hn₁⟩ := c.fst
   obtain ⟨l₁, hl₁, e₁⟩ := Addition.Num.list hn₁
@@ -439,7 +438,7 @@ theorem pow_correct {p : Id} {e b : Nat} (c : Power N p e b r) :
       fun e' => hN.free_agent (i := r.1) (k := r.2) c.free (e' ▸ c.hp), hrl _ _ hl₁,
       hrl _ _ hl₂⟩
   obtain ⟨N', sts, hres, -, hag⟩ := Powering.run l₁ cP e₁ e₂
-  refine ⟨N', sts, normal_of_numerals fun i γ hi => ?_, hres.isNum⟩
+  refine ⟨N', sts, hres.isNum, fun i γ hi => ?_⟩
   rcases hag i γ hi with hz | hsu | ⟨hi₀, hne⟩
   · exact .inl hz
   · exact .inr hsu
@@ -447,6 +446,16 @@ theorem pow_correct {p : Id} {e b : Nat} (c : Power N p e b r) :
     · exact .inl hz
     · exact .inr hsu
     · exact absurd e' hne
+
+/-- **Powers are correct, for all inputs.**  A net whose agent `pow` has
+the numerals `e` and `b` as exponent and base and the free port `r` as
+result reduces, in `powCost e b` steps, to a normal form in which `r`
+carries the numeral `b ^ e`. -/
+theorem pow_correct {p : Id} {e b : Nat} (c : Power N p e b r) :
+    ∃ N', Steps (Step system) (powCost e b) N N' ∧ Normal (Step system) N' ∧
+      IsNum N' r (b ^ e) := by
+  obtain ⟨N', sts, hnum, hag⟩ := pow_steps c
+  exact ⟨N', sts, normal_of_numerals hag, hnum⟩
 
 /-! ### The nets for `b ^ e`, and the machine on them -/
 
