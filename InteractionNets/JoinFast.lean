@@ -64,13 +64,14 @@ def XSys.OneJoin (xs : XSys S) : Prop :=
   ∀ α β R a b, xs.rule α β = some R → (R.joinPairs xs.sys.ar a b α β).length ≤ 1
 
 /-- **The system pays its walks** with the measure `Φ` and `c₀` per claim,
-at goals with the property `P`: a claim does not lower the measure by more
-than `c₀`, and the walk of the segment a rule joins finds what it finds
-within `n` advances, on any memory holding the net after the rule, where
-`n + 1` is paid by `c₀` and the growth of the measure. -/
+at goals with the property `P`, before and after the claim: a claim does not
+lower the measure by more than `c₀`, and the walk of the segment a rule
+joins finds what it finds within `n` advances, on any memory holding the
+net after the rule, where `n + 1` is paid by `c₀` and the growth of the
+measure. -/
 def XSys.WalkPaid (xs : XSys S) (Φ : Net S → Nat) (c₀ : Nat) (P : Net S → Prop) : Prop :=
-  ∀ (G : Net S) (a b : Id) (α β : S) (R : XRhs S), P G → xs.rule α β = some R →
-    Redex xs.sys G a b α β R.toRhs →
+  ∀ (G : Net S) (a b : Id) (α β : S) (R : XRhs S), P G → P (G.fire a b R.toRhs) →
+    xs.rule α β = some R → Redex xs.sys G a b α β R.toRhs →
     Φ G ≤ c₀ + Φ (G.fire a b R.toRhs) ∧
     ∀ p q, R.joinPairs xs.sys.ar a b α β = [(p, q)] → ∀ X : XNet S, X.Like (G.fire a b R.toRhs) →
       ∃ n, 1 ≤ n ∧ n + 1 + Φ G ≤ c₀ + Φ (G.fire a b R.toRhs) ∧
@@ -217,7 +218,8 @@ owes drops by the actions of walks it takes, and grows at a claim by `c₀`
 and the growth of the measure. -/
 theorem JMach.owes_step {Φ : Net S → Nat} {c₀ : Nat} {P : Net S → Prop} (hJ : xs.OneJoin)
     (hpay : xs.WalkPaid Φ c₀ P) {M : JMach S} (hL : M.Live xs) {T : JThread S}
-    (h1 : M.ths = [T]) (hP : P M.toMach.goal) {b : Nat} (hb : M.Owes b) :
+    (h1 : M.ths = [T]) (hP : P M.toMach.goal) (hP' : P (M.step xs 0).1.toMach.goal) {b : Nat}
+    (hb : M.Owes b) :
     ∃ b', (M.step xs 0).1.Owes b' ∧
       M.walkAct 0 + b' + Φ M.toMach.goal ≤
         b + c₀ * (M.step xs 0).2 + Φ (M.step xs 0).1.toMach.goal := by
@@ -334,7 +336,7 @@ theorem JMach.owes_step {Φ : Net S → Nat} {c₀ : Nat} {P : Net S → Prop} (
     · change T.st = _ at hs
       have hact := JMach.act_half_some (xs := xs) (X := M.mem) (T := T) hs hh
       obtain ⟨hR, rg, eg⟩ := JMach.claim_goal hL ht hs hh
-      obtain ⟨hmono, hjp⟩ := hpay _ a b₀ α β R hP hR rg
+      obtain ⟨hmono, hjp⟩ := hpay _ a b₀ α β R hP (eg ▸ hP') hR rg
       have h1' : (M.step xs 0).2 = 1 := by rw [hc', hact]
       rw [h1', eg, hw0, Nat.mul_one]
       refine ⟨c₀ + Φ (M.toMach.goal.fire a b₀ R.toRhs) - Φ M.toMach.goal,
@@ -363,7 +365,7 @@ claim and the growth of the measure**, when every rule joins one segment at
 most and the system pays its walks at the goals of the run. -/
 theorem JMach.walked_le {Φ : Net S → Nat} {c₀ : Nat} {P : Net S → Prop} (hJ : xs.OneJoin)
     (hpay : xs.WalkPaid Φ c₀ P) {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
-    (hP : ∀ i, P ((JMach.init X 1).trace xs (fun _ => 0) i).1.toMach.goal) (i : Nat) :
+    {i : Nat} (hP : ∀ j, j ≤ i → P ((JMach.init X 1).trace xs (fun _ => 0) j).1.toMach.goal) :
     JMach.walked xs (fun _ => 0) (JMach.init X 1) i + Φ X.toNet ≤
       c₀ * ((JMach.init X 1).trace xs (fun _ => 0) i).2 +
         Φ ((JMach.init X 1).trace xs (fun _ => 0) i).1.toMach.goal := by
@@ -371,13 +373,14 @@ theorem JMach.walked_le {Φ : Net S → Nat} {c₀ : Nat} {P : Net S → Prop} (
   have eg : (JMach.init X 1).toMach.goal = X.toNet := by
     rw [JMach.init_toMach X 1]
     exact congrArg CState.goal (Mach.init_quiet X.toNet).abs
-  have key : ∀ i, ∃ b, ((JMach.init X 1).trace xs (fun _ => 0) i).1.Owes b ∧
-      JMach.walked xs (fun _ => 0) (JMach.init X 1) i + b + Φ X.toNet ≤
-        c₀ * ((JMach.init X 1).trace xs (fun _ => 0) i).2 +
-          Φ ((JMach.init X 1).trace xs (fun _ => 0) i).1.toMach.goal := by
-    intro i
-    induction i with
+  have key : ∀ k, k ≤ i → ∃ b, ((JMach.init X 1).trace xs (fun _ => 0) k).1.Owes b ∧
+      JMach.walked xs (fun _ => 0) (JMach.init X 1) k + b + Φ X.toNet ≤
+        c₀ * ((JMach.init X 1).trace xs (fun _ => 0) k).2 +
+          Φ ((JMach.init X 1).trace xs (fun _ => 0) k).1.toMach.goal := by
+    intro k
+    induction k with
     | zero =>
+      intro _
       refine ⟨0, fun T hT => ?_, ?_⟩
       · change (JMach.init X 1).ths[0]? = some T at hT
         simp only [JMach.init, List.range_one, List.map_cons, List.map_nil,
@@ -389,22 +392,24 @@ theorem JMach.walked_le {Φ : Net S → Nat} {c₀ : Nat} {P : Net S → Prop} (
       · show 0 + 0 + Φ X.toNet ≤ c₀ * 0 + Φ (JMach.init X 1).toMach.goal
         rw [eg]
         omega
-    | succ i ih =>
-      obtain ⟨b, hb, hle⟩ := ih
-      have hl : ((JMach.init X 1).trace xs (fun _ => 0) i).1.ths.length = 1 := by
+    | succ k ih =>
+      intro hk
+      obtain ⟨b, hb, hle⟩ := ih (by omega)
+      have hl : ((JMach.init X 1).trace xs (fun _ => 0) k).1.ths.length = 1 := by
         rw [JMach.trace_length]
         simp [JMach.init]
       obtain ⟨T, h1⟩ := JMach.one_thread hl
-      obtain ⟨b', hb', hle'⟩ := JMach.owes_step hJ hpay (live i) h1 (hP i) hb
+      obtain ⟨b', hb', hle'⟩ :=
+        JMach.owes_step hJ hpay (live k) h1 (hP k (by omega)) (hP (k + 1) hk) hb
       refine ⟨b', hb', ?_⟩
-      show JMach.walked xs (fun _ => 0) (JMach.init X 1) i +
-          JMach.walkAct ((JMach.init X 1).trace xs (fun _ => 0) i).1 0 + b' + Φ X.toNet ≤
-        c₀ * (((JMach.init X 1).trace xs (fun _ => 0) i).2 +
-          (((JMach.init X 1).trace xs (fun _ => 0) i).1.step xs 0).2) +
-          Φ (((JMach.init X 1).trace xs (fun _ => 0) i).1.step xs 0).1.toMach.goal
+      show JMach.walked xs (fun _ => 0) (JMach.init X 1) k +
+          JMach.walkAct ((JMach.init X 1).trace xs (fun _ => 0) k).1 0 + b' + Φ X.toNet ≤
+        c₀ * (((JMach.init X 1).trace xs (fun _ => 0) k).2 +
+          (((JMach.init X 1).trace xs (fun _ => 0) k).1.step xs 0).2) +
+          Φ (((JMach.init X 1).trace xs (fun _ => 0) k).1.step xs 0).1.toMach.goal
       rw [Nat.mul_add]
       omega
-  obtain ⟨b, -, hle⟩ := key i
+  obtain ⟨b, -, hle⟩ := key i (Nat.le_refl _)
   omega
 
 end INet

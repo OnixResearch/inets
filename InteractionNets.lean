@@ -90,6 +90,7 @@ import InteractionNets.MeasureJoin
 import InteractionNets.Arith.JoinChain
 import InteractionNets.WireFar
 import InteractionNets.JoinFast
+import InteractionNets.JoinPay
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
 
@@ -3450,6 +3451,12 @@ holds up to equality rather than up to renaming.
   (`XSys.WalkPaid`), then the actions of walks along the run are at most
   `c₀` per claim plus the growth of `Φ` from the first goal
   (`JMach.walked_le`).
+  How long a walk takes: if its first side goes for `r₁` segments and its
+  second for `r₂`, it is over after `r₁ + r₂` advances (`JWalk.found_by`),
+  and after twice the shorter if that side stops (`JWalk.found_stop₁`,
+  `JWalk.found_stop₂`); a side goes along a path of different points, as
+  far as the segments allow (`side_go`, `side_len`), and ends at a loop,
+  where no segment goes on, or at a principal port (`side_end`).
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
