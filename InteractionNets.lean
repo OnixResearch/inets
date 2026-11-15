@@ -3297,7 +3297,10 @@ holds up to equality rather than up to renaming.
   fairly, so they come to rest; from then on the memory does not change
   (`XMach.trace_rest_eq`), and `readNum` returns every numeral of a
   well-formed memory given enough fuel (`XNet.readNum_complete`).  How
-  many actions are enough is not bounded; two runs are evaluated in the
+  many actions are enough is bounded for threads that take turns on any
+  net that lists no name twice (`XNet.runRead_bound`, see below), but the
+  bound is not instantiated for these expressions; two runs are
+  evaluated in the
   kernel.  The reader and the run are for any system with a zero and a
   successor (`XNet.runRead`): when the net of a memory reduces to a
   normal form with the numeral `v` on a port, whatever the run returns
@@ -3551,9 +3554,12 @@ holds up to equality rather than up to renaming.
   most four agents and twelve ports (`Peano.xsys_bounded`) and the net
   lists no name twice (`Peano.GExpr.net_nodup`), so the threads are at
   rest with the value in memory after a number of actions given by the
-  net, the threads and the cost (`Peano.GExpr.rest_by`).  The bound is
-  far above what runs take.  How much fuel the reader needs to read the
-  value is still not bounded.
+  net, the threads and the cost (`Peano.GExpr.rest_by`).  Reading the
+  value needs fuel for the segments of the memory and the length of the
+  value (`XNet.readNum_bounded`): the reader goes along no segment twice
+  (`XNet.trail_nodup`).  So running and reading takes a bounded number of
+  actions (`XNet.runRead_bound`, `Peano.GExpr.run_by`,
+  `Peano.PExpr.run_by`).  The bounds are far above what runs take.
 * Expressions built from numerals with `+`, `*` and `^` (`Peano.PExpr`)
   have nets (`PExpr.net`): the nets of the two arguments and an adder, a
   multiplier or a power that waits, side by side under the tags `0`,
@@ -3577,8 +3583,8 @@ holds up to equality rather than up to renaming.
   is confluent.  These expressions can be run too (`PExpr.run`):
   whatever the run returns is the value (`PExpr.run_sound`), and with
   enough actions it returns the value (`PExpr.run_complete`); three
-  runs are evaluated in the kernel, one of them `2 ^ (1 + 1)`.  How many actions are enough is not
-  bounded.
+  runs are evaluated in the kernel, one of them `2 ^ (1 + 1)`.  How many actions are enough
+  is bounded (`Peano.PExpr.run_by`).
 * An executable system (`XSys`) carries proofs: that its rules are the rules
   of a `System`, and that the slots of each right-hand side are listed.  For
   a system given as data (`SysData`) these follow from the evaluation of

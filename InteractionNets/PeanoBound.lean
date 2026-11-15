@@ -135,6 +135,30 @@ theorem GExpr.rest_by (e : GExpr) {nt : Nat} (hnt : 0 < nt) :
     (normal_of_numerals hag) i hi
   exact ⟨hr, e.rest hnt _ hr⟩
 
+/-- **How many actions are enough to run an expression and read its
+value.**  Run for at least the bound of `Peano.GExpr.rest_by`, the
+segments of the net and of `e.cost` right-hand sides, and the length of
+the value, `nt` threads taking turns return the value. -/
+theorem GExpr.run_by (e : GExpr) {nt : Nat} (hnt : 0 < nt) (s : Nat)
+    (h₁ : nt * ((nt + e.cost) * e.net.passBound e.cost 4 12 + e.cost * (4 + 12 + 1) + 1) ≤ s)
+    (h₂ : e.net.wires.length + 12 * e.cost ≤ s) (h₃ : e.eval + 1 ≤ s) :
+    e.run nt s = some e.eval := by
+  obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
+  exact XNet.runRead_bound (zero := zero) (succ := succ) (by decide) hX (GExpr.net_nodup e) hnt
+    xsys_bounded hs (normal_of_numerals hag) hA s h₁ h₂ h₃
+
+/-- **The same for the expressions of `+`, `*` and `^`.** -/
+theorem PExpr.run_by (e : PExpr) {nt : Nat} (hnt : 0 < nt) (s : Nat)
+    (h₁ : nt * ((nt + e.cost) * e.net.passBound e.cost 4 12 + e.cost * (4 + 12 + 1) + 1) ≤ s)
+    (h₂ : e.net.wires.length + 12 * e.cost ≤ s) (h₃ : e.eval + 1 ≤ s) :
+    e.run nt s = some e.eval := by
+  have h := GExpr.run_by e.toG hnt s (by rw [e.toG_cost, e.toG_net]; exact h₁)
+    (by rw [e.toG_cost, e.toG_net]; exact h₂) (by rw [e.toG_eval]; exact h₃)
+  rw [e.toG_eval] at h
+  show XNet.runRead xsys zero succ e.net e.res nt s = some e.eval
+  rw [← e.toG_net, ← e.toG_res]
+  exact h
+
 end Peano
 
 end INet
