@@ -58,7 +58,6 @@ import InteractionNets.PeanoRun
 import InteractionNets.PeanoGExpr
 import InteractionNets.RoundRobin
 import InteractionNets.PeanoBound
-import InteractionNets.PeanoExamples
 import InteractionNets.Extra
 import InteractionNets.Union
 import InteractionNets.UnionExamples
@@ -2057,11 +2056,13 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              is its value, and after a number of actions
                              given by the net, the threads and the cost,
                              the value is returned
-* `INet.Peano.cater_computes`, `INet.Peano.tri_computes`, `INet.Peano.cater_rest`,
-  `INet.Peano.tri_rest`
-                             two agents added to the system with
-                             nothing but their rules: the lazy caterer
-                             and the triangular numbers
+* `INet.Core`, `INet.Peano.core`, `INet.Extra.core`, `INet.Extra.cater_computes`,
+  `INet.Extra.tri_computes`, `INet.Extra.cater_rest`, `INet.Extra.tri_rest`
+                             the development holds in any system with
+                             numerals, a copier and an eraser; `Peano`
+                             is one, and `Extra` is a second, with the
+                             lazy caterer and the triangular numbers,
+                             proved there by the general theorems alone
 * `INet.Arith.sum_ok`, `INet.Arith.sum_correct`
                              the nets `Arith.sum m n` are valid for all `m`
                              and `n`, and on each of them the reducer takes
@@ -3447,28 +3448,28 @@ holds up to equality rather than up to renaming.
   machine (`Core.Op2.rest`, `Core.Op1.rest`, and the fair versions)
   brings in the adder (`Peano.sum_rest`, `Peano.sum_fair`).
 * The development holds in any system with the core (`Core`): numerals,
-  a copier and an eraser with their rules, no rule for two numerals, and
-  the arities of zero and successor, the symbols being given by the
-  system.  Copying and erasing (`Copies.Rules`), what it is to compute,
-  the theorems on recursion and on constants, and the theorems for the
-  machine are stated for any such system; `Peano` is an instance
-  (`Peano.core`).  `Extra` is a second system, apart from `Peano`, with
-  numerals, an adder, a copier, an eraser, the lazy caterer and the
-  triangular numbers (`Extra.core`, `Extra.rules`); both agents are
-  proved there by the general theorems alone (`Extra.cater_computes`,
-  `Extra.tri_computes`, `Extra.cater_rest`, `Extra.tri_rest`), and the
-  reducer runs on them in the kernel.  The expressions over operators
-  and the bounds on actions are still stated for `Peano` only.
-* Two agents added with nothing but their rules (`PeanoExamples`): the
-  lazy caterer `cater`, `c 0 = 1` and `c (S x) = c x + S x`, and the
-  triangular numbers `tri`, `t 0 = 0` and `t (S x) = t x + S x`.  Each
-  rule on a successor is the template on the predecessor with the adder
-  (`Peano.caterSucc_eq`, `Peano.triSucc_eq`), each rule on a zero puts
-  down a constant, and their theorems are the general ones applied to
-  their rules (`Peano.cater_computes`, `Peano.tri_computes`, and for the
-  machine `Peano.cater_rest`, `Peano.tri_rest`).  `c 2 + 2!` is run by
-  two threads in the kernel and gives `6` in its 41 interactions, and
-  `t (2 + 1) * 3!` is an expression.
+  a copier and an eraser with their rules (`Copies.Rules`), no rule for
+  two numerals, the arities of zero and successor, `zero ≠ succ`, and
+  rules that give every new agent a side, the symbols being given by
+  the system.  Copying and erasing, what it is to compute, the theorems
+  on recursion and on constants, the theorems for the machine, the
+  expressions over operators (`Core.GExpr`, `Core.Op1`, `Core.Op2`) and
+  the bounds on actions (`Core.GExpr.rest_by`, `Core.GExpr.run_by`, given
+  a bound on the rules) are stated for any such system.  The small nets
+  are checked once over the symbols of `Arith` and relabelled
+  (`XNet.Ok.relabel`).  `Peano` is an instance (`Peano.core`).
+* `Extra` is a second system, apart from `Peano`, with numerals, an
+  adder, a copier, an eraser, and two agents added with nothing but
+  their rules: the lazy caterer `cater`, `c 0 = 1` and
+  `c (S x) = c x + S x`, and the triangular numbers `tri`, `t 0 = 0` and
+  `t (S x) = t x + S x` (`Extra.core`, `Extra.rules`).  Each rule on a
+  successor is the template on the predecessor with the adder, each rule
+  on a zero puts down a constant, and their theorems are the general
+  ones applied to their rules (`Extra.cater_computes`,
+  `Extra.tri_computes`, and on the machine `Extra.cater_rest`,
+  `Extra.tri_rest` and the fair versions).  With its own operators,
+  `c 2 + t 2` is run by two threads in the kernel and gives `7`; the
+  reducer runs `c 3` and `t 4` in the kernel.
 * How many actions are enough, threads taking turns (`RoundRobin`).
   For any system, a run in which `nt` threads take turns on a
   well-formed net that lists no name twice, with a normal form `n` steps

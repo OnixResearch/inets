@@ -220,6 +220,14 @@ theorem PExpr.run_by (e : PExpr) {nt : Nat} (hnt : 0 < nt) (s : Nat)
   rw [← e.toG_net, ← e.toG_res]
   exact h
 
+set_option maxRecDepth 100000 in
+/-- `2! + 1` run by two threads taking turns, with the factorial as an
+operator of one argument: after 1500 actions they are at rest and the
+result read is `3`. -/
+example : (Core.GExpr.app2 addOp (.app1 facOp (.lit 2)) (.lit 1) : GExpr).run 2 1500 =
+    some 3 := by
+  decide +kernel
+
 end Peano
 
 end INet

@@ -1,4 +1,4 @@
-import InteractionNets.PeanoRun
+import InteractionNets.PeanoBound
 
 /-! # A system of its own: the lazy caterer and the triangular numbers
 
@@ -220,6 +220,61 @@ example : ((Core.unaryNet zero succ tri 4).normalize xsys 200).map
     (fun r => (r.2, (r.1.agents.filter (·.2 = succ)).length,
       (r.1.agents.filter (·.2 = zero)).length, r.1.agents.length)) =
     some (triCost 4, 10, 1, 11) := by
+  decide +kernel
+
+/-- **The lazy caterer under any fair schedule.** -/
+theorem cater_fair (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
+    (hfair : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ σ j = u) :
+    ∃ i₀, ∀ i, i₀ ≤ i →
+      ((XMach.init (Core.unaryNet zero succ cater n) nt).trace xsys σ i).1.resting = true ∧
+      ((XMach.init (Core.unaryNet zero succ cater n) nt).trace xsys σ i).2 = caterCost n ∧
+      Addition.IsNum ar zero succ
+        ((XMach.init (Core.unaryNet zero succ cater n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
+        (cate n) :=
+  Core.unary_fair (xsys := xsys) cater_computes rfl (by decide) n hnt σ hfair
+
+/-- **The triangular numbers under any fair schedule.** -/
+theorem tri_fair (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
+    (hfair : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ σ j = u) :
+    ∃ i₀, ∀ i, i₀ ≤ i →
+      ((XMach.init (Core.unaryNet zero succ tri n) nt).trace xsys σ i).1.resting = true ∧
+      ((XMach.init (Core.unaryNet zero succ tri n) nt).trace xsys σ i).2 = triCost n ∧
+      Addition.IsNum ar zero succ
+        ((XMach.init (Core.unaryNet zero succ tri n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
+        (triN n) :=
+  Core.unary_fair (xsys := xsys) tri_computes rfl (by decide) n hnt σ hfair
+
+/-! ### Expressions -/
+
+/-- **The rules are bounded**: at most four new agents and twelve ports. -/
+theorem xsys_bounded : xsys.Bounded 4 12 := by
+  intro α β R h
+  cases α <;> cases β <;> (cases h <;> decide)
+
+/-- The adder as an operator, by its own theorem. -/
+def addOp : Core.Op2 xsys :=
+  ⟨add, fun m n => m + n, fun m _ => m + 1, rfl, by decide, by decide,
+    fun u => Core.add_steps' rules ⟨u.wf, u.ha, u.fst, u.snd, u.out, u.free, u.only⟩⟩
+
+/-- The lazy caterer as an operator. -/
+def caterOp : Core.Op1 xsys := Core.Op1.ofComputes cater_computes rfl (by decide) (by decide)
+
+/-- The triangular numbers as an operator. -/
+def triOp : Core.Op1 xsys := Core.Op1.ofComputes tri_computes rfl (by decide) (by decide)
+
+/-- `c 2 + t 2`, an expression over the operators of this system: the
+value `7`, in `25` interactions. -/
+example : (Core.GExpr.app2 addOp (.app1 caterOp (.lit 2)) (.app1 triOp (.lit 2)) :
+      Core.GExpr xsys).eval = 7 ∧
+    (Core.GExpr.app2 addOp (.app1 caterOp (.lit 2)) (.app1 triOp (.lit 2)) :
+      Core.GExpr xsys).cost = 25 := by
+  decide
+
+set_option maxRecDepth 100000 in
+/-- `c 2 + t 2` run by two threads taking turns: after 1500 actions they
+are at rest and the result read is `7`. -/
+example : (Core.GExpr.app2 addOp (.app1 caterOp (.lit 2)) (.app1 triOp (.lit 2)) :
+    Core.GExpr xsys).run 2 1500 = some 7 := by
   decide +kernel
 
 end Extra
