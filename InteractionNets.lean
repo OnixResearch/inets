@@ -88,6 +88,7 @@ import InteractionNets.JoinBound
 import InteractionNets.Arith.JoinRun
 import InteractionNets.MeasureJoin
 import InteractionNets.Arith.JoinChain
+import InteractionNets.WireFar
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
 
@@ -3430,6 +3431,16 @@ holds up to equality rather than up to renaming.
   (`joinChain` with the bits of the positions reversed), the walks take
   98,309 actions for `n = 4,096`, almost exactly `2 * n * lg n`, where
   in order they take five for each join.
+  Towards a bound of that order: in a wiring where a point lies on two
+  segments at most, a path whose ends lie on no other segment is all a
+  trail from one of its points can reach, so the longest trail from its
+  `j`-th point has at most `max (j + 1) (t - j + 1)` points
+  (`IsPath.trail_le`, `IsPath.lfar_le`, `IsPath.of_ends`), and adding
+  segments only lengthens the longest trail (`lfar_mono`).  When a walk
+  stops on the shorter of two joined wires, the far half of that wire at
+  least doubles the longest trail from each of its points; summing the
+  logarithms of the longest trails is the measure such a bound would
+  charge the walks to.  The charge itself is not yet proved.
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
