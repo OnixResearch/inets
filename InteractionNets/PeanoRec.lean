@@ -38,6 +38,10 @@ The three theorems of the agents follow (`Peano.mul_computes'`,
 are stacked: the multiplier is derived with the adder as combiner, and
 the power and the factorial with that derived multiplier, so none of the
 three uses the proofs written for them one by one.
+
+The test is a new agent, the lazy caterer, whose theorem
+(`Peano.cater_computes`) is the theorem on recursion applied to its
+rules.
 -/
 
 namespace INet
@@ -981,6 +985,82 @@ theorem fac_computes' : Computes1 fac fact facCost :=
   (prim_computes rule_fac_succ ⟨by decide, by decide, by decide, by decide, by decide,
     by decide, by decide⟩ (zero1_facZero rule_fac_zero (by decide))
     mul_computes'.combines).congr prim_fac primCost_fac
+
+/-! ### A new agent: the lazy caterer
+
+The agent `cater` was added to the system with two rules and nothing
+else: on a zero the rule of the factorial, and on a successor the rule
+`Peano.caterSucc`, `c (S x) = c x + S x`.  The number `c n` is the most
+pieces a pancake can be cut into with `n` straight cuts, `n (n + 1) / 2 + 1`
+(`Peano.two_mul_cate`).  Its proof is the theorem on recursion on the
+predecessor, with the adder as combiner. -/
+
+/-- The lazy caterer's numbers. -/
+def cate : Nat → Nat
+  | 0 => 1
+  | n + 1 => cate n + (n + 1)
+
+/-- In closed form: `2 c n = n (n + 1) + 2`. -/
+theorem two_mul_cate : ∀ n, 2 * cate n = n * (n + 1) + 2
+  | 0 => rfl
+  | n + 1 => by
+    have ih := two_mul_cate n
+    have e₁ : (n + 1) * (n + 1 + 1) = (n + 1) * (n + 1) + (n + 1) := Nat.mul_succ _ _
+    have e₂ : (n + 1) * (n + 1) = n * (n + 1) + (n + 1) := Nat.succ_mul _ _
+    have e : (n + 1) * (n + 1 + 1) = n * (n + 1) + 2 * (n + 1) := by omega
+    show 2 * (cate n + (n + 1)) = (n + 1) * (n + 1 + 1) + 2
+    rw [Nat.mul_add, ih, e]
+    omega
+
+/-- Its number of interactions: on a zero, one; on a successor, one, the
+copy of the rest, the rest, and the addition. -/
+def caterCost : Nat → Nat
+  | 0 => 1
+  | n + 1 => n + 1 + 1 + caterCost n + (cate n + 1)
+
+/-- The rule written for it is the template. -/
+theorem caterSucc_eq : caterSucc = primSucc cater add := rfl
+
+theorem rule_cater_succ : system.rule cater succ = some (primSucc cater add).toX.toRhs := rfl
+theorem rule_cater_zero : system.rule cater zero = some facZero.toX.toRhs := rfl
+
+theorem prim_cate (n : Nat) : prim 1 (fun m n => m + n) n = cate n := by
+  induction n with
+  | zero => rfl
+  | succ n ih =>
+    show prim _ _ n + (n + 1) = cate n + (n + 1)
+    rw [ih]
+
+theorem primCost_cate (n : Nat) :
+    primCost 1 (fun m _ => m + 1) 1 (fun m n => m + n) n = caterCost n := by
+  induction n with
+  | zero => rfl
+  | succ n ih =>
+    show n + 1 + 1 + primCost _ _ _ _ n + (prim _ _ n + 1) = caterCost (n + 1)
+    rw [ih, prim_cate]
+    rfl
+
+/-- **The lazy caterer computes its numbers**, in any net, in
+`caterCost n` steps: the theorem on recursion on the predecessor, with
+the rule of the factorial on a zero and the adder as combiner. -/
+theorem cater_computes : Computes1 cater cate caterCost :=
+  (prim_computes rule_cater_succ ⟨by decide, by decide, by decide, by decide, by decide,
+    by decide, by decide⟩ (zero1_facZero rule_cater_zero (by decide)) add_combines).congr
+    prim_cate primCost_cate
+
+/-- The net for `c 3`, with the result on the free port `([0], 0)`. -/
+def caterThree : XNet Peano :=
+  XNet.ofWires [([1], cater), ([2], succ), ([3], succ), ([4], succ), ([5], zero)] [([0], 0)]
+    [(([1], 0), ([2], 0)), (([2], 1), ([3], 0)), (([3], 1), ([4], 0)), (([4], 1), ([5], 0)),
+      (([1], 1), ([0], 0))]
+
+/-- The reducer stops on `c 3` after `caterCost 3 = 20` steps, on seven
+successors and a zero: `c 3 = 7`. -/
+example : (caterThree.normalize xsys 100).map (fun r => (r.2, r.1.agents.map (·.2))) =
+    some (caterCost 3, [succ, succ, succ, zero, succ, succ, succ, succ]) := by
+  decide +kernel
+
+example : cate 3 = 7 := rfl
 
 end Peano
 

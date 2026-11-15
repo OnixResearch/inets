@@ -2043,7 +2043,7 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              interactions and holds `n!`
 * `INet.Peano.iter_computes`, `INet.Peano.prim_computes`, `INet.Peano.Combines2`,
   `INet.Peano.add_combines`, `INet.Peano.mul_computes'`,
-  `INet.Peano.pow_computes'`, `INet.Peano.fac_computes'`
+  `INet.Peano.pow_computes'`, `INet.Peano.fac_computes'`, `INet.Peano.cater_computes`
                              recursion proved once, in two shapes: an
                              agent whose rule on a successor follows a
                              template in it and a combiner computes the
@@ -2051,7 +2051,8 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              that the combiner combines; the adder is a
                              combiner; the theorems of the multiplier,
                              the power and the factorial follow, with
-                             the same costs
+                             the same costs; a new agent, the lazy
+                             caterer, proved by the theorem alone
 * `INet.Peano.PExpr.rest`, `INet.Peano.PExpr.fair`, `INet.Peano.PExpr.good`,
   `INet.Peano.add_evals`, `INet.Peano.mul_evals`, `INet.Peano.system_sided`
                              every expression built from numerals with
@@ -3350,8 +3351,8 @@ holds up to equality rather than up to renaming.
   and with the same numerals (`Arith.carry_rest`).  This covers nets
   whose agents all come from the smaller system; a net that also has
   other agents is the business of `Addition`.  The system `Peano` has
-  both: five more symbols, for multiplying, copying, erasing, powers
-  and factorials, and the rules for them.  It contains addition (`Peano.rules`,
+  both: six more symbols, for multiplying, copying, erasing, powers,
+  factorials and the lazy caterer, and the rules for them.  It contains addition (`Peano.rules`,
   `Peano.add_steps`) and has `Arith` inside it (`Peano.embeds`), so
   every expression of additions comes out right in it
   (`Peano.expr_rest`).  The two helpers of multiplication are proved, in
@@ -3463,9 +3464,15 @@ holds up to equality rather than up to renaming.
   argument, so the adder is one (`Peano.add_combines`), and so is every
   agent that computes.  `Peano.mul_computes'`, `Peano.pow_computes'` and
   `Peano.fac_computes'` derive the three theorems again from these two,
-  with the costs `prodCost`, `powCost` and `facCost`.  A new agent still
-  needs a symbol and its rules in the system, and its own theorems for
-  the machine.
+  with the costs `prodCost`, `powCost` and `facCost`; the power and the
+  factorial are derived with the derived multiplier.  The test is a new
+  agent, the lazy caterer `cater`, added to the system with two rules:
+  the rule of the factorial on a zero and `c (S x) = c x + S x`
+  (`Peano.caterSucc`), which is the template on the predecessor with the
+  adder.  It computes `c n = n (n + 1) / 2 + 1` (`Peano.cater_computes`,
+  `Peano.two_mul_cate`) by the theorem on recursion alone, and the
+  reducer stops on `c 3` with `7` after `caterCost 3 = 20` steps.  Its
+  theorems for the machine are not proved.
 * Expressions built from numerals with `+`, `*` and `^` (`Peano.PExpr`)
   have nets (`PExpr.net`): the nets of the two arguments and an adder, a
   multiplier or a power that waits, side by side under the tags `0`,

@@ -2,12 +2,14 @@ import InteractionNets.Arith.Carry
 
 /-! # A larger system: addition, multiplication, powers, factorials
 
-Eight symbols: `zero`, `succ` and `add` as in `Arith`, a multiplier
+Nine symbols: `zero`, `succ` and `add` as in `Arith`, a multiplier
 `mul`, the two agents that multiplication needs because it uses its
 second argument once for every successor of the first: `dup`, which
 copies a numeral, and `era`, which erases one; and `pow` and `fac`, for
 powers and factorials, which use the multiplier as the multiplier uses
-the adder.  The system
+the adder; and `cater`, the lazy caterer, `c 0 = 1` and
+`c (S x) = c x + S x`, added to test the theorems on recursion of
+`PeanoRec`, which prove it with nothing but its rules.  The system
 is given as data and validated by evaluating `SysData.check`.
 
 It contains addition (`Peano.rules`), so the adder adds in it, with
@@ -22,9 +24,9 @@ inputs, is `Peano.mul_correct`, in `PeanoMul`.
 namespace INet
 
 /-- The symbols: numbers, addition, multiplication, copying, erasing,
-powers and factorials. -/
+powers, factorials, and the lazy caterer. -/
 inductive Peano
-  | zero | succ | add | mul | dup | era | pow | fac
+  | zero | succ | add | mul | dup | era | pow | fac | cater
   deriving DecidableEq, Repr
 
 namespace Peano
@@ -34,7 +36,8 @@ auxiliary ports are the second argument and the result.  The principal
 port of `dup` is what it copies, its auxiliary ports are the two copies;
 `era` has only the port of what it erases.  The principal port of `pow`
 is the exponent, its auxiliary ports are the base and the result.  The
-principal port of `fac` is its argument, its auxiliary port the result. -/
+principal port of `fac` is its argument, its auxiliary port the result;
+the same for `cater`. -/
 def ar : Peano → Nat
   | zero => 0
   | succ => 1
@@ -44,6 +47,7 @@ def ar : Peano → Nat
   | era => 0
   | pow => 2
   | fac => 1
+  | cater => 1
 
 /-- `0 * y = 0`: a new `zero` on the result, and `y` is erased. -/
 def mulZero : RuleData Peano :=
@@ -124,6 +128,20 @@ def facSucc : RuleData Peano :=
       (.new (some false) 1 0, .new (some false) 2 1),   -- the new `succ` — second argument of `mul`
       (.new (some false) 2 2, .ifc false 0)]            -- result of `mul` — result
 
+/-- The lazy caterer, `c (S x) = c x + S x`: `x` is copied; a new
+successor on one copy is the second argument of a new adder, whose first
+argument is the result of a new `cater` on the other copy.  On a zero it
+has the rule of the factorial, `c 0 = 1`. -/
+def caterSucc : RuleData Peano :=
+  RuleData.ofWires [((some false, 0), dup), ((some false, 1), succ), ((some false, 2), add),
+      ((some true, 0), cater)]
+    [(.ifc true 0, .new (some false) 0 0),             -- `x` — the new `dup`
+      (.new (some false) 0 1, .new (some false) 1 1),   -- first copy — under the new `succ`
+      (.new (some false) 0 2, .new (some true) 0 0),    -- second copy — argument of `cater`
+      (.new (some true) 0 1, .new (some false) 2 0),    -- result of `cater` — first argument of `add`
+      (.new (some false) 1 0, .new (some false) 2 1),   -- the new `succ` — second argument of `add`
+      (.new (some false) 2 2, .ifc false 0)]            -- result of `add` — result
+
 def data : SysData Peano :=
   ⟨ar, [((add, zero), Addition.zeroData), ((zero, add), Addition.zeroData.swap),
     ((add, succ), Addition.succData succ add), ((succ, add), (Addition.succData succ add).swap),
@@ -136,7 +154,9 @@ def data : SysData Peano :=
     ((pow, zero), powZero), ((zero, pow), powZero.swap),
     ((pow, succ), powSucc), ((succ, pow), powSucc.swap),
     ((fac, zero), facZero), ((zero, fac), facZero.swap),
-    ((fac, succ), facSucc), ((succ, fac), facSucc.swap)]⟩
+    ((fac, succ), facSucc), ((succ, fac), facSucc.swap),
+    ((cater, zero), facZero), ((zero, cater), facZero.swap),
+    ((cater, succ), caterSucc), ((succ, cater), caterSucc.swap)]⟩
 
 /-- The system, by evaluation of the check. -/
 def xsys : XSys Peano := data.toXSys (by decide)
