@@ -54,6 +54,7 @@ import InteractionNets.PeanoMul
 import InteractionNets.PeanoProd
 import InteractionNets.Union
 import InteractionNets.UnionExamples
+import InteractionNets.PeanoExpr
 import InteractionNets.LongRun
 import InteractionNets.Window
 import InteractionNets.Measure
@@ -2013,6 +2014,14 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              that is at rest has made exactly that many
                              interactions and holds the numeral `m * n`,
                              and under a fair schedule it comes to rest
+* `INet.Peano.PExpr.rest`, `INet.Peano.PExpr.fair`, `INet.Peano.PExpr.good`,
+  `INet.Peano.add_evals`, `INet.Peano.mul_evals`, `INet.Peano.system_sided`
+                             every expression built from numerals with
+                             `+` and `*` comes out right on the machine:
+                             with any number of threads and any schedule,
+                             a run on its net that is at rest has made
+                             exactly `PExpr.cost` interactions and holds
+                             the numeral of its value
 * `INet.Arith.sum_ok`, `INet.Arith.sum_correct`
                              the nets `Arith.sum m n` are valid for all `m`
                              and `n`, and on each of them the reducer takes
@@ -3335,10 +3344,28 @@ holds up to equality rather than up to renaming.
   apply: a run on `prod m n` that is at rest, with any number of
   threads and any schedule, has made exactly that many interactions and
   holds the numeral `m * n` on the free port (`Peano.prod_rest`), and a
-  fair run comes to rest (`Peano.prod_fair`).  Scope: the net of
-  `mul_correct` has only the multiplier and its two arguments; products
-  inside larger expressions, and a multiplier whose arguments are still
-  being computed, are not covered.
+  fair run comes to rest (`Peano.prod_fair`).  The net of `mul_correct`
+  has only the multiplier and its two arguments.
+* Expressions built from numerals with `+` and `*` (`Peano.PExpr`) have
+  nets (`PExpr.net`): the nets of the two arguments and an adder or a
+  multiplier that waits, side by side under the tags `0`, `1` and `2`
+  (`XNet.three`), with the result port of each argument wired to a port
+  of the operator.  The rules of `Peano` give every new agent a side
+  (`Peano.system_sided`), so the argument nets reduce inside the whole
+  as they do alone (`Net.Made.steps`); the operator then has two
+  numerals as arguments in a net of successors and zeros
+  (`Peano.op_setup`), which is the situation of `Peano.add_steps'` and
+  `Peano.mul_steps`.  Hence every such net is well formed and computes
+  the value of its expression in exactly `PExpr.cost` interactions
+  (`PExpr.good`), and on the machine, with any number of threads and any
+  schedule, a run at rest has made that many interactions and holds the
+  numeral of the value on its free port (`PExpr.rest`); a fair run comes
+  to rest (`PExpr.fair`).  The cost counts `e₁ + 1` for an addition and
+  `prodCost e₁ e₂` for a multiplication, on the values of the arguments.
+  Scope: the operators are evaluated on numerals, so this is one order
+  of reduction, and the count is the same for every order because the
+  system is confluent; there is no evaluator that reads the result back
+  for these expressions, as there is for additions (`Arith.Expr.run`).
 * An executable system (`XSys`) carries proofs: that its rules are the rules
   of a `System`, and that the slots of each right-hand side are listed.  For
   a system given as data (`SysData`) these follow from the evaluation of

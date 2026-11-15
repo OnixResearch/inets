@@ -222,9 +222,6 @@ theorem good_prod : ∀ m n, GoodProd (prod m n) m n (m + n + 4)
 `n`. -/
 theorem prod_ok (m n : Nat) : (prod m n).Ok ar := (good_prod m n).ok
 
-/-- The number of interactions of `m * n`. -/
-def prodCost (m n : Nat) : Nat := (m + 1) * (n + 2) + m * (n + 1)
-
 /-- **Multiplication comes out right, whatever the threads do**: with any
 number of threads and any schedule, a run of the machine on the net for
 `m * n` that is at rest has made exactly `prodCost m n` interactions, and

@@ -569,13 +569,15 @@ structure Product (N : Net Peano) (a : Id) (m n : Nat) (r : Port) : Prop where
   free : N.free r
   only : ∀ i γ, N.agent i γ → γ = zero ∨ γ = succ ∨ i = a
 
-/-- **Multiplication is correct, for all inputs.**  A net whose multiplier
-has the numerals `m` and `n` as arguments and the free port `r` as result
-reduces, in `(m + 1) * (n + 2) + m * (n + 1)` steps, to a normal form in
-which `r` carries the numeral `m * n`. -/
-theorem mul_correct {a : Id} {m : Nat} (c : Product N a m n r) :
-    ∃ N', Steps (Step system) ((m + 1) * (n + 2) + m * (n + 1)) N N' ∧
-      Normal (Step system) N' ∧ IsNum N' r (m * n) := by
+/-- The number of interactions of `m * n`. -/
+def prodCost (m n : Nat) : Nat := (m + 1) * (n + 2) + m * (n + 1)
+
+/-- **The run of a multiplication**: in `prodCost m n` steps the net
+becomes one that has the numeral `m * n` on the result port and whose
+agents are successors and zeros. -/
+theorem mul_steps {a : Id} {m : Nat} (c : Product N a m n r) :
+    ∃ N', Steps (Step system) (prodCost m n) N N' ∧ IsNum N' r (m * n) ∧
+      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ := by
   have c₀ : MState N a m n [] r :=
     ⟨c.wf, c.ha, c.fst, c.snd, ⟨r, c.out, rfl⟩, c.free, List.nodup_nil, fun i γ hi =>
       (c.only i γ hi).elim .inl fun h => h.elim (fun h => .inr (.inl h))
@@ -587,11 +589,59 @@ theorem mul_correct {a : Id} {m : Nat} (c : Product N a m n r) :
   obtain ⟨x, hx, e⟩ := c₂.val
   have e' : x = r := e
   rw [e', Nat.add_zero] at hx
-  refine ⟨N', sts₁.trans sts₂, normal_of_numerals fun i γ hi => ?_, hx⟩
+  refine ⟨N', sts₁.trans sts₂, hx, fun i γ hi => ?_⟩
   rcases c₂.only i γ hi with h | h | h
   · exact .inl h
   · exact .inr h
   · exact absurd h List.not_mem_nil
+
+/-- **Multiplication is correct, for all inputs.**  A net whose multiplier
+has the numerals `m` and `n` as arguments and the free port `r` as result
+reduces, in `(m + 1) * (n + 2) + m * (n + 1)` steps, to a normal form in
+which `r` carries the numeral `m * n`. -/
+theorem mul_correct {a : Id} {m : Nat} (c : Product N a m n r) :
+    ∃ N', Steps (Step system) ((m + 1) * (n + 2) + m * (n + 1)) N N' ∧
+      Normal (Step system) N' ∧ IsNum N' r (m * n) := by
+  obtain ⟨N', sts, hnum, hag⟩ := mul_steps c
+  exact ⟨N', sts, normal_of_numerals hag, hnum⟩
+
+/-- **The situation of an addition.**  The adder `a` has the numerals `m`
+and `n` as arguments and the free port `r` as result, and the net has no
+other agents than the adder and the successors and zeros. -/
+structure Sum (N : Net Peano) (a : Id) (m n : Nat) (r : Port) : Prop where
+  wf : N.WF ar
+  ha : N.agent a add
+  fst : IsNum N (a, 0) m
+  snd : IsNum N (a, 1) n
+  out : N.Paired ar (a, 2) r
+  free : N.free r
+  only : ∀ i γ, N.agent i γ → γ = zero ∨ γ = succ ∨ i = a
+
+/-- **The run of an addition**, in this system: in `m + 1` steps the net
+becomes one that has the numeral `m + n` on the result port and whose
+agents are successors and zeros. -/
+theorem add_steps' {a : Id} {m : Nat} (c : Sum N a m n r) :
+    ∃ N', Steps (Step system) (m + 1) N N' ∧ IsNum N' r (m + n) ∧
+      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ := by
+  have hN := c.wf
+  obtain ⟨h, hph, hnh⟩ := c.fst
+  obtain ⟨l, hl, el⟩ := Addition.Num.list hnh
+  have hrl : ¬ r.1 ∈ l := fun hm =>
+    (hl.label _ hm).elim (fun h => hN.free_agent (i := r.1) (k := r.2) c.free h)
+      fun h => hN.free_agent (i := r.1) (k := r.2) c.free h
+  have cA : Addition.Adding ar zero succ add N a 0 h l n r :=
+    ⟨hN, c.ha, hph, hl, c.snd, ⟨r, c.out, rfl⟩, ⟨.inr (.inr ⟨r.2, c.free⟩),
+      fun e => hN.free_agent (i := r.1) (k := r.2) c.free (e ▸ c.ha), hrl⟩⟩
+  obtain ⟨N', sts, inum, -, hag⟩ := Addition.Adding.run rules l cA el
+  rw [el] at sts
+  rw [Nat.zero_add] at inum
+  refine ⟨N', sts, inum, fun i γ hi => ?_⟩
+  rcases hag i γ hi with hsu | ⟨hi₀, hne⟩
+  · exact .inr hsu
+  · rcases c.only i γ hi₀ with hz | hsu | e
+    · exact .inl hz
+    · exact .inr hsu
+    · exact absurd e hne
 
 end Peano
 
