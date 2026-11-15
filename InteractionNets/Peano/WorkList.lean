@@ -1,4 +1,4 @@
-import InteractionNets.WorkList
+import InteractionNets.WorkCount
 import InteractionNets.Peano.Bound
 
 /-! # Where rechecking only what a rule touched pays
@@ -51,6 +51,39 @@ example : xActions 100000 (XMach.init (inertThenPairs 40) 1) 0 = 5283 := by
   decide +kernel
 example : wActions 100000 (WMach.init (inertThenPairs 40) 1) 0 = 403 := by
   decide +kernel
+
+/-! ### A bound on every fair run, from one evaluated run
+
+One thread runs `inertThenPairs 10` to rest in 103 actions, making 10
+claims, none of a rule that joins interface ports.  By
+`WMach.fair_bound_ref`, every fair run, with any number of threads, is then
+at rest with the normal form after `F * 992` actions, where `F` is the
+window in which every thread acts: linear in the 10 steps, although the
+system has a rule that joins interface ports (`0 + y`). -/
+
+theorem inertThenPairs_ok : (inertThenPairs 10).Ok xsys.sys.ar := by
+  decide +kernel
+
+theorem inertThenPairs_ref :
+    ((WMach.init (inertThenPairs 10) 1).trace xsys (fun _ => 0) 103).1.resting = true := by
+  decide +kernel
+
+theorem inertThenPairs_fair {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {F : Nat}
+    (hfair : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ j < i + F ∧ σ j = u) (i : Nat)
+    (hi : F * 992 ≤ i) :
+    ((WMach.init (inertThenPairs 10) nt).trace xsys σ i).1.resting = true ∧
+      ((WMach.init (inertThenPairs 10) nt).trace xsys σ i).2 = 10 := by
+  have e₁ : ((WMach.init (inertThenPairs 10) 1).trace xsys (fun _ => 0) 103).2 = 10 := by
+    decide +kernel
+  have e₂ : WMach.joined xsys (fun _ => 0) (WMach.init (inertThenPairs 10) 1) 103 = 0 := by
+    decide +kernel
+  have ea : (inertThenPairs 10).agents.length = 31 := by decide +kernel
+  have ew : (inertThenPairs 10).wires.length = 42 := by decide +kernel
+  have hnd : ((inertThenPairs 10).agents.map Prod.fst).Nodup := by decide +kernel
+  have h := WMach.fair_bound_ref inertThenPairs_ok.1 hnd xsys_bounded (Nat.one_pos)
+    inertThenPairs_ref hnt σ hfair i (by rw [e₁, e₂, ea, ew]; exact hi)
+  rw [e₁] at h
+  exact ⟨h.1, h.2.1⟩
 
 end Peano
 end INet

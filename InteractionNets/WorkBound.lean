@@ -611,7 +611,8 @@ theorem WMach.step_goal {M : WMach S} (hL : M.Live xs) (t : Nat) :
         Redex xs.sys M.toMach.goal a b α β R.toRhs ∧
         (M.step xs t).1.toMach.goal = M.toMach.goal.fire a b R.toRhs ∧
         Writes a b R.toRhs (R.newAgents a b) (R.newLinks xs.sys.ar a b α β) ∧
-        WMach.stepKids xs M t = R.newAgents a b := by
+        WMach.stepKids xs M t = R.newAgents a b ∧
+        WMach.stepJoins xs M t = if R.joins xs.sys.ar α β then 1 else 0 := by
   cases ht : M.ths[t]? with
   | none =>
     have e : M.step xs t = (M, 0) := by
@@ -662,7 +663,7 @@ theorem WMach.step_goal {M : WMach S} (hL : M.Live xs) (t : Nat) :
       have hmx : (M.ths.map WThread.toX)[t]? = some T.toX := by
         rw [List.getElem?_map, ht]
         rfl
-      refine .inr ⟨a₀, b₀, α₀, β₀, R, hR, by rw [es'], rg, ?_, hw, ?_⟩
+      refine .inr ⟨a₀, b₀, α₀, β₀, R, hR, by rw [es'], rg, ?_, hw, ?_, ?_⟩
       · rw [es']
         show Mach.goal ⟨(M.mem.takeAgent b₀).toNet, threadOf ((M.ths.set t _).map WThread.toX)⟩ = _
         rw [List.map_set, threadOf_set hmx, XNet.takeAgent_toNet]
@@ -673,6 +674,12 @@ theorem WMach.step_goal {M : WMach S} (hL : M.Live xs) (t : Nat) :
         rw [hs]
         dsimp only
         rw [hh]
+      · unfold WMach.stepJoins WMach.actJoins
+        rw [ht]
+        dsimp only
+        rw [hs]
+        dsimp only
+        simp only [hh]
 
 /-- The agents written so far along a run, by the claims that wrote them. -/
 def WMach.born (xs : XSys S) (σ : Nat → Nat) (M : WMach S) : Nat → List (Id × S)
@@ -712,7 +719,7 @@ theorem WMach.born_inv {X : XNet S} {nt : Nat} {σ : Nat → Nat} {C D : Nat}
     rw [hsucc] at hG' hA'
     rw [hbs, hsucc]
     rcases WMach.step_goal (live i) (σ i) with ⟨h0, eg, ek, -⟩ |
-      ⟨a, b, α, β, R, hR, h1, rg, eg, hw, ek⟩
+      ⟨a, b, α, β, R, hR, h1, rg, eg, hw, ek, -⟩
     · rw [ek, List.append_nil, h0, Nat.add_zero]
       refine ⟨hnd, fun e he => ?_, hl, hlen⟩
       show (((WMach.init X nt).trace xs σ i).1.step xs (σ i)).1.toMach.goal.Used e.1

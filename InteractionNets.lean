@@ -69,6 +69,8 @@ import InteractionNets.Arith.Bound
 import InteractionNets.WorkList
 import InteractionNets.WorkLive
 import InteractionNets.WorkBound
+import InteractionNets.Weighted
+import InteractionNets.WorkCount
 import InteractionNets.Peano.WorkList
 import InteractionNets.Union
 import InteractionNets.UnionExamples
@@ -3309,7 +3311,13 @@ holds up to equality rather than up to renaming.
   have different names, so their trails share no segment.  For a system
   whose rules join no interface ports that is linear in the steps
   (`WMach.fair_bound_nojoin`); in general at most every claim joins
-  (`WMach.fair_bound_all`).
+  (`WMach.fair_bound_all`).  How many claims join is fixed by the start:
+  weigh a firing `1` when its rule joins interface ports, and every
+  reduction to the normal form weighs the same, no reduction more
+  (`wsteps_bounded`, from the diamond with weights `wdiamond`).  So one
+  evaluated run that comes to rest bounds every fair run
+  (`WMach.fair_bound_ref`); for a numeral beside 10 eraser-zero pairs that
+  is `F * 992` actions, checked in the kernel (`Peano.inertThenPairs_fair`).
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers
