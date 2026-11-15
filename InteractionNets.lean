@@ -58,6 +58,7 @@ import InteractionNets.PeanoFact
 import InteractionNets.PeanoRec
 import InteractionNets.PeanoRun
 import InteractionNets.PeanoGExpr
+import InteractionNets.PeanoConst
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.PeanoExpr
@@ -2070,6 +2071,10 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              caterer among them, with the guarantees of
                              the expressions of `+`, `*` and `^`, which
                              are a case; the adder alone on the machine
+* `INet.Peano.zero1_const`, `INet.Peano.zero2_const`, `INet.Peano.tri_computes`,
+  `INet.Peano.tri_rest`
+                             any constant on a zero; the triangular
+                             numbers, proved from their rules alone
 * `INet.Peano.PExpr.rest`, `INet.Peano.PExpr.fair`, `INet.Peano.PExpr.good`,
   `INet.Peano.add_evals`, `INet.Peano.mul_evals`, `INet.Peano.system_sided`
                              every expression built from numerals with
@@ -3368,8 +3373,9 @@ holds up to equality rather than up to renaming.
   and with the same numerals (`Arith.carry_rest`).  This covers nets
   whose agents all come from the smaller system; a net that also has
   other agents is the business of `Addition`.  The system `Peano` has
-  both: six more symbols, for multiplying, copying, erasing, powers,
-  factorials and the lazy caterer, and the rules for them.  It contains addition (`Peano.rules`,
+  both: seven more symbols, for multiplying, copying, erasing, powers,
+  factorials, the lazy caterer and the triangular numbers, and the rules
+  for them.  It contains addition (`Peano.rules`,
   `Peano.add_steps`) and has `Arith` inside it (`Peano.embeds`), so
   every expression of additions comes out right in it
   (`Peano.expr_rest`).  The two helpers of multiplication are proved, in
@@ -3520,6 +3526,17 @@ holds up to equality rather than up to renaming.
   kernel and gives `6` in its 41 interactions.  A single operator on the
   machine (`Peano.Op2.rest`, `Peano.Op1.rest`, and the fair versions)
   brings in the adder (`Peano.sum_rest`, `Peano.sum_fair`).
+* Any constant on a zero (`PeanoConst`).  Any rule that puts the numeral
+  `k` on the result, and for two arguments erases the second, meets the
+  hypothesis on a zero of the theorems on recursion
+  (`Peano.zero1_const`, `Peano.zero2_const`), given checks bounded by `k`
+  that are evaluated for the rule (`Peano.ConstRule`, `Peano.EraRule`).
+  The zero rules of the factorial, the multiplier and the power are
+  cases.  The test is a new agent, the triangular numbers `tri`, whose
+  rule on a zero puts down `0`: `Peano.tri_computes` is the theorems on
+  recursion and on constants applied to its rules, `Peano.tri_rest` and
+  `Peano.tri_fair` are the theorems for operators, and `t (2 + 1) * 3!`
+  is an expression.
 * Expressions built from numerals with `+`, `*` and `^` (`Peano.PExpr`)
   have nets (`PExpr.net`): the nets of the two arguments and an adder, a
   multiplier or a power that waits, side by side under the tags `0`,

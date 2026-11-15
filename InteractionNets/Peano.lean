@@ -2,14 +2,16 @@ import InteractionNets.Arith.Carry
 
 /-! # A larger system: addition, multiplication, powers, factorials
 
-Nine symbols: `zero`, `succ` and `add` as in `Arith`, a multiplier
+Ten symbols: `zero`, `succ` and `add` as in `Arith`, a multiplier
 `mul`, the two agents that multiplication needs because it uses its
 second argument once for every successor of the first: `dup`, which
 copies a numeral, and `era`, which erases one; and `pow` and `fac`, for
 powers and factorials, which use the multiplier as the multiplier uses
 the adder; and `cater`, the lazy caterer, `c 0 = 1` and
 `c (S x) = c x + S x`, added to test the theorems on recursion of
-`PeanoRec`, which prove it with nothing but its rules.  The system
+`PeanoRec`, which prove it with nothing but its rules; and `tri`, the
+triangular numbers, `t 0 = 0` and `t (S x) = t x + S x`, whose rule on a
+zero puts down a constant no other agent has (`PeanoConst`).  The system
 is given as data and validated by evaluating `SysData.check`.
 
 It contains addition (`Peano.rules`), so the adder adds in it, with
@@ -24,9 +26,9 @@ inputs, is `Peano.mul_correct`, in `PeanoMul`.
 namespace INet
 
 /-- The symbols: numbers, addition, multiplication, copying, erasing,
-powers, factorials, and the lazy caterer. -/
+powers, factorials, the lazy caterer and the triangular numbers. -/
 inductive Peano
-  | zero | succ | add | mul | dup | era | pow | fac | cater
+  | zero | succ | add | mul | dup | era | pow | fac | cater | tri
   deriving DecidableEq, Repr
 
 namespace Peano
@@ -37,7 +39,7 @@ port of `dup` is what it copies, its auxiliary ports are the two copies;
 `era` has only the port of what it erases.  The principal port of `pow`
 is the exponent, its auxiliary ports are the base and the result.  The
 principal port of `fac` is its argument, its auxiliary port the result;
-the same for `cater`. -/
+the same for `cater` and `tri`. -/
 def ar : Peano → Nat
   | zero => 0
   | succ => 1
@@ -48,6 +50,7 @@ def ar : Peano → Nat
   | pow => 2
   | fac => 1
   | cater => 1
+  | tri => 1
 
 /-- `0 * y = 0`: a new `zero` on the result, and `y` is erased. -/
 def mulZero : RuleData Peano :=
@@ -142,6 +145,24 @@ def caterSucc : RuleData Peano :=
       (.new (some false) 1 0, .new (some false) 2 1),   -- the new `succ` — second argument of `add`
       (.new (some false) 2 2, .ifc false 0)]            -- result of `add` — result
 
+/-- The triangular numbers on a zero, `t 0 = 0`: a new zero on the
+result. -/
+def triZero : RuleData Peano :=
+  RuleData.ofWires [((some false, 0), zero)]
+    [(.ifc false 0, .new (some false) 0 0)]            -- result — the new `zero`
+
+/-- The triangular numbers on a successor, `t (S x) = t x + S x`: the
+rule of the lazy caterer with `tri` for `cater`. -/
+def triSucc : RuleData Peano :=
+  RuleData.ofWires [((some false, 0), dup), ((some false, 1), succ), ((some false, 2), add),
+      ((some true, 0), tri)]
+    [(.ifc true 0, .new (some false) 0 0),             -- `x` — the new `dup`
+      (.new (some false) 0 1, .new (some false) 1 1),   -- first copy — under the new `succ`
+      (.new (some false) 0 2, .new (some true) 0 0),    -- second copy — argument of `tri`
+      (.new (some true) 0 1, .new (some false) 2 0),    -- result of `tri` — first argument of `add`
+      (.new (some false) 1 0, .new (some false) 2 1),   -- the new `succ` — second argument of `add`
+      (.new (some false) 2 2, .ifc false 0)]            -- result of `add` — result
+
 def data : SysData Peano :=
   ⟨ar, [((add, zero), Addition.zeroData), ((zero, add), Addition.zeroData.swap),
     ((add, succ), Addition.succData succ add), ((succ, add), (Addition.succData succ add).swap),
@@ -156,7 +177,9 @@ def data : SysData Peano :=
     ((fac, zero), facZero), ((zero, fac), facZero.swap),
     ((fac, succ), facSucc), ((succ, fac), facSucc.swap),
     ((cater, zero), facZero), ((zero, cater), facZero.swap),
-    ((cater, succ), caterSucc), ((succ, cater), caterSucc.swap)]⟩
+    ((cater, succ), caterSucc), ((succ, cater), caterSucc.swap),
+    ((tri, zero), triZero), ((zero, tri), triZero.swap),
+    ((tri, succ), triSucc), ((succ, tri), triSucc.swap)]⟩
 
 /-- The system, by evaluation of the check. -/
 def xsys : XSys Peano := data.toXSys (by decide)
