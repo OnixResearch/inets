@@ -3318,6 +3318,9 @@ holds up to equality rather than up to renaming.
   evaluated run that comes to rest bounds every fair run
   (`WMach.fair_bound_ref`); for a numeral beside 10 eraser-zero pairs that
   is `F * 992` actions, checked in the kernel (`Peano.inertThenPairs_fair`).
+  The pass charged for each joining claim is not slack: with `k` pairs
+  `0 + y` behind a numeral both programs take 443, 1483 and 5363 actions
+  for `k` = 10, 20, 40 (`Peano.inertThenJoins`).
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers

@@ -85,5 +85,42 @@ theorem inertThenPairs_fair {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {F : Na
   rw [e₁] at h
   exact ⟨h.1, h.2.1⟩
 
+/-! ### Where a pass per joining claim is paid
+
+The pass that `WMach.fair_bound` charges for each claim of a rule that
+joins interface ports is not slack in the proof.  Beside a numeral listed
+first, put `k` pairs of an adder facing a zero, each `0 + y` with `y` and
+the result free: each claim joins, so the thread takes a fresh list after
+it and reads the numeral again.  Both programs take the same, growing as
+the square of `k`. -/
+
+/-- `k` adders each facing a zero, with their other ports free. -/
+def addZeroPairs (k : Nat) : XNet Peano :=
+  ⟨(List.range k).flatMap fun j => [([2 * j + 1, 8], add), ([2 * j + 2, 8], zero)],
+    (List.range k).flatMap fun j => [([2 * j + 1, 7], 0), ([2 * j + 2, 7], 0)],
+    (List.range k).flatMap fun j =>
+      [(([2 * j + 1, 8], 0), ([2 * j + 2, 8], 0)), (([2 * j + 2, 8], 0), ([2 * j + 1, 8], 0)),
+       (([2 * j + 1, 8], 1), ([2 * j + 1, 7], 0)), (([2 * j + 1, 7], 0), ([2 * j + 1, 8], 1)),
+       (([2 * j + 1, 8], 2), ([2 * j + 2, 7], 0)), (([2 * j + 2, 7], 0), ([2 * j + 1, 8], 2))]⟩
+
+/-- The numeral `k` listed first, then `k` adders facing zeros. -/
+def inertThenJoins (k : Nat) : XNet Peano := ((lit k).tag 0).union (addZeroPairs k)
+
+example : (inertThenJoins 10).Ok xsys.sys.ar := by
+  decide +kernel
+
+/-- With `k` = 10, 20, 40 both programs take 443, 1483, 5363 actions, and
+every claim joins. -/
+example : xActions 10000 (XMach.init (inertThenJoins 10) 1) 0 = 443 := by
+  decide +kernel
+example : wActions 10000 (WMach.init (inertThenJoins 10) 1) 0 = 443 := by
+  decide +kernel
+example : WMach.joined xsys (fun _ => 0) (WMach.init (inertThenJoins 10) 1) 443 = 10 := by
+  decide +kernel
+example : wActions 10000 (WMach.init (inertThenJoins 20) 1) 0 = 1483 := by
+  decide +kernel
+example : wActions 100000 (WMach.init (inertThenJoins 40) 1) 0 = 5363 := by
+  decide +kernel
+
 end Peano
 end INet
