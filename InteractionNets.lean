@@ -59,6 +59,7 @@ import InteractionNets.PeanoGExpr
 import InteractionNets.RoundRobin
 import InteractionNets.PeanoBound
 import InteractionNets.PeanoExamples
+import InteractionNets.Extra
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.PeanoExpr
@@ -3445,6 +3446,19 @@ holds up to equality rather than up to renaming.
   (`PExpr.toG`), and their theorems are those of these expressions.  A single operator on the
   machine (`Peano.Op2.rest`, `Peano.Op1.rest`, and the fair versions)
   brings in the adder (`Peano.sum_rest`, `Peano.sum_fair`).
+* The development holds in any system with the core (`Core`): numerals,
+  a copier and an eraser with their rules, no rule for two numerals, and
+  the arities of zero and successor, the symbols being given by the
+  system.  Copying and erasing (`Copies.Rules`), what it is to compute,
+  the theorems on recursion and on constants, and the theorems for the
+  machine are stated for any such system; `Peano` is an instance
+  (`Peano.core`).  `Extra` is a second system, apart from `Peano`, with
+  numerals, an adder, a copier, an eraser, the lazy caterer and the
+  triangular numbers (`Extra.core`, `Extra.rules`); both agents are
+  proved there by the general theorems alone (`Extra.cater_computes`,
+  `Extra.tri_computes`, `Extra.cater_rest`, `Extra.tri_rest`), and the
+  reducer runs on them in the kernel.  The expressions over operators
+  and the bounds on actions are still stated for `Peano` only.
 * Two agents added with nothing but their rules (`PeanoExamples`): the
   lazy caterer `cater`, `c 0 = 1` and `c (S x) = c x + S x`, and the
   triangular numbers `tri`, `t 0 = 0` and `t (S x) = t x + S x`.  Each
