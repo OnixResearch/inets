@@ -78,6 +78,8 @@ import InteractionNets.UnionExamples
 import InteractionNets.LongRun
 import InteractionNets.Window
 import InteractionNets.Measure
+import InteractionNets.JoinWalk
+import InteractionNets.Peano.JoinWalk
 
 /-!
 # Interaction nets
@@ -3327,6 +3329,32 @@ holds up to equality rather than up to renaming.
   (`WMach.joined_le_census`), one per `+`, and every fair run on an
   expression of additions is at rest with its value after a bound in its
   size, its steps and its additions (`Arith.Expr.wfair`).
+  The rescan after a joining claim is what `JMach` replaces.  The active
+  pairs such a claim makes that have no new agent in them are the pairs
+  of the old agents at the two ends of a joined wire, so `JMach` keeps
+  its list after every claim and, once it has written a rule that joins,
+  walks each joined wire from the joined segment, its two sides in turn,
+  one segment an action (`XRhs.joinPairs`, `JWalk.advance`).  It stops at
+  the first end that is not the principal port of an agent in memory (an
+  auxiliary port, a free port, a segment not yet written, an agent that
+  another thread holds) or when it comes back to the joined segment, the
+  wire being a loop; when both ends are principal ports it puts the agent
+  at the first in front of its list.  A walk reads the memory only and
+  leaves the thread in its last state of writing, so `JMach` is an
+  execution of the machine like `WMach` (`JMach.act_agree`,
+  `JMach.exec_run`), with the same evaluable test
+  (`JMach.exec_agrees`).  With `k` pairs `0 + y` behind a numeral it
+  takes 163, 323 and 643 actions for `k` = 10, 20, 40, where `WMach`
+  takes 443, 1483 and 5363, checked in the kernel; a joined wire that is
+  a loop ends its walk (`Peano.selfLoop`).  Evaluated with one to four
+  threads under round robin and five other schedules, every run measured
+  rests after as many claims as the sequential reducer takes, on sums
+  nested either way, balanced sums, products, powers and the loop; on
+  `((5 + 0) + 0) + …` with 40 additions one thread takes 5,754 actions
+  where `WMach` takes 8,294, and the gap grows with the size, while on
+  `0 + (0 + (… + 5))` the walks cost about twice the rescans (1,090
+  against 578).  That `JMach` never rests before the normal form, and a
+  bound on its actions, are not proved.
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers
