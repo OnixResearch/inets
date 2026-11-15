@@ -20,6 +20,8 @@ namespace INet
 
 namespace Peano
 
+open Core
+
 open Addition (gone gone2)
 
 variable {N : Net Peano} {r : Port}

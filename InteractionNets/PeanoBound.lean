@@ -92,6 +92,8 @@ theorem XNet.pushOn_nodup {S : Type} {X : XNet S} {b : Nat} (hb : X.Below b) (γ
 
 namespace Peano
 
+open Core
+
 /-- **The rules of `Peano` are bounded**: at most four new agents and
 twelve ports. -/
 theorem xsys_bounded : xsys.Bounded 4 12 := by
@@ -132,7 +134,7 @@ theorem GExpr.rest_by (e : GExpr) {nt : Nat} (hnt : 0 < nt) :
   intro i hi
   obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
   have hr := XMach.roundRobin_rest hX (GExpr.net_nodup e) hnt xsys_bounded hs
-    (normal_of_numerals hag) i hi
+    (normal_of_numerals (system := system) hag) i hi
   exact ⟨hr, e.rest hnt _ hr⟩
 
 /-- **The same for any schedule in which every thread acts in every
@@ -147,7 +149,7 @@ theorem GExpr.rest_within (e : GExpr) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Na
   intro i hi
   obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
   have hr := XMach.window_rest hX (GExpr.net_nodup e) hnt xsys_bounded hs
-    (normal_of_numerals hag) σ hwin i hi
+    (normal_of_numerals (system := system) hag) σ hwin i hi
   exact ⟨hr, e.rest hnt _ hr⟩
 
 /-- **How many actions are enough to run an expression and read its
@@ -160,7 +162,7 @@ theorem GExpr.run_by (e : GExpr) {nt : Nat} (hnt : 0 < nt) (s : Nat)
     e.run nt s = some e.eval := by
   obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
   exact XNet.runRead_bound (zero := zero) (succ := succ) (by decide) hX (GExpr.net_nodup e) hnt
-    xsys_bounded hs (normal_of_numerals hag) hA s h₁ h₂ h₃
+    xsys_bounded hs (normal_of_numerals (system := system) hag) hA s h₁ h₂ h₃
 
 /-- **The same for the expressions of `+`, `*` and `^`.** -/
 theorem PExpr.run_by (e : PExpr) {nt : Nat} (hnt : 0 < nt) (s : Nat)

@@ -4,7 +4,7 @@ import InteractionNets.PeanoCopy
 
 Small facts about names in nets of `Peano`, what it is for an agent to
 compute (`Peano.Computes1`, `Peano.Computes2`), the adder alone
-(`Peano.add_steps'`), the costs of the multiplier, the power and the
+(`Core.add_steps'`), the costs of the multiplier, the power and the
 factorial, and the building of nets by putting successors on wires.
 The theorems that the agents compute are in `PeanoRec`, by recursion
 proved once.
@@ -83,44 +83,92 @@ theorem Addition.Num.insert1 {ar : S → Nat} {zero succ : S} {N : Net S} {u : I
 
 end Building
 
-namespace Peano
+/-- **A system with numerals, a copier and an eraser**: the symbols are
+apart, the system has the rules of the copier and the eraser, and no rule
+for two numerals.  The symbols are given by the system. -/
+class Core {S : Type} (system : System S) (zero succ dup era : outParam S) : Prop
+    extends Copies.Rules system zero succ dup era where
+  numerals : ∀ α β, (α = zero ∨ α = succ) → (β = zero ∨ β = succ) → system.rule α β = none
+
+namespace Core
 
 open Addition (gone gone2)
 
+variable {S : Type}
+
+/-! ### The shape of the theorems -/
+
+/-- **An agent that computes a function of two numerals, in any net.** -/
+def Computes2 (system : System S) {zero succ dup era : S} [Core system zero succ dup era]
+    (op : S) (f c : Nat → Nat → Nat) : Prop :=
+  ∀ (l₁ : List Id) {N : Net S} {a h₁ h₂ : Id} {l₂ : List Id} {r : Port} {m n : Nat},
+    N.WF system.ar → N.agent a op → N.Paired system.ar (a, 0) (h₁, 0) → Addition.NumList system.ar zero succ N h₁ l₁ →
+    N.Paired system.ar (a, 1) (h₂, 0) → Addition.NumList system.ar zero succ N h₂ l₂ → N.Paired system.ar (a, 2) r →
+    r.1 ≠ a ∧ ¬ r.1 ∈ l₁ ∧ ¬ r.1 ∈ l₂ → l₁.length = m + 1 → l₂.length = n + 1 →
+    ∃ N', Steps (Step system) (c m n) N N' ∧
+      Addition.IsNumQ system.ar zero succ N' (fun i => ¬ N.Used i) r (f m n) ∧ N.Keeps system.ar (gone2 N a l₁ l₂) N' ∧
+      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ a)
+
+/-- **An agent that computes a function of one numeral, in any net.** -/
+def Computes1 (system : System S) {zero succ dup era : S} [Core system zero succ dup era]
+    (op : S) (f c : Nat → Nat) : Prop :=
+  ∀ (l : List Id) {N : Net S} {a h : Id} {r : Port} {n : Nat},
+    N.WF system.ar → N.agent a op → N.Paired system.ar (a, 0) (h, 0) → Addition.NumList system.ar zero succ N h l →
+    N.Paired system.ar (a, 1) r → r.1 ≠ a ∧ ¬ r.1 ∈ l → l.length = n + 1 →
+    ∃ N', Steps (Step system) (c n) N N' ∧
+      Addition.IsNumQ system.ar zero succ N' (fun i => ¬ N.Used i) r (f n) ∧ N.Keeps system.ar (gone N a l) N' ∧
+      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ a)
+
+/-- **The situation of an addition.**  The adder `a` has the numerals `m`
+and `n` as arguments and the free port `r` as result, and the net has no
+other agents than the adder and the successors and zeros. -/
+structure Sum (system : System S) {zero succ dup era : S} [Core system zero succ dup era]
+    (add : S) (N : Net S) (a : Id) (m n : Nat) (r : Port) : Prop where
+  wf : N.WF system.ar
+  ha : N.agent a add
+  fst : Addition.IsNum system.ar zero succ N (a, 0) m
+  snd : Addition.IsNum system.ar zero succ N (a, 1) n
+  out : N.Paired system.ar (a, 2) r
+  free : N.free r
+  only : ∀ i γ, N.agent i γ → γ = zero ∨ γ = succ ∨ i = a
+
+section
+
+variable {system : System S} {zero succ dup era : S} [K : Core system zero succ dup era]
+
+local notation "ar" => system.ar
+local notation "NumList" => Addition.NumList system.ar zero succ
+local notation "IsNum" => Addition.IsNum system.ar zero succ
+
 /-! ### Small facts about names -/
 
-theorem ne_of_agent {N : Net Peano} (hN : N.WF ar) {i j : Id} {α β : Peano}
+theorem ne_of_agent {N : Net S} (hN : N.WF ar) {i j : Id} {α β : S}
     (hi : N.agent i α) (hj : N.agent j β) (h : α ≠ β) : i ≠ j := by
   rintro rfl
   exact h (hN.agent_fun hi hj)
 
-theorem not_gone {N : Net Peano} {d i : Id} {l : List Id} (h1 : i ≠ d) (h2 : ¬ i ∈ l)
+theorem not_gone {N : Net S} {d i : Id} {l : List Id} (h1 : i ≠ d) (h2 : ¬ i ∈ l)
     (h3 : N.Used i) : ¬ gone N d l i := by
   rintro (e | hm | hu)
   · exact h1 e
   · exact h2 hm
   · exact hu h3
 
+include K in
 /-- A net whose agents are zeros and successors is normal. -/
-theorem normal_of_numerals {N : Net Peano} (h : ∀ i γ, N.agent i γ → γ = zero ∨ γ = succ) :
+theorem normal_of_numerals {N : Net S} (h : ∀ i γ, N.agent i γ → γ = zero ∨ γ = succ) :
     Normal (Step system) N := by
   rintro N' ⟨a, b, α, β, R, red, -⟩
   have hr := red.rule
-  have hnone : ∀ α β : Peano, (α = zero ∨ α = succ) → (β = zero ∨ β = succ) →
-      system.rule α β = none := by
-    rintro α β (rfl | rfl) (rfl | rfl) <;> rfl
-  rw [hnone α β (h a α red.ha) (h b β red.hb)] at hr
+  rw [K.numerals α β (h a α red.ha) (h b β red.hb)] at hr
   cases hr
 
-/-- The number of interactions of `m * n`. -/
-def prodCost (m n : Nat) : Nat := (m + 1) * (n + 2) + m * (n + 1)
-
 /-- The agents of a numeral are in use. -/
-theorem numList_used {N : Net Peano} {h : Id} {l : List Id} (hl : NumList N h l) {j : Id}
+theorem numList_used {N : Net S} {h : Id} {l : List Id} (hl : NumList N h l) {j : Id}
     (hj : j ∈ l) : N.Used j :=
   (hl.label j hj).elim (fun h => .inl ⟨_, h⟩) fun h => .inl ⟨_, h⟩
 
-theorem not_gone2 {N : Net Peano} {a i : Id} {l₁ l₂ : List Id} (h1 : i ≠ a) (h2 : ¬ i ∈ l₁)
+theorem not_gone2 {N : Net S} {a i : Id} {l₁ l₂ : List Id} (h1 : i ≠ a) (h2 : ¬ i ∈ l₁)
     (h3 : ¬ i ∈ l₂) (h4 : N.Used i) : ¬ gone2 N a l₁ l₂ i := by
   rintro (e | hm | hm | hu)
   · exact h1 e
@@ -128,24 +176,11 @@ theorem not_gone2 {N : Net Peano} {a i : Id} {l₁ l₂ : List Id} (h1 : i ≠ a
   · exact h3 hm
   · exact hu h4
 
-variable {N : Net Peano} {n : Nat} {r : Port}
-
-/-- **The situation of an addition.**  The adder `a` has the numerals `m`
-and `n` as arguments and the free port `r` as result, and the net has no
-other agents than the adder and the successors and zeros. -/
-structure Sum (N : Net Peano) (a : Id) (m n : Nat) (r : Port) : Prop where
-  wf : N.WF ar
-  ha : N.agent a add
-  fst : IsNum N (a, 0) m
-  snd : IsNum N (a, 1) n
-  out : N.Paired ar (a, 2) r
-  free : N.free r
-  only : ∀ i γ, N.agent i γ → γ = zero ∨ γ = succ ∨ i = a
-
 /-- **The run of an addition**, in this system: in `m + 1` steps the net
 becomes one that has the numeral `m + n` on the result port and whose
 agents are successors and zeros. -/
-theorem add_steps' {a : Id} {m : Nat} (c : Sum N a m n r) :
+theorem add_steps' {add : S} (HA : Addition.Rules system zero succ add) {a : Id} {m : Nat}
+    (c : Sum system add N a m n r) :
     ∃ N', Steps (Step system) (m + 1) N N' ∧ IsNum N' r (m + n) ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ := by
   have hN := c.wf
@@ -157,7 +192,7 @@ theorem add_steps' {a : Id} {m : Nat} (c : Sum N a m n r) :
   have cA : Addition.Adding ar zero succ add N (fun _ => True) a 0 h l n r :=
     ⟨hN, c.ha, hph, hl, Addition.IsNum.isNumQ c.snd, ⟨r, c.out, rfl⟩, ⟨.inr (.inr ⟨r.2, c.free⟩),
       fun e => hN.free_agent (i := r.1) (k := r.2) c.free (e ▸ c.ha), hrl⟩, fun _ _ => trivial⟩
-  obtain ⟨N', sts, inum, -, hag⟩ := Addition.Adding.run rules l cA el
+  obtain ⟨N', sts, inum, -, hag⟩ := Addition.Adding.run HA l cA el
   rw [el] at sts
   rw [Nat.zero_add] at inum
   refine ⟨N', sts, inum.isNum, fun i γ hi => ?_⟩
@@ -168,6 +203,18 @@ theorem add_steps' {a : Id} {m : Nat} (c : Sum N a m n r) :
     · exact .inr hsu
     · exact absurd e hne
 
+end
+
+end Core
+
+namespace Peano
+
+open Core
+open Addition (gone gone2)
+
+/-- The number of interactions of `m * n`. -/
+def prodCost (m n : Nat) : Nat := (m + 1) * (n + 2) + m * (n + 1)
+
 /-- The number of interactions of `b ^ e`: on the zero, one and the
 erasure of the base; on a successor, one, the copy of the base, the power
 for the rest and the multiplication. -/
@@ -175,26 +222,20 @@ def powCost : Nat → Nat → Nat
   | 0, b => b + 1 + 1
   | e + 1, b => b + 1 + 1 + powCost e b + prodCost b (b ^ e)
 
-/-! ### The shape of the theorems -/
+/-! ### `Peano` has the core -/
 
-/-- **An agent that computes a function of two numerals, in any net.** -/
-def Computes2 (op : Peano) (f c : Nat → Nat → Nat) : Prop :=
-  ∀ (l₁ : List Id) {N : Net Peano} {a h₁ h₂ : Id} {l₂ : List Id} {r : Port} {m n : Nat},
-    N.WF ar → N.agent a op → N.Paired ar (a, 0) (h₁, 0) → NumList N h₁ l₁ →
-    N.Paired ar (a, 1) (h₂, 0) → NumList N h₂ l₂ → N.Paired ar (a, 2) r →
-    r.1 ≠ a ∧ ¬ r.1 ∈ l₁ ∧ ¬ r.1 ∈ l₂ → l₁.length = m + 1 → l₂.length = n + 1 →
-    ∃ N', Steps (Step system) (c m n) N N' ∧
-      IsNumQ N' (fun i => ¬ N.Used i) r (f m n) ∧ N.Keeps ar (gone2 N a l₁ l₂) N' ∧
-      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ a)
+/-- **`Peano` has numerals, a copier and an eraser.** -/
+instance core : Core system zero succ dup era :=
+  { copyRules with numerals := by rintro α β (rfl | rfl) (rfl | rfl) <;> rfl }
 
-/-- **An agent that computes a function of one numeral, in any net.** -/
-def Computes1 (op : Peano) (f c : Nat → Nat) : Prop :=
-  ∀ (l : List Id) {N : Net Peano} {a h : Id} {r : Port} {n : Nat},
-    N.WF ar → N.agent a op → N.Paired ar (a, 0) (h, 0) → NumList N h l →
-    N.Paired ar (a, 1) r → r.1 ≠ a ∧ ¬ r.1 ∈ l → l.length = n + 1 →
-    ∃ N', Steps (Step system) (c n) N N' ∧
-      IsNumQ N' (fun i => ¬ N.Used i) r (f n) ∧ N.Keeps ar (gone N a l) N' ∧
-      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ a)
+/-- **An agent of `Peano` that computes a function of two numerals.** -/
+abbrev Computes2 (op : Peano) (f c : Nat → Nat → Nat) : Prop := Core.Computes2 system op f c
+
+/-- **An agent of `Peano` that computes a function of one numeral.** -/
+abbrev Computes1 (op : Peano) (f c : Nat → Nat) : Prop := Core.Computes1 system op f c
+
+/-- The situation of an addition in `Peano`. -/
+abbrev Sum (N : Net Peano) (a : Id) (m n : Nat) (r : Port) : Prop := Core.Sum system add N a m n r
 
 /-- The factorial of a number. -/
 def fact : Nat → Nat

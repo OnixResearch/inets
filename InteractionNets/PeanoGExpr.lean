@@ -138,6 +138,8 @@ end Three
 
 namespace Peano
 
+open Core
+
 /-- **The rules of `Peano` give every new agent a side.** -/
 theorem system_sided : system.Sided := by
   intro α β R hR j
@@ -522,7 +524,7 @@ def Op2.ofComputes {op : Peano} {f c : Nat → Nat → Nat} (H : Computes2 op f 
 /-- **The adder is an operator**, by its own theorem. -/
 def addOp : Op2 :=
   ⟨add, fun m n => m + n, fun m _ => m + 1, rfl, by decide, by decide,
-    fun u => add_steps' ⟨u.wf, u.ha, u.fst, u.snd, u.out, u.free, u.only⟩⟩
+    fun u => add_steps' rules ⟨u.wf, u.ha, u.fst, u.snd, u.out, u.free, u.only⟩⟩
 
 /-- The multiplier, through the theorem on recursion. -/
 def mulOp : Op2 := Op2.ofComputes mul_computes rfl (by decide) (by decide)
@@ -848,7 +850,7 @@ theorem GExpr.rest (e : GExpr) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i :
     ((XMach.init e.net nt).trace xsys σ i).2 = e.cost ∧
       IsNum ((XMach.init e.net nt).trace xsys σ i).1.mem.toNet e.res e.eval := by
   obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
-  have hn' := normal_of_numerals hag
+  have hn' := normal_of_numerals (system := system) hag
   have L := XMach.trace_live σ (XMach.init_live (xs := xsys) hX hnt) i
   obtain ⟨q, hn⟩ := L.rest hr
   have r := XMach.trace_run xsys σ (XMach.init e.net nt) i
@@ -866,7 +868,7 @@ theorem GExpr.fair (e : GExpr) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
       ((XMach.init e.net nt).trace xsys σ i).2 = e.cost ∧
       IsNum ((XMach.init e.net nt).trace xsys σ i).1.mem.toNet e.res e.eval := by
   obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
-  obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) hX hnt hs (normal_of_numerals hag) σ hfair
+  obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) hX hnt hs (normal_of_numerals (system := system) hag) σ hfair
   refine ⟨i₀, fun i hi => ?_⟩
   obtain ⟨h₁, h₂, h₃⟩ := h i hi
   refine ⟨h₁, h₂, ?_⟩
@@ -882,7 +884,7 @@ theorem GExpr.run_sound (e : GExpr) {nt steps v : Nat} (hnt : 0 < nt)
     (h : e.run nt steps = some v) : v = e.eval := by
   obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
   exact XNet.runRead_sound (zero := zero) (succ := succ) xsys (by decide) (Nat.le_refl 1) hX hs
-    (normal_of_numerals hag) hA hnt h
+    (normal_of_numerals (system := system) hag) hA hnt h
 
 /-- **Given enough actions, the run returns the value of the
 expression.** -/
@@ -890,7 +892,7 @@ theorem GExpr.run_complete (e : GExpr) {nt : Nat} (hnt : 0 < nt) :
     ∃ s₀, ∀ s, s₀ ≤ s → e.run nt s = some e.eval := by
   obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
   exact XNet.runRead_complete (zero := zero) (succ := succ) xsys (by decide) hX hs
-    (normal_of_numerals hag) hA hnt
+    (normal_of_numerals (system := system) hag) hA hnt
 
 /-! ### One operator on the machine -/
 
@@ -905,7 +907,7 @@ theorem Op2.rest (o : Op2) (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → N
         (o.f m n) := by
   have g := good_binaryNet o.ar_eq o.ne0 o.ne1 m n
   obtain ⟨N', hs, hnum, hag⟩ := o.steps g.config
-  have hn' := normal_of_numerals hag
+  have hn' := normal_of_numerals (system := system) hag
   have L := XMach.trace_live σ (XMach.init_live (xs := xsys) g.ok.1 hnt) i
   obtain ⟨q, hn⟩ := L.rest hr
   have rn := XMach.trace_run xsys σ (XMach.init (binaryNet o.sym m n) nt) i
@@ -927,7 +929,7 @@ theorem Op2.fair (o : Op2) (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → N
         (o.f m n) := by
   have g := good_binaryNet o.ar_eq o.ne0 o.ne1 m n
   obtain ⟨N', hs, hnum, hag⟩ := o.steps g.config
-  obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) g.ok.1 hnt hs (normal_of_numerals hag)
+  obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) g.ok.1 hnt hs (normal_of_numerals (system := system) hag)
     σ hfair
   refine ⟨i₀, fun i hi => ?_⟩
   obtain ⟨h₁, h₂, h₃⟩ := h i hi
@@ -943,7 +945,7 @@ theorem Op1.rest (o : Op1) (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat
         (o.f n) := by
   have g := good_unaryNet o.ar_eq o.ne1 n
   obtain ⟨N', hs, hnum, hag⟩ := o.steps g.config
-  have hn' := normal_of_numerals hag
+  have hn' := normal_of_numerals (system := system) hag
   have L := XMach.trace_live σ (XMach.init_live (xs := xsys) g.ok.1 hnt) i
   obtain ⟨q, hn⟩ := L.rest hr
   have rn := XMach.trace_run xsys σ (XMach.init (unaryNet o.sym n) nt) i
@@ -965,7 +967,7 @@ theorem Op1.fair (o : Op1) (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat
         (o.f n) := by
   have g := good_unaryNet o.ar_eq o.ne1 n
   obtain ⟨N', hs, hnum, hag⟩ := o.steps g.config
-  obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) g.ok.1 hnt hs (normal_of_numerals hag)
+  obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) g.ok.1 hnt hs (normal_of_numerals (system := system) hag)
     σ hfair
   refine ⟨i₀, fun i hi => ?_⟩
   obtain ⟨h₁, h₂, h₃⟩ := h i hi

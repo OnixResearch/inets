@@ -16,6 +16,8 @@ namespace INet
 
 namespace Peano
 
+open Core
+
 /-! ### Expressions -/
 
 /-- **Expressions**: numerals, additions, multiplications and powers.

@@ -8,28 +8,28 @@ numeral, leaves a new agent of its own symbol on the rest, and a second
 agent, the combiner, that takes the result of the new agent.  The course
 is proved here once, for any two symbols, in two shapes.
 
-* **On a parameter** (`Peano.iterSucc`): `f (S x) y = g y (f x y)`.  The
+* **On a parameter** (`Core.iterSucc`): `f (S x) y = g y (f x y)`.  The
   agent copies its second argument, the parameter; one copy goes to the
   combiner, the other to the new agent.  The multiplier (`g` the adder)
   and the power (`g` the multiplier) have this rule.
-  `Peano.iter_computes`.
-* **On the predecessor** (`Peano.primSucc`): `f (S x) = g (f x) (S x)`.
+  `Core.iter_computes`.
+* **On the predecessor** (`Core.primSucc`): `f (S x) = g (f x) (S x)`.
   The agent copies the rest of its argument; one copy goes to the new
   agent, a new successor is put on the other, and the combiner takes the
   two.  The factorial (`g` the multiplier) has this rule.
-  `Peano.prim_computes`.
+  `Core.prim_computes`.
 
 The rule on a successor is given as a template in the two symbols, and
 the theorem asks that the system has it.  What the agent does on a zero
-is a hypothesis (`Peano.Zero2`, `Peano.Zero1`), met by any rule that puts
+is a hypothesis (`Core.Zero2`, `Core.Zero1`), met by any rule that puts
 a numeral `k` on the result, and for two arguments erases the second
-(`Peano.zero1_const`, `Peano.zero2_const`), given checks bounded by `k`
-that are evaluated for the rule (`Peano.ConstRule`, `Peano.EraRule`).
+(`Core.zero1_const`, `Core.zero2_const`), given checks bounded by `k`
+that are evaluated for the rule (`Core.ConstRule`, `Core.EraRule`).
 
 The combiner is asked for less than `Peano.Computes2`: its result may
-reuse the agents of its second argument (`Peano.Combines2`).  The adder
-does that, and is a combiner (`Peano.add_combines`); every agent that
-computes is one (`Peano.Computes2.combines`).
+reuse the agents of its second argument (`Core.Combines2`).  The adder
+does that, and is a combiner (`Core.add_combines`); every agent that
+computes is one (`Core.Computes2.combines`).
 
 The theorems of the agents follow, stacked: the multiplier with the
 adder as combiner (`Peano.mul_computes`), and the power and the
@@ -39,9 +39,16 @@ factorial with that multiplier (`Peano.pow_computes`,
 
 namespace INet
 
-namespace Peano
+namespace Core
 
 open Addition (gone gone2)
+
+variable {S : Type} {system : System S} {zero succ dup era : S} [K : Core system zero succ dup era]
+
+local notation "ar" => system.ar
+local notation "NumList" => Addition.NumList system.ar zero succ
+local notation "IsNum" => Addition.IsNum system.ar zero succ
+local notation "IsNumQ" => Addition.IsNumQ system.ar zero succ
 
 /-! ### Combiners -/
 
@@ -49,32 +56,34 @@ open Addition (gone gone2)
 that the result is made of agents that satisfy any property `Q` that the
 agents of the second argument and all names not in use satisfy.  The
 result may thus reuse the agents of the second argument. -/
-def Combines2 (op : Peano) (f c : Nat → Nat → Nat) : Prop :=
-  ∀ (l₁ : List Id) (Q : Id → Prop) {N : Net Peano} {a h₁ h₂ : Id} {l₂ : List Id} {r : Port}
+def Combines2 (system : System S) {zero succ dup era : S} [Core system zero succ dup era]
+    (op : S) (f c : Nat → Nat → Nat) : Prop :=
+  ∀ (l₁ : List Id) (Q : Id → Prop) {N : Net S} {a h₁ h₂ : Id} {l₂ : List Id} {r : Port}
     {m n : Nat},
-    N.WF ar → N.agent a op → N.Paired ar (a, 0) (h₁, 0) → NumList N h₁ l₁ →
-    N.Paired ar (a, 1) (h₂, 0) → NumList N h₂ l₂ → N.Paired ar (a, 2) r →
+    N.WF system.ar → N.agent a op → N.Paired system.ar (a, 0) (h₁, 0) → Addition.NumList system.ar zero succ N h₁ l₁ →
+    N.Paired system.ar (a, 1) (h₂, 0) → Addition.NumList system.ar zero succ N h₂ l₂ → N.Paired system.ar (a, 2) r →
     r.1 ≠ a ∧ ¬ r.1 ∈ l₁ ∧ ¬ r.1 ∈ l₂ → l₁.length = m + 1 → l₂.length = n + 1 →
     (∀ i, i ∈ l₂ → Q i) → (∀ i, ¬ N.Used i → Q i) →
     ∃ N', Steps (Step system) (c m n) N N' ∧
-      IsNumQ N' Q r (f m n) ∧ N.Keeps ar (gone2 N a l₁ l₂) N' ∧
+      Addition.IsNumQ system.ar zero succ N' Q r (f m n) ∧ N.Keeps system.ar (gone2 N a l₁ l₂) N' ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ a)
 
 /-- **An agent that computes is a combiner.** -/
-theorem Computes2.combines {op : Peano} {f c : Nat → Nat → Nat} (H : Computes2 op f c) :
-    Combines2 op f c :=
+theorem Computes2.combines {op : S} {f c : Nat → Nat → Nat} (H : Computes2 system op f c) :
+    Combines2 system op f c :=
   fun l₁ _ _ _ _ _ _ _ _ _ hN ha h1 n1 h2 n2 ho hr e1 e2 _ hQ => by
     obtain ⟨N', sts, ⟨h, l, p, hl, el, fl⟩, kp, hag⟩ := H l₁ hN ha h1 n1 h2 n2 ho hr e1 e2
     exact ⟨N', sts, ⟨h, l, p, hl, el, fun i hi => hQ i (fl i hi)⟩, kp, hag⟩
 
 /-- **The adder is a combiner.**  Its result is made of new successors
 and of the agents of its second argument. -/
-theorem add_combines : Combines2 add (fun m n => m + n) (fun m _ => m + 1) :=
+theorem add_combines {add : S} (HA : Addition.Rules system zero succ add) :
+    Combines2 system add (fun m n => m + n) (fun m _ => m + 1) :=
   fun l₁ Q _ _ _ h₂ l₂ r _ _ hN ha h1 n1 h2 n2 ho hr e1 e2 hl₂ hQ => by
     have c : Addition.Adding ar zero succ add _ Q _ 0 _ l₁ _ r :=
       ⟨hN, ha, h1, n1, ⟨h₂, l₂, h2, n2, e2, hl₂⟩, ⟨r, ho, rfl⟩,
         ⟨Net.End.used ho.2.1, hr.1, hr.2.1⟩, hQ⟩
-    obtain ⟨N', sts, hres, kp, hag⟩ := Addition.Adding.run rules l₁ c e1
+    obtain ⟨N', sts, hres, kp, hag⟩ := Addition.Adding.run HA l₁ c e1
     rw [e1] at sts
     rw [Nat.zero_add] at hres
     refine ⟨N', sts, hres, kp.mono ?_, fun i γ hi => ?_⟩
@@ -87,16 +96,16 @@ theorem add_combines : Combines2 add (fun m n => m + n) (fun m _ => m + 1) :=
       · exact .inr (.inr h)
 
 /-- The same agent with the same result and cost, written differently. -/
-theorem Computes2.congr {op : Peano} {f c f' c' : Nat → Nat → Nat} (H : Computes2 op f c)
-    (hf : ∀ m n, f m n = f' m n) (hc : ∀ m n, c m n = c' m n) : Computes2 op f' c' := by
+theorem Computes2.congr {op : S} {f c f' c' : Nat → Nat → Nat} (H : Computes2 system op f c)
+    (hf : ∀ m n, f m n = f' m n) (hc : ∀ m n, c m n = c' m n) : Computes2 system op f' c' := by
   have ef : f = f' := funext fun m => funext fun n => hf m n
   have ec : c = c' := funext fun m => funext fun n => hc m n
   rw [← ef, ← ec]
   exact H
 
 /-- The same for one argument. -/
-theorem Computes1.congr {op : Peano} {f c f' c' : Nat → Nat} (H : Computes1 op f c)
-    (hf : ∀ n, f n = f' n) (hc : ∀ n, c n = c' n) : Computes1 op f' c' := by
+theorem Computes1.congr {op : S} {f c f' c' : Nat → Nat} (H : Computes1 system op f c)
+    (hf : ∀ n, f n = f' n) (hc : ∀ n, c n = c' n) : Computes1 system op f' c' := by
   have ef : f = f' := funext hf
   have ec : c = c' := funext hc
   rw [← ef, ← ec]
@@ -108,7 +117,7 @@ theorem Computes1.congr {op : Peano} {f c f' c' : Nat → Nat} (H : Computes1 op
 copied; one copy is the first argument of a new `g`, the other the second
 argument of a new `op` on `x`, whose result is the second argument of
 `g`. -/
-def iterSucc (op g : Peano) : RuleData Peano :=
+def iterSucc (dup op g : S) : RuleData S :=
   RuleData.ofWires [((some false, 0), dup), ((some false, 1), g), ((some true, 0), op)]
     [(.ifc false 0, .new (some false) 0 0),            -- `y` — the new `dup`
       (.new (some false) 0 1, .new (some false) 1 0),   -- first copy — first argument of `g`
@@ -120,7 +129,7 @@ def iterSucc (op g : Peano) : RuleData Peano :=
 /-- **Recursion on the predecessor**, `f (S x) = g (f x) (S x)`: `x` is
 copied; a new successor on one copy is the second argument of a new `g`,
 whose first argument is the result of a new `op` on the other copy. -/
-def primSucc (op g : Peano) : RuleData Peano :=
+def primSucc (succ dup op g : S) : RuleData S :=
   RuleData.ofWires [((some false, 0), dup), ((some false, 1), succ), ((some false, 2), g),
       ((some true, 0), op)]
     [(.ifc true 0, .new (some false) 0 0),             -- `x` — the new `dup`
@@ -130,18 +139,9 @@ def primSucc (op g : Peano) : RuleData Peano :=
       (.new (some false) 1 0, .new (some false) 2 1),   -- the new `succ` — second argument of `g`
       (.new (some false) 2 2, .ifc false 0)]            -- result of `g` — result
 
-/-- The multiplier recurses on its parameter, with the adder. -/
-theorem mulSucc_eq : mulSucc = iterSucc mul add := rfl
-
-/-- The power recurses on its parameter, with the multiplier. -/
-theorem powSucc_eq : powSucc = iterSucc pow mul := rfl
-
-/-- The factorial recurses on the predecessor, with the multiplier. -/
-theorem facSucc_eq : facSucc = primSucc fac mul := rfl
-
 /-- **The symbols are apart**: the agent and the combiner are neither
 numerals nor copiers, and not the same. -/
-structure Apart (op g : Peano) : Prop where
+structure Apart (zero succ dup op g : S) : Prop where
   op_zero : zero ≠ op
   op_succ : succ ≠ op
   op_dup : dup ≠ op
@@ -154,23 +154,25 @@ structure Apart (op g : Peano) : Prop where
 
 /-- **An agent that computes a function of its second argument when its
 first is zero**: `Peano.Computes2` with the first argument `0`. -/
-def Zero2 (op : Peano) (h c₀ : Nat → Nat) : Prop :=
-  ∀ {N : Net Peano} {a z h₂ : Id} {l₂ : List Id} {r : Port} {n : Nat},
-    N.WF ar → N.agent a op → N.Paired ar (a, 0) (z, 0) → N.agent z zero →
-    N.Paired ar (a, 1) (h₂, 0) → NumList N h₂ l₂ → N.Paired ar (a, 2) r →
+def Zero2 (system : System S) {zero succ dup era : S} [Core system zero succ dup era]
+    (op : S) (h c₀ : Nat → Nat) : Prop :=
+  ∀ {N : Net S} {a z h₂ : Id} {l₂ : List Id} {r : Port} {n : Nat},
+    N.WF system.ar → N.agent a op → N.Paired system.ar (a, 0) (z, 0) → N.agent z zero →
+    N.Paired system.ar (a, 1) (h₂, 0) → Addition.NumList system.ar zero succ N h₂ l₂ → N.Paired system.ar (a, 2) r →
     r.1 ≠ a ∧ r.1 ≠ z ∧ ¬ r.1 ∈ l₂ → l₂.length = n + 1 →
-    ∃ N', Steps (Step system) (c₀ n) N N' ∧ IsNumQ N' (fun i => ¬ N.Used i) r (h n) ∧
-      N.Keeps ar (gone2 N a [z] l₂) N' ∧
+    ∃ N', Steps (Step system) (c₀ n) N N' ∧ Addition.IsNumQ system.ar zero succ N' (fun i => ¬ N.Used i) r (h n) ∧
+      N.Keeps system.ar (gone2 N a [z] l₂) N' ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ a)
 
 /-- **An agent that puts the numeral `k` on its result when its argument
 is zero**: `Peano.Computes1` with the argument `0`. -/
-def Zero1 (op : Peano) (k c₀ : Nat) : Prop :=
-  ∀ {N : Net Peano} {a z : Id} {r : Port},
-    N.WF ar → N.agent a op → N.Paired ar (a, 0) (z, 0) → N.agent z zero →
-    N.Paired ar (a, 1) r → r.1 ≠ a ∧ r.1 ≠ z →
-    ∃ N', Steps (Step system) c₀ N N' ∧ IsNumQ N' (fun i => ¬ N.Used i) r k ∧
-      N.Keeps ar (gone N a [z]) N' ∧
+def Zero1 (system : System S) {zero succ dup era : S} [Core system zero succ dup era]
+    (op : S) (k c₀ : Nat) : Prop :=
+  ∀ {N : Net S} {a z : Id} {r : Port},
+    N.WF system.ar → N.agent a op → N.Paired system.ar (a, 0) (z, 0) → N.agent z zero →
+    N.Paired system.ar (a, 1) r → r.1 ≠ a ∧ r.1 ≠ z →
+    ∃ N', Steps (Step system) c₀ N N' ∧ Addition.IsNumQ system.ar zero succ N' (fun i => ¬ N.Used i) r k ∧
+      N.Keeps system.ar (gone N a [z]) N' ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ a)
 
 /-! ### Recursion on a parameter -/
@@ -188,10 +190,10 @@ def iterCost (c₀ : Nat → Nat) (cg : Nat → Nat → Nat) (h : Nat → Nat) (
   | m + 1, n => n + 1 + 1 + iterCost c₀ cg h g m n + cg n (iter h g m n)
 
 /-- The rule makes three agents. -/
-theorem iterSucc_lab {op g : Peano} {o : Option Bool} {j : Nat} {γ : Peano}
-    (h : (iterSucc op g).toX.toRhs.lab o j = some γ) :
+theorem iterSucc_lab {op g : S} {o : Option Bool} {j : Nat} {γ : S}
+    (h : (iterSucc dup op g).toX.toRhs.lab o j = some γ) :
     (o = some false ∧ j = 0) ∨ (o = some false ∧ j = 1) ∨ (o = some true ∧ j = 0) := by
-  have h' : assoc (o, j) (iterSucc op g).agents = some γ := h
+  have h' : assoc (o, j) (iterSucc dup op g).agents = some γ := h
   have hm : ((o, j), γ) ∈ [(((some false : Option Bool), 0), dup), ((some false, 1), g),
       ((some true, 0), op)] := assoc_mem h'
   rcases List.mem_cons.1 hm with e | hm'
@@ -213,12 +215,12 @@ the parameter, a combiner `M` whose first argument is the first copy and
 whose result is the old result, and an agent `P` on the rest, whose
 second argument is the second copy and whose result is the second
 argument of the combiner. -/
-theorem iterSucc_step {op g : Peano} (hs : system.rule op succ = some (iterSucc op g).toX.toRhs)
-    {N : Net Peano} {p s h' t : Id} {x : Port}
+theorem iterSucc_step {op g : S} (hs : system.rule op succ = some (iterSucc dup op g).toX.toRhs)
+    {N : Net S} {p s h' t : Id} {x : Port}
     (hA : Addition.Adder ar op N p s succ) (hpi : N.Paired ar (s, 1) (h', 0))
     (hpt : N.Paired ar (p, 1) (t, 0)) (hpx : N.Paired ar (p, 2) x)
     (hh' : h' ≠ p ∧ h' ≠ s) (ht : t ≠ p ∧ t ≠ s) (hx : x.1 ≠ p ∧ x.1 ≠ s) :
-    ∃ (N₁ : Net Peano) (D M P : Id), Step system N N₁ ∧
+    ∃ (N₁ : Net S) (D M P : Id), Step system N N₁ ∧
       N.Keeps ar (fun i => i = p ∨ i = s) N₁ ∧
       ¬ N.Used D ∧ ¬ N.Used M ∧ ¬ N.Used P ∧
       N₁.agent D dup ∧ N₁.agent M g ∧ N₁.agent P op ∧
@@ -227,10 +229,10 @@ theorem iterSucc_step {op g : Peano} (hs : system.rule op succ = some (iterSucc 
       (∀ i, N.Used i → N₁.Used i) ∧
       ∀ i γ, N₁.agent i γ → (N.agent i γ ∧ i ≠ p ∧ i ≠ s) ∨ i = D ∨ i = M ∨ i = P := by
   have hN := hA.wf
-  have hR : (iterSucc op g).toX.toRhs.WF ar op succ := system.rule_wf hs
-  have red : Redex system N p s op succ (iterSucc op g).toX.toRhs :=
+  have hR : (iterSucc dup op g).toX.toRhs.WF ar op succ := system.rule_wf hs
+  have red : Redex system N p s op succ (iterSucc dup op g).toX.toRhs :=
     ⟨hA.ha, hA.hs, hA.site.ne, hA.pair.2.2, hs⟩
-  have st : Step system N (N.fire p s (iterSucc op g).toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
+  have st : Step system N (N.fire p s (iterSucc dup op g).toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
   have hN₁ := Step.wf hN st
   refine ⟨_, child p s (some false) 0, child p s (some false) 1, child p s (some true) 0, st,
     hA.site.keeps _, hA.site.not_used_child _ _, hA.site.not_used_child _ _,
@@ -238,22 +240,22 @@ theorem iterSucc_step {op g : Peano} (hs : system.rule op succ = some (iterSucc 
     .inr ⟨some true, 0, rfl, rfl⟩, ?_, ?_, ?_, ?_, ?_, ?_,
     fun i hu => Net.used_fire hN hu _ _ _, ?_⟩
   · exact (hA.site.paired_fire_ifc_new hR
-      (show (iterSucc op g).toX.toRhs.link (.ifc false 0) (.new (some false) 0 0) from rfl)
+      (show (iterSucc dup op g).toX.toRhs.link (.ifc false 0) (.new (some false) 0 0) from rfl)
       (hpt.symm hN) ht.1 ht.2).symm hN₁
   · exact Site.paired_fire_new_new hR
-      (show (iterSucc op g).toX.toRhs.link (.new (some false) 0 1) (.new (some false) 1 0)
+      (show (iterSucc dup op g).toX.toRhs.link (.new (some false) 0 1) (.new (some false) 1 0)
         from rfl)
   · exact Site.paired_fire_new_new hR
-      (show (iterSucc op g).toX.toRhs.link (.new (some false) 0 2) (.new (some true) 0 1)
+      (show (iterSucc dup op g).toX.toRhs.link (.new (some false) 0 2) (.new (some true) 0 1)
         from rfl)
   · exact (hA.site.paired_fire_ifc_new hR
-      (show (iterSucc op g).toX.toRhs.link (.ifc true 0) (.new (some true) 0 0) from rfl)
+      (show (iterSucc dup op g).toX.toRhs.link (.ifc true 0) (.new (some true) 0 0) from rfl)
       (hpi.symm hN) hh'.1 hh'.2).symm hN₁
   · exact Site.paired_fire_new_new hR
-      (show (iterSucc op g).toX.toRhs.link (.new (some true) 0 2) (.new (some false) 1 1)
+      (show (iterSucc dup op g).toX.toRhs.link (.new (some true) 0 2) (.new (some false) 1 1)
         from rfl)
   · exact (hA.site.paired_fire_ifc_new hR
-      (show (iterSucc op g).toX.toRhs.link (.ifc false 1) (.new (some false) 1 2) from rfl)
+      (show (iterSucc dup op g).toX.toRhs.link (.ifc false 1) (.new (some false) 1 2) from rfl)
       (hpx.symm hN) hx.1 hx.2).symm hN₁
   · rintro i γ (⟨hi, h1, h2⟩ | ⟨o, j, e, hlab⟩)
     · exact .inl ⟨hi, h1, h2⟩
@@ -263,15 +265,15 @@ theorem iterSucc_step {op g : Peano} (hs : system.rule op succ = some (iterSucc 
       · exact .inr (.inr (.inr e))
 
 /-- **Recursion on a parameter computes.**  If the system has the rule
-`Peano.iterSucc op g` for `op` on a successor, `op` computes `h` when its
+`Core.iterSucc dup op g` for `op` on a successor, `op` computes `h` when its
 first argument is zero, and `g` combines, then `op` computes the function
-`Peano.iter h fg`, in `Peano.iterCost` steps.  On a successor the agent
+`Peano.iter h fg`, in `Core.iterCost` steps.  On a successor the agent
 copies its parameter; the agent left on the rest computes by this theorem,
 on the second argument of the combiner; the combiner then combines. -/
-theorem iter_computes {op g : Peano} {h c₀ : Nat → Nat} {fg cg : Nat → Nat → Nat}
-    (hs : system.rule op succ = some (iterSucc op g).toX.toRhs) (hd : Apart op g)
-    (hz : Zero2 op h c₀) (hg : Combines2 g fg cg) :
-    Computes2 op (iter h fg) (iterCost c₀ cg h fg)
+theorem iter_computes {op g : S} {h c₀ : Nat → Nat} {fg cg : Nat → Nat → Nat}
+    (hs : system.rule op succ = some (iterSucc dup op g).toX.toRhs) (hd : Apart zero succ dup op g)
+    (hz : Zero2 system op h c₀) (hg : Combines2 system g fg cg) :
+    Computes2 system op (iter h fg) (iterCost c₀ cg h fg)
   | [], _, _, _, _, _, _, _, _, _, _, _, hl, _, _, _, _, _, _ => by cases hl
   | s :: l', N, p, _, h₂, l₂, r, e, b, hN, hp, hps, hnum, hpt, hl₂, hpx, hr, hlen, hlen₂ => by
     obtain ⟨hrp, hrl₁, hrl₂⟩ := hr
@@ -328,7 +330,7 @@ theorem iter_computes {op g : Peano} {h c₀ : Nat → Nat} {fg cg : Nat → Nat
       have hMl : ¬ M ∈ l₂ := fun hm => hM (numList_used hl₂ hm)
       have hPl : ¬ P ∈ l₂ := fun hm => hP (numList_used hl₂ hm)
       obtain ⟨N₂, sts₂, ⟨cM, lM, pM, hlM, elM, fM⟩, ⟨cP, lP, pP, hlP, elP, fP⟩, k₂, hag₂⟩ :=
-        copy_fresh hN₁ aD pDt hl₂₁ hlen₂ pDM pDP
+        Copies.copy_fresh K.toRules hN₁ aD pDt hl₂₁ hlen₂ pDM pDP
           ⟨ne_of_agent hN₁ aM aD hd.g_dup.symm, hMl⟩ ⟨ne_of_agent hN₁ aP aD hd.op_dup.symm, hPl⟩
       have hN₂ := Steps.wf hN₁ sts₂
       have U₂ : ∀ i, N.Used i → N₂.Used i := fun i hu => Steps.used hN₁ sts₂ (hused i hu)
@@ -421,7 +423,7 @@ theorem iter_computes {op g : Peano} {h c₀ : Nat → Nat} {fg cg : Nat → Nat
 `0, …, k - 1` are successors, each with its argument on the next, the new
 agent `k` is a zero, and the interface port `res` is wired to the new
 agent `0`.  Every field is evaluated for a given rule. -/
-structure ConstRule (R : RuleData Peano) (res k : Nat) : Prop where
+structure ConstRule (zero succ : S) (R : RuleData S) (res k : Nat) : Prop where
   succs : ∀ j, j < k → assoc ((some false : Option Bool), j) R.agents = some succ
   last : assoc ((some false : Option Bool), k) R.agents = some zero
   links : ∀ j, j < k →
@@ -430,7 +432,7 @@ structure ConstRule (R : RuleData Peano) (res k : Nat) : Prop where
 
 /-- **The rule also erases the second argument**: the new agent
 `(some true, 0)` is an eraser, on the interface port `0`. -/
-structure EraRule (R : RuleData Peano) : Prop where
+structure EraRule (era : S) (R : RuleData S) : Prop where
   era : assoc ((some true : Option Bool), 0) R.agents = some era
   link : assoc (LPort.ifc false 0) R.wires = some (LPort.new (some true) 0 0)
 
@@ -439,8 +441,8 @@ def constIds (a z : Id) (k : Nat) : List Id := (List.range' 0 (k + 1)).map (chil
 
 /-- **After the firing, the new agents of the rule are the numeral `k`**,
 from the agent `k - d` on. -/
-theorem const_chain {op : Peano} {R : RuleData Peano} {res k : Nat} (C : ConstRule R res k)
-    (hR : R.toX.toRhs.WF ar op zero) {N : Net Peano} {a z : Id} (hA : Addition.Adder ar op N a z zero) :
+theorem const_chain {op : S} {R : RuleData S} {res k : Nat} (C : ConstRule zero succ R res k)
+    (hR : R.toX.toRhs.WF ar op zero) {N : Net S} {a z : Id} (hA : Addition.Adder ar op N a z zero) :
     ∀ d, d ≤ k → NumList (N.fire a z R.toX.toRhs) (child a z (some false) (k - d))
       ((List.range' (k - d) (d + 1)).map (child a z (some false)))
   | 0, _ => by
@@ -460,8 +462,8 @@ theorem const_chain {op : Peano} {R : RuleData Peano} {res k : Nat} (C : ConstRu
     rw [List.range'_succ, List.map_cons, e]
     exact .next (.inr ⟨some false, k - (d + 1), rfl, C.succs _ hj⟩) hp hl
 
-theorem constIds_numList {op : Peano} {R : RuleData Peano} {res k : Nat} (C : ConstRule R res k)
-    (hR : R.toX.toRhs.WF ar op zero) {N : Net Peano} {a z : Id}
+theorem constIds_numList {op : S} {R : RuleData S} {res k : Nat} (C : ConstRule zero succ R res k)
+    (hR : R.toX.toRhs.WF ar op zero) {N : Net S} {a z : Id}
     (hA : Addition.Adder ar op N a z zero) :
     NumList (N.fire a z R.toX.toRhs) (child a z (some false) 0) (constIds a z k) := by
   have h := const_chain C hR hA k (Nat.le_refl k)
@@ -479,9 +481,9 @@ theorem mem_constIds {a z i : Id} {k : Nat} (h : i ∈ constIds a z k) :
 
 /-- **Any rule that puts the numeral `k` on the result** of an agent of
 one argument, and makes nothing else, meets the hypothesis on a zero. -/
-theorem zero1_const {op : Peano} {R : RuleData Peano} {k : Nat}
-    (hr : system.rule op zero = some R.toX.toRhs) (h0 : zero ≠ op) (C : ConstRule R 0 k)
-    (hall : ∀ e ∈ R.agents, e.1.1 = some false ∧ e.1.2 ≤ k) : Zero1 op k 1 := by
+theorem zero1_const {op : S} {R : RuleData S} {k : Nat}
+    (hr : system.rule op zero = some R.toX.toRhs) (h0 : zero ≠ op) (C : ConstRule zero succ R 0 k)
+    (hall : ∀ e ∈ R.agents, e.1.1 = some false ∧ e.1.2 ≤ k) : Zero1 system op k 1 := by
   intro N a z r hN ha hps hz hpx hr'
   have hA : Addition.Adder ar op N a z zero := ⟨hN, ha, hz, h0, hps⟩
   have hR : R.toX.toRhs.WF ar op zero := system.rule_wf hr
@@ -517,11 +519,11 @@ theorem zero1_const {op : Peano} {R : RuleData Peano} {k : Nat}
 /-- **Any rule that puts the numeral `k` on the result** of an agent of
 two arguments, erases the second argument and makes nothing else, meets
 the hypothesis on a zero. -/
-theorem zero2_const {op : Peano} {R : RuleData Peano} {k : Nat}
+theorem zero2_const {op : S} {R : RuleData S} {k : Nat}
     (hr : system.rule op zero = some R.toX.toRhs) (h0 : zero ≠ op) (h1 : succ ≠ op)
-    (C : ConstRule R 1 k) (E : EraRule R)
+    (C : ConstRule zero succ R 1 k) (E : EraRule era R)
     (hall : ∀ e ∈ R.agents, (e.1.1 = some false ∧ e.1.2 ≤ k) ∨ e.1 = (some true, 0)) :
-    Zero2 op (fun _ => k) (fun n => n + 1 + 1) := by
+    Zero2 system op (fun _ => k) (fun n => n + 1 + 1) := by
   intro N p s h₂ l₂ r n hN hp hps hz hpt hl₂ hpx hr' hlen₂
   obtain ⟨hrp, hrs, hrl₂⟩ := hr'
   have hru : N.Used r.1 := Net.End.used hpx.2.1
@@ -563,7 +565,7 @@ theorem zero2_const {op : Peano} {R : RuleData Peano} {k : Nat}
   have hnl := constIds_numList C hR hA
   -- the erasure
   have hl₂₁ := hl₂.keeps k₁ hav
-  obtain ⟨N₂, sts, k₂, hag₂⟩ := erase l₂ hN₁ aE pEt hl₂₁
+  obtain ⟨N₂, sts, k₂, hag₂⟩ := Copies.erase K.toRules l₂ hN₁ aE pEt hl₂₁
   rw [hlen₂] at sts
   have ngc : ∀ i, i ∈ constIds p s k → ¬ gone (N.fire p s R.toX.toRhs) (child p s (some true) 0)
       l₂ i := by
@@ -573,8 +575,8 @@ theorem zero2_const {op : Peano} {R : RuleData Peano} {k : Nat}
       exact hA.site.not_used_child _ _
     refine not_gone ?_ (fun hm => hu (numList_used hl₂ hm)) ?_
     · rcases hnl.label i hi with h | h
-      · exact ne_of_agent hN₁ h aE (by decide)
-      · exact ne_of_agent hN₁ h aE (by decide)
+      · exact ne_of_agent hN₁ h aE K.zero_ne_era
+      · exact ne_of_agent hN₁ h aE K.succ_ne_era
     · rcases hnl.label i hi with h | h
       · exact .inl ⟨_, h⟩
       · exact .inl ⟨_, h⟩
@@ -615,25 +617,6 @@ theorem zero2_const {op : Peano} {R : RuleData Peano} {k : Nat}
         subst ho hj
         exact absurd e hne
 
-/-! ### The three rules, again -/
-
-/-- The rule of the factorial on a zero, as a case. -/
-theorem zero1_facZero {op : Peano} (hr : system.rule op zero = some facZero.toX.toRhs)
-    (h0 : zero ≠ op) : Zero1 op 1 1 :=
-  zero1_const hr h0 ⟨by decide, by decide, by decide, by decide⟩ (by decide)
-
-/-- The rule of the multiplier on a zero, as a case. -/
-theorem zero2_mulZero {op : Peano} (hr : system.rule op zero = some mulZero.toX.toRhs)
-    (h0 : zero ≠ op) (h1 : succ ≠ op) : Zero2 op (fun _ => 0) (fun n => n + 1 + 1) :=
-  zero2_const hr h0 h1 ⟨by decide, by decide, by decide, by decide⟩ ⟨by decide, by decide⟩
-    (by decide)
-
-/-- The rule of the power on a zero, as a case. -/
-theorem zero2_powZero {op : Peano} (hr : system.rule op zero = some powZero.toX.toRhs)
-    (h0 : zero ≠ op) (h1 : succ ≠ op) : Zero2 op (fun _ => 1) (fun n => n + 1 + 1) :=
-  zero2_const hr h0 h1 ⟨by decide, by decide, by decide, by decide⟩ ⟨by decide, by decide⟩
-    (by decide)
-
 /-! ### Recursion on the predecessor -/
 
 /-- The function: `k` on zero, and `g (f x) (S x)` on `S x`. -/
@@ -648,11 +631,11 @@ def primCost (c₀ : Nat) (cg : Nat → Nat → Nat) (k : Nat) (g : Nat → Nat 
   | n + 1 => n + 1 + 1 + primCost c₀ cg k g n + cg (prim k g n) (n + 1)
 
 /-- The rule makes four agents. -/
-theorem primSucc_lab {op g : Peano} {o : Option Bool} {j : Nat} {γ : Peano}
-    (h : (primSucc op g).toX.toRhs.lab o j = some γ) :
+theorem primSucc_lab {op g : S} {o : Option Bool} {j : Nat} {γ : S}
+    (h : (primSucc succ dup op g).toX.toRhs.lab o j = some γ) :
     (o = some false ∧ j = 0) ∨ (o = some false ∧ j = 1) ∨ (o = some false ∧ j = 2) ∨
       (o = some true ∧ j = 0) := by
-  have h' : assoc (o, j) (primSucc op g).agents = some γ := h
+  have h' : assoc (o, j) (primSucc succ dup op g).agents = some γ := h
   have hm : ((o, j), γ) ∈ [(((some false : Option Bool), 0), dup), ((some false, 1), succ),
       ((some false, 2), g), ((some true, 0), op)] := assoc_mem h'
   rcases List.mem_cons.1 hm with e | hm'
@@ -678,11 +661,11 @@ the rest of the argument, a successor `U` on the first copy, an agent `F`
 on the second copy, and a combiner `M` whose first argument is the result
 of `F`, whose second argument is `U`, and whose result is the old
 result. -/
-theorem primSucc_step {op g : Peano} (hs : system.rule op succ = some (primSucc op g).toX.toRhs)
-    {N : Net Peano} {a s h' : Id} {x : Port}
+theorem primSucc_step {op g : S} (hs : system.rule op succ = some (primSucc succ dup op g).toX.toRhs)
+    {N : Net S} {a s h' : Id} {x : Port}
     (hA : Addition.Adder ar op N a s succ) (hpi : N.Paired ar (s, 1) (h', 0))
     (hpx : N.Paired ar (a, 1) x) (hh' : h' ≠ a ∧ h' ≠ s) (hx : x.1 ≠ a ∧ x.1 ≠ s) :
-    ∃ (N₁ : Net Peano) (D U M F : Id), Step system N N₁ ∧
+    ∃ (N₁ : Net S) (D U M F : Id), Step system N N₁ ∧
       N.Keeps ar (fun i => i = a ∨ i = s) N₁ ∧
       ¬ N.Used D ∧ ¬ N.Used U ∧ ¬ N.Used M ∧ ¬ N.Used F ∧
       N₁.agent D dup ∧ N₁.agent U succ ∧ N₁.agent M g ∧ N₁.agent F op ∧
@@ -692,10 +675,10 @@ theorem primSucc_step {op g : Peano} (hs : system.rule op succ = some (primSucc 
       ∀ i γ, N₁.agent i γ →
         (N.agent i γ ∧ i ≠ a ∧ i ≠ s) ∨ i = D ∨ i = U ∨ i = M ∨ i = F := by
   have hN := hA.wf
-  have hR : (primSucc op g).toX.toRhs.WF ar op succ := system.rule_wf hs
-  have red : Redex system N a s op succ (primSucc op g).toX.toRhs :=
+  have hR : (primSucc succ dup op g).toX.toRhs.WF ar op succ := system.rule_wf hs
+  have red : Redex system N a s op succ (primSucc succ dup op g).toX.toRhs :=
     ⟨hA.ha, hA.hs, hA.site.ne, hA.pair.2.2, hs⟩
-  have st : Step system N (N.fire a s (primSucc op g).toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
+  have st : Step system N (N.fire a s (primSucc succ dup op g).toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
   have hN₁ := Step.wf hN st
   refine ⟨_, child a s (some false) 0, child a s (some false) 1, child a s (some false) 2,
     child a s (some true) 0, st, hA.site.keeps _, hA.site.not_used_child _ _,
@@ -704,22 +687,22 @@ theorem primSucc_step {op g : Peano} (hs : system.rule op succ = some (primSucc 
     .inr ⟨some false, 2, rfl, rfl⟩, .inr ⟨some true, 0, rfl, rfl⟩, ?_, ?_, ?_, ?_, ?_, ?_,
     fun i hu => Net.used_fire hN hu _ _ _, ?_⟩
   · exact (hA.site.paired_fire_ifc_new hR
-      (show (primSucc op g).toX.toRhs.link (.ifc true 0) (.new (some false) 0 0) from rfl)
+      (show (primSucc succ dup op g).toX.toRhs.link (.ifc true 0) (.new (some false) 0 0) from rfl)
       (hpi.symm hN) hh'.1 hh'.2).symm hN₁
   · exact Site.paired_fire_new_new hR
-      (show (primSucc op g).toX.toRhs.link (.new (some false) 0 1) (.new (some false) 1 1)
+      (show (primSucc succ dup op g).toX.toRhs.link (.new (some false) 0 1) (.new (some false) 1 1)
         from rfl)
   · exact Site.paired_fire_new_new hR
-      (show (primSucc op g).toX.toRhs.link (.new (some false) 0 2) (.new (some true) 0 0)
+      (show (primSucc succ dup op g).toX.toRhs.link (.new (some false) 0 2) (.new (some true) 0 0)
         from rfl)
   · exact Site.paired_fire_new_new hR
-      (show (primSucc op g).toX.toRhs.link (.new (some true) 0 1) (.new (some false) 2 0)
+      (show (primSucc succ dup op g).toX.toRhs.link (.new (some true) 0 1) (.new (some false) 2 0)
         from rfl)
   · exact Site.paired_fire_new_new hR
-      (show (primSucc op g).toX.toRhs.link (.new (some false) 1 0) (.new (some false) 2 1)
+      (show (primSucc succ dup op g).toX.toRhs.link (.new (some false) 1 0) (.new (some false) 2 1)
         from rfl)
   · exact (hA.site.paired_fire_ifc_new hR
-      (show (primSucc op g).toX.toRhs.link (.ifc false 0) (.new (some false) 2 2) from rfl)
+      (show (primSucc succ dup op g).toX.toRhs.link (.ifc false 0) (.new (some false) 2 2) from rfl)
       (hpx.symm hN) hx.1 hx.2).symm hN₁
   · rintro i γ (⟨hi, h1, h2⟩ | ⟨o, j, e, hlab⟩)
     · exact .inl ⟨hi, h1, h2⟩
@@ -730,16 +713,16 @@ theorem primSucc_step {op g : Peano} (hs : system.rule op succ = some (primSucc 
       · exact .inr (.inr (.inr (.inr e)))
 
 /-- **Recursion on the predecessor computes.**  If the system has the
-rule `Peano.primSucc op g` for `op` on a successor, `op` puts the numeral
+rule `Core.primSucc succ dup op g` for `op` on a successor, `op` puts the numeral
 `k` on its result when its argument is zero, and `g` combines, then `op`
-computes the function `Peano.prim k fg`, in `Peano.primCost` steps.  On a
+computes the function `Peano.prim k fg`, in `Core.primCost` steps.  On a
 successor the agent copies the rest of its argument; the agent left on
 one copy computes by this theorem, on the first argument of the combiner;
 the combiner then combines it with the successor of the other copy. -/
-theorem prim_computes {op g : Peano} {k c₀ : Nat} {fg cg : Nat → Nat → Nat}
-    (hs : system.rule op succ = some (primSucc op g).toX.toRhs) (hd : Apart op g)
-    (hz : Zero1 op k c₀) (hg : Combines2 g fg cg) :
-    Computes1 op (prim k fg) (primCost c₀ cg k fg)
+theorem prim_computes {op g : S} {k c₀ : Nat} {fg cg : Nat → Nat → Nat}
+    (hs : system.rule op succ = some (primSucc succ dup op g).toX.toRhs) (hd : Apart zero succ dup op g)
+    (hz : Zero1 system op k c₀) (hg : Combines2 system g fg cg) :
+    Computes1 system op (prim k fg) (primCost c₀ cg k fg)
   | [], _, _, _, _, _, _, _, _, hl, _, _, _ => by cases hl
   | s :: l', N, a, _, r, n, hN, ha, hps, hnum, hpx, hr, hlen => by
     obtain ⟨hra, hrl⟩ := hr
@@ -783,13 +766,13 @@ theorem prim_computes {op g : Peano} {k c₀ : Nat} {fg cg : Nat → Nat → Nat
       have hMl : ¬ M ∈ l' := fun hm => hM (numList_used hl' hm)
       have hFl : ¬ F ∈ l' := fun hm => hF (numList_used hl' hm)
       obtain ⟨N₂, sts₂, ⟨cU, lU, pU, hlU, elU, fU⟩, ⟨cF, lF, pF, hlF, elF, fF⟩, k₂, hag₂⟩ :=
-        copy_fresh hN₁ aD pDh hl'₁ ek pDU pDF
-          ⟨ne_of_agent hN₁ aU aD (by decide), hUl⟩
+        Copies.copy_fresh K.toRules hN₁ aD pDh hl'₁ ek pDU pDF
+          ⟨ne_of_agent hN₁ aU aD K.succ_ne_dup, hUl⟩
           ⟨ne_of_agent hN₁ aF aD hd.op_dup.symm, hFl⟩
       have hN₂ := Steps.wf hN₁ sts₂
       have U₂ : ∀ i, N.Used i → N₂.Used i := fun i hu => Steps.used hN₁ sts₂ (hused i hu)
       have ngU : ¬ gone N₁ D l' U :=
-        not_gone (ne_of_agent hN₁ aU aD (by decide)) hUl (.inl ⟨_, aU⟩)
+        not_gone (ne_of_agent hN₁ aU aD K.succ_ne_dup) hUl (.inl ⟨_, aU⟩)
       have ngM : ¬ gone N₁ D l' M :=
         not_gone (ne_of_agent hN₁ aM aD hd.g_dup.symm) hMl (.inl ⟨_, aM⟩)
       have ngF : ¬ gone N₁ D l' F :=
@@ -882,6 +865,41 @@ theorem prim_computes {op g : Peano} {k c₀ : Nat} {fg cg : Nat → Nat → Nat
               · exact absurd e1 hneM
               · exact absurd e1 hneF
 
+end Core
+
+namespace Peano
+
+open Core
+open Addition (gone gone2)
+
+/-- The multiplier recurses on its parameter, with the adder. -/
+theorem mulSucc_eq : mulSucc = iterSucc dup mul add := rfl
+
+/-- The power recurses on its parameter, with the multiplier. -/
+theorem powSucc_eq : powSucc = iterSucc dup pow mul := rfl
+
+/-- The factorial recurses on the predecessor, with the multiplier. -/
+theorem facSucc_eq : facSucc = primSucc succ dup fac mul := rfl
+
+/-! ### The three rules, again -/
+
+/-- The rule of the factorial on a zero, as a case. -/
+theorem zero1_facZero {op : Peano} (hr : system.rule op zero = some facZero.toX.toRhs)
+    (h0 : zero ≠ op) : Zero1 system op 1 1 :=
+  zero1_const hr h0 ⟨by decide, by decide, by decide, by decide⟩ (by decide)
+
+/-- The rule of the multiplier on a zero, as a case. -/
+theorem zero2_mulZero {op : Peano} (hr : system.rule op zero = some mulZero.toX.toRhs)
+    (h0 : zero ≠ op) (h1 : succ ≠ op) : Zero2 system op (fun _ => 0) (fun n => n + 1 + 1) :=
+  zero2_const hr h0 h1 ⟨by decide, by decide, by decide, by decide⟩ ⟨by decide, by decide⟩
+    (by decide)
+
+/-- The rule of the power on a zero, as a case. -/
+theorem zero2_powZero {op : Peano} (hr : system.rule op zero = some powZero.toX.toRhs)
+    (h0 : zero ≠ op) (h1 : succ ≠ op) : Zero2 system op (fun _ => 1) (fun n => n + 1 + 1) :=
+  zero2_const hr h0 h1 ⟨by decide, by decide, by decide, by decide⟩ ⟨by decide, by decide⟩
+    (by decide)
+
 /-! ### The three agents, again -/
 
 theorem iter_mul (m n : Nat) : iter (fun _ => 0) (fun n v => n + v) m n = m * n := by
@@ -912,7 +930,7 @@ recursion: it recurses on its parameter with the adder. -/
 theorem mul_computes : Computes2 mul (fun m n => m * n) prodCost :=
   (iter_computes rule_mul_succ ⟨by decide, by decide, by decide, by decide, by decide,
     by decide, by decide⟩ (zero2_mulZero rule_mul_zero (by decide) (by decide))
-    add_combines).congr iter_mul iterCost_mul
+    (add_combines rules)).congr iter_mul iterCost_mul
 
 theorem iter_pow (e b : Nat) : iter (fun _ => 1) (fun n v => n * v) e b = b ^ e := by
   induction e with

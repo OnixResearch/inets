@@ -5,7 +5,7 @@ import InteractionNets.PeanoBound
 The lazy caterer `cater`, `c 0 = 1` and `c (S x) = c x + S x`, and the
 triangular numbers `tri`, `t 0 = 0` and `t (S x) = t x + S x`.  Each was
 added to the system with two rules and nothing else; its theorem is the
-theorem on recursion on the predecessor (`Peano.prim_computes`) applied
+theorem on recursion on the predecessor (`Core.prim_computes`) applied
 to its rules, with the theorem on constants for the zero and the adder
 as combiner, and the theorems for the machine and for expressions follow
 from the general ones.
@@ -14,6 +14,8 @@ from the general ones.
 namespace INet
 
 namespace Peano
+
+open Core
 
 /-! ### A new agent: the lazy caterer
 
@@ -48,9 +50,9 @@ def caterCost : Nat → Nat
   | n + 1 => n + 1 + 1 + caterCost n + (cate n + 1)
 
 /-- The rule written for it is the template. -/
-theorem caterSucc_eq : caterSucc = primSucc cater add := rfl
+theorem caterSucc_eq : caterSucc = primSucc succ dup cater add := rfl
 
-theorem rule_cater_succ : system.rule cater succ = some (primSucc cater add).toX.toRhs := rfl
+theorem rule_cater_succ : system.rule cater succ = some (primSucc succ dup cater add).toX.toRhs := rfl
 theorem rule_cater_zero : system.rule cater zero = some facZero.toX.toRhs := rfl
 
 theorem prim_cate (n : Nat) : prim 1 (fun m n => m + n) n = cate n := by
@@ -74,7 +76,7 @@ theorem primCost_cate (n : Nat) :
 the rule of the factorial on a zero and the adder as combiner. -/
 theorem cater_computes : Computes1 cater cate caterCost :=
   (prim_computes rule_cater_succ ⟨by decide, by decide, by decide, by decide, by decide,
-    by decide, by decide⟩ (zero1_facZero rule_cater_zero (by decide)) add_combines).congr
+    by decide, by decide⟩ (zero1_facZero rule_cater_zero (by decide)) (add_combines rules)).congr
     prim_cate primCost_cate
 
 /-- The net for `c 3`, with the result on the free port `([0], 0)`. -/
@@ -149,7 +151,7 @@ example :
 The agent `tri` was added to the system with two rules: on a zero a new
 zero on the result (`Peano.triZero`), a rule no other agent has, and on a
 successor `t (S x) = t x + S x` (`Peano.triSucc`).  Its theorem is the
-theorem on recursion on the predecessor, with `Peano.zero1_const` for
+theorem on recursion on the predecessor, with `Core.zero1_const` for
 the zero and the adder as combiner. -/
 
 /-- The triangular numbers. -/
@@ -175,7 +177,7 @@ def triCost : Nat → Nat
   | n + 1 => n + 1 + 1 + triCost n + (triN n + 1)
 
 /-- The rule written for it on a successor is the template. -/
-theorem triSucc_eq : triSucc = primSucc tri add := rfl
+theorem triSucc_eq : triSucc = primSucc succ dup tri add := rfl
 
 theorem prim_tri (n : Nat) : prim 0 (fun m n => m + n) n = triN n := by
   induction n with
@@ -197,11 +199,11 @@ theorem primCost_tri (n : Nat) :
 steps: the theorem on recursion on the predecessor, with the theorem on
 constants for the zero and the adder as combiner. -/
 theorem tri_computes : Computes1 tri triN triCost :=
-  (prim_computes (show system.rule tri succ = some (primSucc tri add).toX.toRhs from rfl)
+  (prim_computes (show system.rule tri succ = some (primSucc succ dup tri add).toX.toRhs from rfl)
     ⟨by decide, by decide, by decide, by decide, by decide, by decide, by decide⟩
     (zero1_const (show system.rule tri zero = some triZero.toX.toRhs from rfl) (by decide)
       ⟨by decide, by decide, by decide, by decide⟩ (by decide))
-    add_combines).congr prim_tri primCost_tri
+    (add_combines rules)).congr prim_tri primCost_tri
 
 /-- The triangular numbers as an operator. -/
 def triOp : Op1 := Op1.ofComputes tri_computes rfl (by decide) (by decide)

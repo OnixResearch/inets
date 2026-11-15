@@ -2010,9 +2010,9 @@ An executable reducer.  `XNet` is a finite net without history, as data;
 * `INet.Addition.Adding.run`
                              the adder adds with any other agents in the
                              net and its result wired to any port
-* `INet.Peano.Computes2`, `INet.Peano.Computes1`, `INet.Peano.iter_computes`,
-  `INet.Peano.prim_computes`, `INet.Peano.Combines2`, `INet.Peano.add_combines`,
-  `INet.Peano.zero1_const`, `INet.Peano.zero2_const`
+* `INet.Peano.Computes2`, `INet.Peano.Computes1`, `INet.Core.iter_computes`,
+  `INet.Core.prim_computes`, `INet.Core.Combines2`, `INet.Core.add_combines`,
+  `INet.Core.zero1_const`, `INet.Core.zero2_const`
                              what it is for an agent to compute a
                              function in any net, stated once; recursion
                              proved once, in two shapes: an agent whose
@@ -3390,18 +3390,18 @@ holds up to equality rather than up to renaming.
 * Recursion is proved once, in two shapes (`PeanoRec`).  On a
   parameter, `f (S x) y = g y (f x y)`: the agent copies its second
   argument for a new agent of its own symbol and a combiner `g`
-  (`Peano.iterSucc`, `Peano.iter_computes`).  On the predecessor,
+  (`Core.iterSucc`, `Core.iter_computes`).  On the predecessor,
   `f (S x) = g (f x) (S x)`: the agent copies the rest of its argument,
   one copy for a new agent and the other under a new successor for the
-  combiner (`Peano.primSucc`, `Peano.prim_computes`).  The rule on a
+  combiner (`Core.primSucc`, `Core.prim_computes`).  The rule on a
   successor is a template in the two symbols.  What the agent does on a
-  zero is a hypothesis (`Peano.Zero2`, `Peano.Zero1`), met by any rule
+  zero is a hypothesis (`Core.Zero2`, `Core.Zero1`), met by any rule
   that puts a numeral `k` on the result, and for two arguments erases
-  the second (`Peano.zero1_const`, `Peano.zero2_const`), given checks
-  bounded by `k` that are evaluated for the rule (`Peano.ConstRule`,
-  `Peano.EraRule`).  The combiner need only combine (`Peano.Combines2`):
+  the second (`Core.zero1_const`, `Core.zero2_const`), given checks
+  bounded by `k` that are evaluated for the rule (`Core.ConstRule`,
+  `Core.EraRule`).  The combiner need only combine (`Core.Combines2`):
   its result may reuse the agents of its second argument, so the adder
-  is one (`Peano.add_combines`), and so is every agent that computes.
+  is one (`Core.add_combines`), and so is every agent that computes.
   The proof uses the theorem itself for the rest, a copy
   (`Peano.copy_fresh`), and the combiner in a net that has other agents
   and with the result where the agent needs it; this is what the
