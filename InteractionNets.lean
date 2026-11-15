@@ -86,6 +86,7 @@ import InteractionNets.JoinLive
 import InteractionNets.JoinRun
 import InteractionNets.JoinBound
 import InteractionNets.Arith.JoinRun
+import InteractionNets.MeasureJoin
 
 /-!
 # Interaction nets
@@ -3410,6 +3411,12 @@ holds up to equality rather than up to renaming.
   form, where it covers a few; a bound that shows the gain would charge
   the walks over the whole run, the shorter side of each, and is not
   attempted here.
+  Run as programs at sizes the kernel does not reach, which is measured
+  and not proved (`MeasureJoin.lean`): one thread takes `16 * k + 3`
+  actions on `k` such pairs, 5,123 for `k = 320` where `WMach` takes
+  311,683, and about 144 for each addition on `((5 + 0) + 0) + …`,
+  46,074 for 320 additions where `WMach` takes 245,454; with two threads
+  the sums take 82,870 and 162,430 actions for 320 and 640 additions.
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers
