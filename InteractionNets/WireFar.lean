@@ -60,9 +60,12 @@ structure IsPath (L : V → V → Prop) (f : Nat → V) (t : Nat) : Prop where
 /-- **A path whose ends lie on no other segment is one a trail cannot
 leave**, when a point lies on two segments at most. -/
 theorem IsPath.of_ends (hs : ∀ {p q}, L p q → L q p)
-    (hd : ∀ {p x y z}, L p x → L p y → L p z → x = y ∨ x = z ∨ y = z) {f : Nat → V} {t : Nat}
-    (hl : ∀ i, i < t → L (f i) (f (i + 1))) (hi : ∀ i j, i ≤ t → j ≤ t → f i = f j → i = j)
-    (h0 : ∀ q, L (f 0) q → 0 < t ∧ q = f 1) (ht : ∀ q, L (f t) q → 0 < t ∧ q = f (t - 1)) :
+    (hd : ∀ {p x y z}, L p x → L p y → L p z → x = y ∨ x = z ∨ y = z)
+    {f : Nat → V} {t : Nat}
+    (hl : ∀ i, i < t → L (f i) (f (i + 1)))
+    (hi : ∀ i j, i ≤ t → j ≤ t → f i = f j → i = j)
+    (h0 : ∀ q, L (f 0) q → 0 < t ∧ q = f 1)
+    (ht : ∀ q, L (f t) q → 0 < t ∧ q = f (t - 1)) :
     IsPath L f t := by
   refine ⟨hl, hi, fun i q hit hq => ?_⟩
   rcases Nat.eq_zero_or_pos i with rfl | hpos
@@ -90,7 +93,8 @@ theorem IsPath.trail_shape {f : Nat → V} {t : Nat} (P : IsPath L f t) {j : Nat
     ∀ {vs : List V}, Trail L (f j) vs →
       ∃ n, vs.length = n + 1 ∧
         ((n ≤ j ∧ vs.head? = some (f (j - n)) ∧ ∀ k, k ≤ n → f (j - k) ∈ vs) ∨
-         (j + n ≤ t ∧ vs.head? = some (f (j + n)) ∧ ∀ k, k ≤ n → f (j + k) ∈ vs)) := by
+         (j + n ≤ t ∧ vs.head? = some (f (j + n)) ∧
+           ∀ k, k ≤ n → f (j + k) ∈ vs)) := by
   intro vs tr
   induction tr with
   | start =>
@@ -105,7 +109,8 @@ theorem IsPath.trail_shape {f : Nat → V} {t : Nat} (P : IsPath L f t) {j : Nat
         exact Option.some.inj hh
       subst hc
       rcases P.nb (j - n) q (by omega) hl with ⟨hpos, rfl⟩ | ⟨hlt, rfl⟩
-      · refine ⟨n + 1, by simp only [List.length_cons] at hlen ⊢; omega, .inl ⟨by omega, ?_, fun k hk => ?_⟩⟩
+      · refine ⟨n + 1, by simp only [List.length_cons] at hlen ⊢; omega,
+          .inl ⟨by omega, ?_, fun k hk => ?_⟩⟩
         · simp only [List.head?_cons]
           congr 2
         · rcases Nat.lt_or_ge k (n + 1) with hk' | hk'
@@ -115,7 +120,8 @@ theorem IsPath.trail_shape {f : Nat → V} {t : Nat} (P : IsPath L f t) {j : Nat
             rw [this]
             exact List.mem_cons_self
       · rcases Nat.eq_zero_or_pos n with rfl | hnp
-        · refine ⟨1, by simp only [List.length_cons] at hlen ⊢; omega, .inr ⟨by omega, by simp, fun k hk => ?_⟩⟩
+        · refine ⟨1, by simp only [List.length_cons] at hlen ⊢; omega,
+            .inr ⟨by omega, by simp, fun k hk => ?_⟩⟩
           rcases Nat.eq_zero_or_pos k with rfl | hkp
           · exact List.mem_cons_of_mem _ (by simp at hall ⊢)
           · obtain rfl : k = 1 := by omega
@@ -132,7 +138,8 @@ theorem IsPath.trail_shape {f : Nat → V} {t : Nat} (P : IsPath L f t) {j : Nat
       subst hc
       rcases P.nb (j + n) q (by omega) hl with ⟨hpos, rfl⟩ | ⟨hlt, rfl⟩
       · rcases Nat.eq_zero_or_pos n with rfl | hnp
-        · refine ⟨1, by simp only [List.length_cons] at hlen ⊢; omega, .inl ⟨by omega, ?_, fun k hk => ?_⟩⟩
+        · refine ⟨1, by simp only [List.length_cons] at hlen ⊢; omega,
+            .inl ⟨by omega, ?_, fun k hk => ?_⟩⟩
           · simp only [List.head?_cons, Nat.add_zero]
           · rcases Nat.eq_zero_or_pos k with rfl | hkp
             · exact List.mem_cons_of_mem _ (by simp at hall ⊢)
@@ -144,7 +151,8 @@ theorem IsPath.trail_shape {f : Nat → V} {t : Nat} (P : IsPath L f t) {j : Nat
           have e : j + (n - 1) = j + n - 1 := by omega
           rw [e] at hm
           exact hm
-      · refine ⟨n + 1, by simp only [List.length_cons] at hlen ⊢; omega, .inr ⟨by omega, by simp [Nat.add_assoc], fun k hk => ?_⟩⟩
+      · refine ⟨n + 1, by simp only [List.length_cons] at hlen ⊢; omega,
+          .inr ⟨by omega, by simp [Nat.add_assoc], fun k hk => ?_⟩⟩
         rcases Nat.lt_or_ge k (n + 1) with hk' | hk'
         · exact List.mem_cons_of_mem _ (hall k (by omega))
         · obtain rfl : k = n + 1 := by omega
