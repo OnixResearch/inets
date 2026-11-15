@@ -1,0 +1,140 @@
+import InteractionNets.PeanoConst
+import InteractionNets.RoundRobin
+
+/-! # How many actions an expression takes
+
+Threads that take turns on the net of an expression are at rest, with the
+value on the free port, after a number of actions given by the size of
+the net, the number of threads and the cost of the expression
+(`Peano.GExpr.rest_by`).  This is `XMach.roundRobin_rest`, for which the
+rules of `Peano` are bounded (`Peano.xsys_bounded`: at most four new
+agents and twelve ports) and no name is listed twice in the net of an
+expression (`Peano.GExpr.net_nodup`).
+-/
+
+namespace INet
+
+open Arith (tagPort append_singleton)
+
+/-- The names of a memory with a tag at the end of every name. -/
+theorem XNet.tag_ids {S : Type} (c : Nat) (X : XNet S) :
+    (X.tag c).agents.map Prod.fst = (X.agents.map Prod.fst).map (· ++ [c]) := by
+  show (X.agents.map fun e => (e.1 ++ [c], e.2)).map Prod.fst = _
+  rw [List.map_map, List.map_map]
+  rfl
+
+theorem XNet.tag_nodup {S : Type} (c : Nat) {X : XNet S} (h : (X.agents.map Prod.fst).Nodup) :
+    ((X.tag c).agents.map Prod.fst).Nodup := by
+  rw [XNet.tag_ids]
+  exact List.Pairwise.map _ (fun _ _ hab e => hab (List.append_cancel_right e)) h
+
+theorem XNet.mem_tag_ids {S : Type} {c : Nat} {X : XNet S} {i : Id}
+    (h : i ∈ (X.tag c).agents.map Prod.fst) : ∃ j, i = j ++ [c] := by
+  rw [XNet.tag_ids] at h
+  obtain ⟨j, -, rfl⟩ := List.mem_map.1 h
+  exact ⟨j, rfl⟩
+
+theorem XNet.union_nodup {S : Type} {X Y : XNet S} (hX : (X.agents.map Prod.fst).Nodup)
+    (hY : (Y.agents.map Prod.fst).Nodup)
+    (hd : ∀ i, i ∈ X.agents.map Prod.fst → i ∉ Y.agents.map Prod.fst) :
+    ((X.union Y).agents.map Prod.fst).Nodup := by
+  show ((X.agents ++ Y.agents).map Prod.fst).Nodup
+  rw [List.map_append]
+  exact List.nodup_append.2 ⟨hX, hY, fun a ha b hb e => hd a ha (e ▸ hb)⟩
+
+theorem tag_last_ne {i j : Id} {c c' : Nat} (hc : c ≠ c') : i ++ [c] ≠ j ++ [c'] := by
+  intro e
+  have := congrArg List.getLast? e
+  rw [List.getLast?_append, List.getLast?_append] at this
+  simp at this
+  exact hc this
+
+/-- **Three memories side by side list no name twice**, if each of them
+does. -/
+theorem XNet.three_nodup {S : Type} {X₀ X₁ X₂ : XNet S}
+    (h₀ : (X₀.agents.map Prod.fst).Nodup) (h₁ : (X₁.agents.map Prod.fst).Nodup)
+    (h₂ : (X₂.agents.map Prod.fst).Nodup) :
+    ((XNet.three X₀ X₁ X₂).agents.map Prod.fst).Nodup := by
+  refine XNet.union_nodup (XNet.tag_nodup 0 h₀)
+    (XNet.union_nodup (XNet.tag_nodup 1 h₁) (XNet.tag_nodup 2 h₂) ?_) ?_
+  · intro i hi hj
+    obtain ⟨a, rfl⟩ := XNet.mem_tag_ids hi
+    obtain ⟨b, e⟩ := XNet.mem_tag_ids hj
+    exact tag_last_ne (by decide) e
+  · intro i hi hj
+    obtain ⟨a, rfl⟩ := XNet.mem_tag_ids hi
+    have hj' : a ++ [0] ∈ (X₁.tag 1).agents.map Prod.fst ++ (X₂.tag 2).agents.map Prod.fst := by
+      have : ((X₁.tag 1).union (X₂.tag 2)).agents.map Prod.fst =
+          (X₁.tag 1).agents.map Prod.fst ++ (X₂.tag 2).agents.map Prod.fst := List.map_append
+      rw [← this]
+      exact hj
+    rcases List.mem_append.1 hj' with h | h
+    · obtain ⟨b, e⟩ := XNet.mem_tag_ids h
+      exact tag_last_ne (by decide) e
+    · obtain ⟨b, e⟩ := XNet.mem_tag_ids h
+      exact tag_last_ne (by decide) e
+
+/-- One more agent on a wire, with a fresh name, lists no name twice. -/
+theorem XNet.pushOn_nodup {S : Type} {X : XNet S} {b : Nat} (hb : X.Below b) (γ : S) (p : Port)
+    (h : (X.agents.map Prod.fst).Nodup) : ((X.pushOn γ p [b]).agents.map Prod.fst).Nodup := by
+  unfold XNet.pushOn
+  split
+  · show (([b], γ) :: X.agents).map Prod.fst |>.Nodup
+    rw [List.map_cons]
+    refine List.nodup_cons.2 ⟨fun hm => ?_, h⟩
+    obtain ⟨⟨i, α⟩, he, e⟩ := List.mem_map.1 hm
+    simp only at e
+    subst e
+    obtain ⟨j, hj, e⟩ := hb _ (.inl ⟨α, he⟩)
+    have := List.head_eq_of_cons_eq e
+    omega
+  · exact h
+
+namespace Peano
+
+/-- **The rules of `Peano` are bounded**: at most four new agents and
+twelve ports. -/
+theorem xsys_bounded : xsys.Bounded 4 12 := by
+  intro α β R h
+  cases α <;> cases β <;> (cases h <;> decide)
+
+theorem lit_nodup : ∀ n, ((Peano.lit n).agents.map Prod.fst).Nodup
+  | 0 => by decide
+  | n + 1 => XNet.pushOn_nodup (good_lit n).below succ _ (lit_nodup n)
+
+theorem openOp_nodup (γ : Peano) : ((openOp γ).agents.map Prod.fst).Nodup :=
+  List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩
+
+theorem openOp1_nodup (γ : Peano) : ((openOp1 γ).agents.map Prod.fst).Nodup :=
+  List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩
+
+/-- **The net of an expression lists no name twice.** -/
+theorem GExpr.net_nodup : ∀ e : GExpr, (e.net.agents.map Prod.fst).Nodup
+  | .lit n => lit_nodup n
+  | .app1 o e =>
+    XNet.three_nodup (GExpr.net_nodup e) List.nodup_nil (openOp1_nodup o.sym)
+  | .app2 o e₁ e₂ =>
+    XNet.three_nodup (GExpr.net_nodup e₁) (GExpr.net_nodup e₂) (openOp_nodup o.sym)
+
+/-- **How many actions an expression takes.**  `nt` threads that take
+turns on the net of an expression are at rest after
+
+    nt * ((nt + e.cost) * e.net.passBound e.cost 4 12 + e.cost * 17 + 1)
+
+actions; from then on they have made `e.cost` interactions and the memory
+holds the value on the free port. -/
+theorem GExpr.rest_by (e : GExpr) {nt : Nat} (hnt : 0 < nt) :
+    ∀ i, nt * ((nt + e.cost) * e.net.passBound e.cost 4 12 + e.cost * (4 + 12 + 1) + 1) ≤ i →
+      ((XMach.init e.net nt).trace xsys (fun j => j % nt) i).1.resting = true ∧
+      ((XMach.init e.net nt).trace xsys (fun j => j % nt) i).2 = e.cost ∧
+      IsNum ((XMach.init e.net nt).trace xsys (fun j => j % nt) i).1.mem.toNet e.res
+        e.eval := by
+  intro i hi
+  obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
+  have hr := XMach.roundRobin_rest hX (GExpr.net_nodup e) hnt xsys_bounded hs
+    (normal_of_numerals hag) i hi
+  exact ⟨hr, e.rest hnt _ hr⟩
+
+end Peano
+
+end INet

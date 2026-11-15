@@ -59,6 +59,8 @@ import InteractionNets.PeanoRec
 import InteractionNets.PeanoRun
 import InteractionNets.PeanoGExpr
 import InteractionNets.PeanoConst
+import InteractionNets.RoundRobin
+import InteractionNets.PeanoBound
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.PeanoExpr
@@ -3537,6 +3539,21 @@ holds up to equality rather than up to renaming.
   recursion and on constants applied to its rules, `Peano.tri_rest` and
   `Peano.tri_fair` are the theorems for operators, and `t (2 + 1) * 3!`
   is an expression.
+* How many actions are enough, threads taking turns (`RoundRobin`).
+  For any system, a run in which `nt` threads take turns on a
+  well-formed net that lists no name twice, with a normal form `n` steps
+  away and rules that write at most `C` agents and `D` segments, is at
+  rest after `nt * ((nt + n) * X.passBound n C D + n * (C + D + 1) + 1)`
+  actions (`XMach.roundRobin_rest`).  The measure of `XMach.time_bound`
+  goes down at every action that is not free, and a round of free
+  actions leaves every thread at rest (`XThread.rest_of_cost`).  For the
+  expressions over operators (`PeanoBound`), the rules of `Peano` write at
+  most four agents and twelve ports (`Peano.xsys_bounded`) and the net
+  lists no name twice (`Peano.GExpr.net_nodup`), so the threads are at
+  rest with the value in memory after a number of actions given by the
+  net, the threads and the cost (`Peano.GExpr.rest_by`).  The bound is
+  far above what runs take.  How much fuel the reader needs to read the
+  value is still not bounded.
 * Expressions built from numerals with `+`, `*` and `^` (`Peano.PExpr`)
   have nets (`PExpr.net`): the nets of the two arguments and an adder, a
   multiplier or a power that waits, side by side under the tags `0`,
