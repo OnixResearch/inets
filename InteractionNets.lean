@@ -52,16 +52,13 @@ import InteractionNets.Arith.Carry
 import InteractionNets.Peano
 import InteractionNets.Keeps
 import InteractionNets.PeanoCopy
-import InteractionNets.PeanoMul
-import InteractionNets.PeanoProd
-import InteractionNets.PeanoPow
-import InteractionNets.PeanoFact
+import InteractionNets.PeanoBasic
 import InteractionNets.PeanoRec
 import InteractionNets.PeanoRun
 import InteractionNets.PeanoGExpr
-import InteractionNets.PeanoConst
 import InteractionNets.RoundRobin
 import InteractionNets.PeanoBound
+import InteractionNets.PeanoExamples
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.PeanoExpr
@@ -2013,89 +2010,57 @@ An executable reducer.  `XNet` is a finite net without history, as data;
 * `INet.Addition.Adding.run`
                              the adder adds with any other agents in the
                              net and its result wired to any port
-* `INet.Peano.mul_correct`, `INet.Peano.Product`,
-  `INet.Peano.Multiplying.run`, `INet.Peano.copy_fresh`
-                             the multiplier multiplies: a net whose
-                             multiplier has the numerals `m` and `n` as
-                             arguments reduces, in
-                             `(m + 1) * (n + 2) + m * (n + 1)` steps, to a
-                             normal form with the numeral `m * n` on the
-                             result port; and it does so with any other
-                             agents in the net and its result wired to
-                             any port, leaving the rest alone
-* `INet.Peano.prod_ok`, `INet.Peano.good_prod`, `INet.Peano.prod_rest`,
-  `INet.Peano.prod_fair`
-                             the nets `Peano.prod m n` are valid for all
-                             `m` and `n`; with any number of threads and
-                             any schedule, a run of the machine on one
-                             that is at rest has made exactly that many
-                             interactions and holds the numeral `m * n`,
-                             and under a fair schedule it comes to rest
-* `INet.Peano.pow_correct`, `INet.Peano.Powering.run`,
-  `INet.Peano.power_rest`, `INet.Peano.power_fair`
-                             powers: the agent `pow` with the numerals
-                             `e` and `b` as exponent and base reduces to
-                             the numeral `b ^ e`, in `powCost e b` steps,
-                             in any net; on the machine, a run on the
-                             net `Peano.power e b` that is at rest has
-                             made exactly that many interactions and
-                             holds `b ^ e`
-* `INet.Peano.Computes2`, `INet.Peano.Computes1`, `INet.Peano.mul_computes`,
-  `INet.Peano.pow_computes`, `INet.Peano.fac_computes`,
-  `INet.Peano.fac_correct`, `INet.Peano.fac_rest`, `INet.Peano.fac_fair`
+* `INet.Peano.Computes2`, `INet.Peano.Computes1`, `INet.Peano.iter_computes`,
+  `INet.Peano.prim_computes`, `INet.Peano.Combines2`, `INet.Peano.add_combines`,
+  `INet.Peano.zero1_const`, `INet.Peano.zero2_const`
                              what it is for an agent to compute a
-                             function in any net, stated once; the
-                             multiplier and the power are cases, and so
-                             is a factorial agent, proved through that
-                             statement for the multiplier; on the
-                             machine, a run on the net `Peano.facNet n`
-                             that is at rest has made exactly `facCost n`
-                             interactions and holds `n!`
-* `INet.Peano.iter_computes`, `INet.Peano.prim_computes`, `INet.Peano.Combines2`,
-  `INet.Peano.add_combines`, `INet.Peano.mul_computes'`,
-  `INet.Peano.pow_computes'`, `INet.Peano.fac_computes'`, `INet.Peano.cater_computes`
-                             recursion proved once, in two shapes: an
-                             agent whose rule on a successor follows a
-                             template in it and a combiner computes the
-                             recursion, given what it does on a zero and
-                             that the combiner combines; the adder is a
-                             combiner; the theorems of the multiplier,
-                             the power and the factorial follow, with
-                             the same costs; a new agent, the lazy
-                             caterer, proved by the theorem alone
+                             function in any net, stated once; recursion
+                             proved once, in two shapes: an agent whose
+                             rule on a successor follows a template in
+                             it and a combiner, and whose rule on a zero
+                             puts down a constant, computes the
+                             recursion; the adder is a combiner
+* `INet.Peano.mul_computes`, `INet.Peano.pow_computes`, `INet.Peano.fac_computes`
+                             the multiplier, the power and the factorial
+                             compute `m * n`, `b ^ e` and `n!` in any
+                             net, with the result wired to any port, in
+                             `prodCost m n`, `powCost e b` and `facCost n`
+                             steps: the multiplier by recursion with the
+                             adder as combiner, the other two with that
+                             multiplier
 * `INet.Peano.unary_rest`, `INet.Peano.unary_fair`, `INet.Peano.binary_rest`,
-  `INet.Peano.binary_fair`, `INet.Peano.cater_rest`, `INet.Peano.cater_fair`
+  `INet.Peano.binary_fair`, `INet.Peano.prod_rest`, `INet.Peano.power_rest`,
+  `INet.Peano.fac_rest`, `INet.Peano.sum_rest`
                              the machine, proved once for every agent
-                             that computes, of one or two arguments: a
-                             run at rest has made exactly the counted
-                             interactions and holds the value; a fair
-                             run comes to rest
+                             that computes, of one or two arguments, and
+                             for the adder: a run at rest has made
+                             exactly the counted interactions and holds
+                             the value; a fair run comes to rest
 * `INet.Peano.GExpr.rest`, `INet.Peano.GExpr.fair`, `INet.Peano.GExpr.good`,
-  `INet.Peano.Op1`, `INet.Peano.Op2`, `INet.Peano.PExpr.toG_net`,
-  `INet.Peano.sum_rest`
+  `INet.Peano.Op1`, `INet.Peano.Op2`, `INet.Peano.system_sided`
                              expressions over any operators that
-                             compute, the factorial and the lazy
-                             caterer among them, with the guarantees of
-                             the expressions of `+`, `*` and `^`, which
-                             are a case; the adder alone on the machine
-* `INet.Peano.zero1_const`, `INet.Peano.zero2_const`, `INet.Peano.tri_computes`,
-  `INet.Peano.tri_rest`
-                             any constant on a zero; the triangular
-                             numbers, proved from their rules alone
+                             compute come out right on the machine: with
+                             any number of threads and any schedule, a
+                             run on the net of one that is at rest has
+                             made exactly `GExpr.cost` interactions and
+                             holds the numeral of its value
 * `INet.Peano.PExpr.rest`, `INet.Peano.PExpr.fair`, `INet.Peano.PExpr.good`,
-  `INet.Peano.add_evals`, `INet.Peano.mul_evals`, `INet.Peano.system_sided`
+  `INet.Peano.PExpr.toG_net`
                              every expression built from numerals with
-                             `+`, `*` and `^` comes out right on the
-                             machine:
-                             with any number of threads and any schedule,
-                             a run on its net that is at rest has made
-                             exactly `PExpr.cost` interactions and holds
-                             the numeral of its value
-* `INet.Peano.PExpr.run_sound`, `INet.Peano.PExpr.run_complete`
-                             such an expression can be run and its
-                             result read off the memory: whatever is
-                             returned is its value, and with enough
-                             actions the value is returned
+                             `+`, `*` and `^` is one of them, with the
+                             same net, value and cost
+* `INet.Peano.PExpr.run_sound`, `INet.Peano.PExpr.run_complete`,
+  `INet.Peano.GExpr.run_by`, `INet.Peano.PExpr.run_by`, `INet.XMach.window_rest`
+                             an expression can be run and its result
+                             read off the memory: whatever is returned
+                             is its value, and after a number of actions
+                             given by the net, the threads and the cost,
+                             the value is returned
+* `INet.Peano.cater_computes`, `INet.Peano.tri_computes`, `INet.Peano.cater_rest`,
+  `INet.Peano.tri_rest`
+                             two agents added to the system with
+                             nothing but their rules: the lazy caterer
+                             and the triangular numbers
 * `INet.Arith.sum_ok`, `INet.Arith.sum_correct`
                              the nets `Arith.sum m n` are valid for all `m`
                              and `n`, and on each of them the reducer takes
@@ -3412,112 +3377,56 @@ holds up to equality rather than up to renaming.
   names not having been in use at the start (`Peano.copy_fresh`).  A
   later run consumes such a numeral, and that its agents are new is what
   shows that the later run leaves the rest of the first net alone.
-* The multiplier multiplies (`Peano.mul_correct`): a net whose multiplier
-  has the numerals `m` and `n` as arguments and a free port as result
-  (`Peano.Product`) reduces to a normal form with the numeral `m * n` on
-  that port, in exactly `(m + 1) * (n + 2) + m * (n + 1)` steps.  This
-  is a case of a theorem about a multiplier in any net
-  (`Peano.Multiplying.run`): the net may have any other agents and the
-  result may be wired to any port that is not on the multiplier or its
-  arguments; the port then carries the numeral `m * n`, made of new
-  agents, everything away from the multiplier and its two arguments is
-  kept (`Net.Keeps` for `Addition.gone2`, a closed set), and the agents
-  of the net are zeros, successors, or agents of the start other than
-  the multiplier.  The proof is by recursion on the first argument.  On
-  a zero, the multiplier puts a zero on its result and erases its
-  second argument.  On a successor it leaves an adder and a new
-  multiplier behind and copies its second argument, one copy for each;
-  the new multiplier computes the product of the rest on the second
-  argument of the adder, by the theorem itself, and the adder then adds
-  its copy.  The nets
-  `Peano.prod m n`, built by putting successors on the arguments of the
-  multiplier of `0 * 0`, are valid and are such multiplications for all
-  `m` and `n` (`Peano.good_prod`), so the theorems about the machine
-  apply: a run on `prod m n` that is at rest, with any number of
-  threads and any schedule, has made exactly that many interactions and
-  holds the numeral `m * n` on the free port (`Peano.prod_rest`), and a
-  fair run comes to rest (`Peano.prod_fair`).  The net of `mul_correct`
-  has only the multiplier and its two arguments.
-* Powers (`Peano.pow_correct`).  The system has an agent `pow` whose
-  rules use the multiplier as the rules of the multiplier use the
-  adder: `y ^ 0 = 1`, with `y` erased, and `y ^ S x = y * y ^ x`, with
-  `y` copied.  In any net, with any other agents and its result wired
-  to any port not on it or on its arguments, the agent with the
-  numerals `e` and `b` as exponent and base reduces in `powCost e b`
-  steps to a net in which that port carries the numeral `b ^ e`, made
-  of new agents, and everything away from the agent and its arguments
-  is kept (`Peano.Powering.run`).  The proof is by recursion on the
-  exponent and uses the theorem for itself, for the power of the rest,
-  and `Peano.Multiplying.run` for the multiplication, in a net that has
-  other agents and with the result where the power needs it; this is
-  what the statements about what a run leaves alone, and about results
-  being made of new agents, are for.  For the nets `Peano.power e b`
-  the theorems about the machine apply: a run at rest has made exactly
-  `powCost e b` interactions and holds the numeral `b ^ e`
-  (`Peano.power_rest`), and a fair run comes to rest
-  (`Peano.power_fair`).  The count is given by a recursion, not in
-  closed form: `powCost 0 b = b + 2`, and `powCost (e + 1) b` is
-  `b + 2`, `powCost e b` and `prodCost b (b ^ e)` together.
-* What the theorems for the multiplier and the power say is stated once
-  (`Peano.Computes2`): in any net, an agent with the symbol whose two
-  arguments are the numerals `m` and `n`, with its result wired to any
-  port not on it or on its arguments, reduces in `c m n` steps to a net
-  in which that port carries the numeral `f m n`, made of new agents,
-  with everything away from the agent and its arguments kept and no new
-  agents but zeros and successors.  `Peano.mul_computes` and
-  `Peano.pow_computes` are the two theorems in this form, and
-  `Peano.Computes1` is the form for one argument.  The factorial is the
-  test of it.  The agent `fac` has the rules `0! = 1` and
-  `(S x)! = x! * S x`, the second with a copier, a new successor, a
-  multiplier and a new `fac`.  It computes the factorial
-  (`Peano.fac_computes`): the proof is by recursion on the argument,
-  uses itself for the factorial of the rest, with its result on the
-  first argument of the multiplier, and then uses the multiplier only
-  through `Peano.mul_computes`, on that result and on the new successor
-  with its copy.  For the nets `Peano.facNet n` the result is a normal
-  form (`Peano.fac_correct`) and the theorems about the machine apply
-  (`Peano.fac_rest`, `Peano.fac_fair`); `3!` takes 52 interactions.  The
+* What it is for an agent to compute is stated once (`Peano.Computes2`):
+  in any net, an agent with the symbol whose two arguments are the
+  numerals `m` and `n`, with its result wired to any port not on it or
+  on its arguments, reduces in `c m n` steps to a net in which that port
+  carries the numeral `f m n`, made of new agents, with everything away
+  from the agent and its arguments kept (`Net.Keeps` for
+  `Addition.gone2`, a closed set) and no new agents but zeros and
+  successors.  `Peano.Computes1` is the form for one argument.  The
   adder is not of this form: its result contains the agents of its
-  second argument, so it is not made of new agents only
-  (`Addition.Adding.run` says what it is made of).  The expressions of
-  the next item do not have factorials; the expressions over operators
-  (`PeanoGExpr`, below) do.
-* The three proofs follow one course, and it is proved once, in two
-  shapes (`PeanoRec`).  On a parameter, `f (S x) y = g y (f x y)`: the
-  agent copies its second argument for a new agent of its own symbol and
-  a combiner `g` (`Peano.iterSucc`, `Peano.iter_computes`); the
-  multiplier and the power have this rule.  On the predecessor,
+  second argument (`Addition.Adding.run` says what it is made of).
+* Recursion is proved once, in two shapes (`PeanoRec`).  On a
+  parameter, `f (S x) y = g y (f x y)`: the agent copies its second
+  argument for a new agent of its own symbol and a combiner `g`
+  (`Peano.iterSucc`, `Peano.iter_computes`).  On the predecessor,
   `f (S x) = g (f x) (S x)`: the agent copies the rest of its argument,
   one copy for a new agent and the other under a new successor for the
-  combiner (`Peano.primSucc`, `Peano.prim_computes`); the factorial has
-  this rule.  The rule on a successor is a template in the two symbols;
-  what the agent does on a zero is a hypothesis (`Peano.Zero2`,
-  `Peano.Zero1`), met by the zero rules of the three agents for any
-  agent that has them.  The combiner need only combine
-  (`Peano.Combines2`): its result may reuse the agents of its second
-  argument, so the adder is one (`Peano.add_combines`), and so is every
-  agent that computes.  `Peano.mul_computes'`, `Peano.pow_computes'` and
-  `Peano.fac_computes'` derive the three theorems again from these two,
-  with the costs `prodCost`, `powCost` and `facCost`; the power and the
-  factorial are derived with the derived multiplier.  The test is a new
-  agent, the lazy caterer `cater`, added to the system with two rules:
-  the rule of the factorial on a zero and `c (S x) = c x + S x`
-  (`Peano.caterSucc`), which is the template on the predecessor with the
-  adder.  It computes `c n = n (n + 1) / 2 + 1` (`Peano.cater_computes`,
-  `Peano.two_mul_cate`) by the theorem on recursion alone, and the
-  reducer stops on `c 3` with `7` after `caterCost 3 = 20` steps.
+  combiner (`Peano.primSucc`, `Peano.prim_computes`).  The rule on a
+  successor is a template in the two symbols.  What the agent does on a
+  zero is a hypothesis (`Peano.Zero2`, `Peano.Zero1`), met by any rule
+  that puts a numeral `k` on the result, and for two arguments erases
+  the second (`Peano.zero1_const`, `Peano.zero2_const`), given checks
+  bounded by `k` that are evaluated for the rule (`Peano.ConstRule`,
+  `Peano.EraRule`).  The combiner need only combine (`Peano.Combines2`):
+  its result may reuse the agents of its second argument, so the adder
+  is one (`Peano.add_combines`), and so is every agent that computes.
+  The proof uses the theorem itself for the rest, a copy
+  (`Peano.copy_fresh`), and the combiner in a net that has other agents
+  and with the result where the agent needs it; this is what the
+  statements about what a run leaves alone, and about results being
+  made of new agents, are for.
+* The multiplier, the power and the factorial are cases.  The
+  multiplier has the rule on a parameter with the adder,
+  `S x * y = y + x * y`, and computes the product in
+  `prodCost m n = (m + 1) * (n + 2) + m * (n + 1)` steps
+  (`Peano.mul_computes`); the power has it with that multiplier,
+  `y ^ S x = y * y ^ x` (`Peano.pow_computes`); the factorial has the
+  rule on the predecessor with that multiplier, `(S x)! = x! * S x`
+  (`Peano.fac_computes`).  `powCost` and `facCost` are recursions, not
+  closed forms.
 * The theorems for the machine are proved once for every agent that
   computes (`PeanoRun`).  For an agent of one argument, on the net
   `Peano.unaryNet op n`, and of two, on `Peano.binaryNet op m n`: with
   any number of threads and any schedule, a run at rest has made exactly
   `c n` (or `c m n`) interactions and holds the numeral of the value
   (`Peano.unary_rest`, `Peano.binary_rest`), and a fair run comes to rest
-  (`Peano.unary_fair`, `Peano.binary_fair`).  The multiplier, the power,
-  the factorial and the lazy caterer are cases (`Peano.prod_rest'`,
-  `Peano.power_rest'`, `Peano.fac_rest'`, `Peano.cater_rest`, and the
-  fair versions), through the theorems derived from recursion, so for
-  them the chain from the rules to the machine goes through the general
-  theorems alone.  The adder is not a case of these: its result is not
+  (`Peano.unary_fair`, `Peano.binary_fair`).  The multiplier, the power
+  and the factorial are cases (`Peano.prod_rest`, `Peano.power_rest`,
+  `Peano.fac_rest`, and the fair versions), on the nets `Peano.prod m n`,
+  `Peano.power e b` and `Peano.facNet n`, so the chain from their rules
+  to the machine goes through the general theorems alone.  The adder is not a case of these: its result is not
   made of new agents only.  It is a case of the next item.
 * Expressions over any operators that compute (`PeanoGExpr`).  An
   operator is data (`Peano.Op1`, `Peano.Op2`): a symbol, its function,
@@ -3533,21 +3442,19 @@ holds up to equality rather than up to renaming.
   under fair ones (`GExpr.fair`), and it can be run and read
   (`GExpr.run_sound`, `GExpr.run_complete`).  The expressions of `+`, `*`
   and `^` are a case, with the same nets, values and costs
-  (`PExpr.toG`, `PExpr.rest'`).  `c 2 + 2!` is run by two threads in the
-  kernel and gives `6` in its 41 interactions.  A single operator on the
+  (`PExpr.toG`), and their theorems are those of these expressions.  A single operator on the
   machine (`Peano.Op2.rest`, `Peano.Op1.rest`, and the fair versions)
   brings in the adder (`Peano.sum_rest`, `Peano.sum_fair`).
-* Any constant on a zero (`PeanoConst`).  Any rule that puts the numeral
-  `k` on the result, and for two arguments erases the second, meets the
-  hypothesis on a zero of the theorems on recursion
-  (`Peano.zero1_const`, `Peano.zero2_const`), given checks bounded by `k`
-  that are evaluated for the rule (`Peano.ConstRule`, `Peano.EraRule`).
-  The zero rules of the factorial, the multiplier and the power are
-  cases.  The test is a new agent, the triangular numbers `tri`, whose
-  rule on a zero puts down `0`: `Peano.tri_computes` is the theorems on
-  recursion and on constants applied to its rules, `Peano.tri_rest` and
-  `Peano.tri_fair` are the theorems for operators, and `t (2 + 1) * 3!`
-  is an expression.
+* Two agents added with nothing but their rules (`PeanoExamples`): the
+  lazy caterer `cater`, `c 0 = 1` and `c (S x) = c x + S x`, and the
+  triangular numbers `tri`, `t 0 = 0` and `t (S x) = t x + S x`.  Each
+  rule on a successor is the template on the predecessor with the adder
+  (`Peano.caterSucc_eq`, `Peano.triSucc_eq`), each rule on a zero puts
+  down a constant, and their theorems are the general ones applied to
+  their rules (`Peano.cater_computes`, `Peano.tri_computes`, and for the
+  machine `Peano.cater_rest`, `Peano.tri_rest`).  `c 2 + 2!` is run by
+  two threads in the kernel and gives `6` in its 41 interactions, and
+  `t (2 + 1) * 3!` is an expression.
 * How many actions are enough, threads taking turns (`RoundRobin`).
   For any system, a run in which `nt` threads take turns on a
   well-formed net that lists no name twice, with a normal form `n` steps
@@ -3573,15 +3480,14 @@ holds up to equality rather than up to renaming.
 * Expressions built from numerals with `+`, `*` and `^` (`Peano.PExpr`)
   have nets (`PExpr.net`): the nets of the two arguments and an adder, a
   multiplier or a power that waits, side by side under the tags `0`,
-  `1` and `2`
-  (`XNet.three`), with the result port of each argument wired to a port
-  of the operator.  The rules of `Peano` give every new agent a side
-  (`Peano.system_sided`), so the argument nets reduce inside the whole
-  as they do alone (`Net.Made.steps`); the operator then has two
-  numerals as arguments in a net of successors and zeros
-  (`Peano.op_setup`), which is the situation of `Peano.add_steps'`,
-  `Peano.mul_steps` and `Peano.pow_steps`.  Hence every such net is well formed and computes
-  the value of its expression in exactly `PExpr.cost` interactions
+  `1` and `2` (`XNet.three`), with the result port of each argument
+  wired to a port of the operator.  The rules of `Peano` give every new
+  agent a side (`Peano.system_sided`), so the argument nets reduce
+  inside the whole as they do alone (`Net.Made.steps`); the operator
+  then has two numerals as arguments in a net of successors and zeros
+  (`Peano.op_setup`).  Each such expression is an expression over
+  operators with the same net (`PExpr.toG_net`), so its net is well
+  formed and computes the value in exactly `PExpr.cost` interactions
   (`PExpr.good`), and on the machine, with any number of threads and any
   schedule, a run at rest has made that many interactions and holds the
   numeral of the value on its free port (`PExpr.rest`); a fair run comes

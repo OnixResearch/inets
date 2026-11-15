@@ -1,4 +1,4 @@
-import InteractionNets.PeanoConst
+import InteractionNets.PeanoExpr
 import InteractionNets.RoundRobin
 
 /-! # How many actions an expression takes

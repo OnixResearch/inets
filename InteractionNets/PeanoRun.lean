@@ -2,29 +2,18 @@ import InteractionNets.PeanoRec
 
 /-! # The machine, for any agent that computes
 
-The factorial was proved on the machine by a proof of its own
-(`Peano.fac_rest`, `Peano.fac_fair`), and that proof uses the factorial
-only through `Peano.fac_computes`.  It is done here once, for any agent
-of one argument that computes (`Peano.Computes1`).
-
 `Peano.unaryNet op n` is the net with the agent `op` on the numeral `n`
 and its result on the free port `([0], 0)`.  If `op` computes `f` in `c`
-steps, then on the machine, with any number of threads and any schedule,
-a run on that net that is at rest has made exactly `c n` interactions
-and holds the numeral `f n` (`Peano.unary_rest`), and a fair run comes
-to rest (`Peano.unary_fair`).
-
-The factorial is a case (`Peano.fac_rest'`, `Peano.fac_fair'`), and so is
-the lazy caterer, which had no theorem for the machine
-(`Peano.cater_rest`, `Peano.cater_fair`).
-
+steps (`Peano.Computes1`), then on the machine, with any number of
+threads and any schedule, a run on that net that is at rest has made
+exactly `c n` interactions and holds the numeral `f n`
+(`Peano.unary_rest`), and a fair run comes to rest (`Peano.unary_fair`).
 The same for two arguments (`Peano.Computes2`, `Peano.binaryNet`,
-`Peano.binary_rest`, `Peano.binary_fair`), with the multiplier and the
-power as cases (`Peano.prod_rest'`, `Peano.power_rest'`,
-`Peano.prod_fair'`, `Peano.power_fair'`).  The cases use the theorems
-derived from recursion (`Peano.mul_computes'`, `Peano.pow_computes'`,
-`Peano.fac_computes'`), so the chain from the rules to the machine goes
-through the general theorems alone.
+`Peano.binary_rest`, `Peano.binary_fair`).
+
+The factorial, the multiplier and the power are cases (`Peano.fac_rest`,
+`Peano.prod_rest`, `Peano.power_rest`, and the fair versions), on the
+nets `Peano.facNet n`, `Peano.prod m n` and `Peano.power e b`.
 -/
 
 namespace INet
@@ -198,52 +187,25 @@ theorem unary_fair {op : Peano} {f c : Nat → Nat} (H : Computes1 op f c) (har 
   rw [h₃]
   exact hnum
 
-/-! ### The factorial and the lazy caterer -/
+/-! ### The factorial -/
 
-/-- The nets for factorials are the nets of this module. -/
-theorem facNet_eq : ∀ n, facNet n = unaryNet fac n
-  | 0 => rfl
-  | n + 1 => by
-    show (facNet n).pushOn succ ([1], 0) [n + 3] = (unaryNet fac n).pushOn succ ([1], 0) [n + 3]
-    rw [facNet_eq n]
+/-- The net for `n!`. -/
+def facNet (n : Nat) : XNet Peano := unaryNet fac n
 
 /-- **Factorials on the machine**, as a case. -/
-theorem fac_rest' (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+theorem fac_rest (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (facNet n) nt).trace xsys σ i).1.resting = true) :
     ((XMach.init (facNet n) nt).trace xsys σ i).2 = facCost n ∧
       IsNum ((XMach.init (facNet n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (fact n) := by
-  rw [facNet_eq] at hr ⊢
-  exact unary_rest fac_computes' rfl (by decide) n hnt σ hr
+  exact unary_rest fac_computes rfl (by decide) n hnt σ hr
 
 /-- **Factorials under any fair schedule**, as a case. -/
-theorem fac_fair' (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
+theorem fac_fair (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
     (hfair : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ σ j = u) :
     ∃ i₀, ∀ i, i₀ ≤ i → ((XMach.init (facNet n) nt).trace xsys σ i).1.resting = true ∧
       ((XMach.init (facNet n) nt).trace xsys σ i).2 = facCost n ∧
       IsNum ((XMach.init (facNet n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (fact n) := by
-  rw [facNet_eq]
-  exact unary_fair fac_computes' rfl (by decide) n hnt σ hfair
-
-/-- **The lazy caterer on the machine**: with any number of threads and
-any schedule, a run on the net for `c n` that is at rest has made exactly
-`caterCost n` interactions and holds the numeral `c n`. -/
-theorem cater_rest (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
-    (hr : ((XMach.init (unaryNet cater n) nt).trace xsys σ i).1.resting = true) :
-    ((XMach.init (unaryNet cater n) nt).trace xsys σ i).2 = caterCost n ∧
-      IsNum ((XMach.init (unaryNet cater n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
-        (cate n) :=
-  unary_rest cater_computes rfl (by decide) n hnt σ hr
-
-/-- **The lazy caterer under any fair schedule**: the run comes to rest
-after `caterCost n` interactions with the numeral `c n` in memory. -/
-theorem cater_fair (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
-    (hfair : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ σ j = u) :
-    ∃ i₀, ∀ i, i₀ ≤ i →
-      ((XMach.init (unaryNet cater n) nt).trace xsys σ i).1.resting = true ∧
-      ((XMach.init (unaryNet cater n) nt).trace xsys σ i).2 = caterCost n ∧
-      IsNum ((XMach.init (unaryNet cater n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
-        (cate n) :=
-  unary_fair cater_computes rfl (by decide) n hnt σ hfair
+  exact unary_fair fac_computes rfl (by decide) n hnt σ hfair
 
 /-! ### Agents of two arguments -/
 
@@ -471,64 +433,67 @@ theorem binary_fair {op : Peano} {f c : Nat → Nat → Nat} (H : Computes2 op f
   rw [h₃]
   exact hnum
 
-/-- The nets for products are the nets of this module. -/
-theorem prod_eq : ∀ m n, prod m n = binaryNet mul m n
-  | 0, 0 => rfl
-  | 0, n + 1 => by
-    show (prodSnd n).pushOn succ ([1], 1) [n + 4] =
-      (binarySnd mul n).pushOn succ ([1], 1) [n + 4]
-    rw [show prodSnd n = binarySnd mul n from prod_eq 0 n]
-  | m + 1, n => by
-    show (prod m n).pushOn succ ([1], 0) [m + n + 4] =
-      (binaryNet mul m n).pushOn succ ([1], 0) [m + n + 4]
-    rw [prod_eq m n]
+/-- The net for `m * n`. -/
+def prod (m n : Nat) : XNet Peano := binaryNet mul m n
 
-/-- The nets for powers are the nets of this module. -/
-theorem power_eq : ∀ e b, power e b = binaryNet pow e b
-  | 0, 0 => rfl
-  | 0, b + 1 => by
-    show (powerSnd b).pushOn succ ([1], 1) [b + 4] =
-      (binarySnd pow b).pushOn succ ([1], 1) [b + 4]
-    rw [show powerSnd b = binarySnd pow b from power_eq 0 b]
-  | e + 1, b => by
-    show (power e b).pushOn succ ([1], 0) [e + b + 4] =
-      (binaryNet pow e b).pushOn succ ([1], 0) [e + b + 4]
-    rw [power_eq e b]
+/-- The net for `b ^ e`, with the exponent first. -/
+def power (e b : Nat) : XNet Peano := binaryNet pow e b
 
 /-- **Multiplication on the machine**, as a case, through the multiplier
 derived from the theorem on recursion. -/
-theorem prod_rest' (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+theorem prod_rest (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (prod m n) nt).trace xsys σ i).1.resting = true) :
     ((XMach.init (prod m n) nt).trace xsys σ i).2 = prodCost m n ∧
       IsNum ((XMach.init (prod m n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (m * n) := by
-  rw [prod_eq] at hr ⊢
-  exact binary_rest mul_computes' rfl (by decide) (by decide) m n hnt σ hr
+  exact binary_rest mul_computes rfl (by decide) (by decide) m n hnt σ hr
 
 /-- **Powers on the machine**, as a case. -/
-theorem power_rest' (e b : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+theorem power_rest (e b : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (power e b) nt).trace xsys σ i).1.resting = true) :
     ((XMach.init (power e b) nt).trace xsys σ i).2 = powCost e b ∧
       IsNum ((XMach.init (power e b) nt).trace xsys σ i).1.mem.toNet ([0], 0) (b ^ e) := by
-  rw [power_eq] at hr ⊢
-  exact binary_rest pow_computes' rfl (by decide) (by decide) e b hnt σ hr
+  exact binary_rest pow_computes rfl (by decide) (by decide) e b hnt σ hr
 
 /-- **Multiplication under any fair schedule**, as a case. -/
-theorem prod_fair' (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
+theorem prod_fair (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
     (hfair : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ σ j = u) :
     ∃ i₀, ∀ i, i₀ ≤ i → ((XMach.init (prod m n) nt).trace xsys σ i).1.resting = true ∧
       ((XMach.init (prod m n) nt).trace xsys σ i).2 = prodCost m n ∧
       IsNum ((XMach.init (prod m n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (m * n) := by
-  rw [prod_eq]
-  exact binary_fair mul_computes' rfl (by decide) (by decide) m n hnt σ hfair
+  exact binary_fair mul_computes rfl (by decide) (by decide) m n hnt σ hfair
 
 /-- **Powers under any fair schedule**, as a case. -/
-theorem power_fair' (e b : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
+theorem power_fair (e b : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
     (hfair : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ σ j = u) :
     ∃ i₀, ∀ i, i₀ ≤ i → ((XMach.init (power e b) nt).trace xsys σ i).1.resting = true ∧
       ((XMach.init (power e b) nt).trace xsys σ i).2 = powCost e b ∧
       IsNum ((XMach.init (power e b) nt).trace xsys σ i).1.mem.toNet ([0], 0) (b ^ e) := by
-  rw [power_eq]
-  exact binary_fair pow_computes' rfl (by decide) (by decide) e b hnt σ hfair
+  exact binary_fair pow_computes rfl (by decide) (by decide) e b hnt σ hfair
+
+/-- The count for `2 * 3` is the 23 steps that the reducer takes. -/
+example : prodCost 2 3 = 23 := by decide
+
+/-- The reducer on the net for `2 * 3` stops after 23 steps on a net whose
+agents are six successors and a zero. -/
+example : ((prod 2 3).normalize xsys 100).map
+    (fun r => (r.2, (r.1.agents.filter (·.2 = succ)).length,
+      (r.1.agents.filter (·.2 = zero)).length)) = some (23, 6, 1) := by
+  decide +kernel
+
+/-- The reducer on the net for `2 ^ 3` stops after `powCost 3 2 = 75`
+steps on eight successors and a zero. -/
+example : ((power 3 2).normalize xsys 200).map
+    (fun r => (r.2, (r.1.agents.filter (·.2 = succ)).length,
+      (r.1.agents.filter (·.2 = zero)).length, r.1.agents.length)) = some (75, 8, 1, 9) := by
+  decide +kernel
+
+/-- `3! = 6`, in 52 interactions, and the reducer agrees. -/
+example : fact 3 = 6 ∧ facCost 3 = 52 := by decide
+
+example : ((facNet 3).normalize xsys 200).map
+    (fun r => (r.2, (r.1.agents.filter (·.2 = succ)).length,
+      (r.1.agents.filter (·.2 = zero)).length, r.1.agents.length)) = some (52, 6, 1, 7) := by
+  decide +kernel
 
 end Peano
 

@@ -11,7 +11,7 @@ the adder; and `cater`, the lazy caterer, `c 0 = 1` and
 `c (S x) = c x + S x`, added to test the theorems on recursion of
 `PeanoRec`, which prove it with nothing but its rules; and `tri`, the
 triangular numbers, `t 0 = 0` and `t (S x) = t x + S x`, whose rule on a
-zero puts down a constant no other agent has (`PeanoConst`).  The system
+zero puts down a constant no other agent has (`PeanoExamples`).  The system
 is given as data and validated by evaluating `SysData.check`.
 
 It contains addition (`Peano.rules`), so the adder adds in it, with
@@ -20,7 +20,7 @@ of `Arith` is inside it (`Peano.embeds`), so what is proved for the nets
 of `Arith` holds for them here (`Peano.expr_rest`).
 
 One product is evaluated here.  That the multiplier multiplies, for all
-inputs, is `Peano.mul_correct`, in `PeanoMul`.
+inputs, is `Peano.mul_computes`, in `PeanoRec`.
 -/
 
 namespace INet
@@ -259,7 +259,7 @@ def twoTimesThree : XNet Peano :=
 
 /-- The reducer validates the net for `2 * 3` and stops after 23 steps on
 a net whose agents are six successors and a zero.  This is one product,
-evaluated; the proof for all products is `Peano.mul_correct`. -/
+evaluated; the proof for all products is `Peano.mul_computes`. -/
 example : (twoTimesThree.normalize xsys 100).map (fun r => (r.2, r.1.agents.map (·.2))) =
     some (23, [zero, succ, succ, succ, succ, succ, succ]) := by
   decide +kernel
