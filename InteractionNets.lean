@@ -21,6 +21,7 @@ import InteractionNets.Names
 import InteractionNets.Bits
 import InteractionNets.RoundByRound
 import InteractionNets.Examples
+import InteractionNets.Addition
 import InteractionNets.Arith.Correct
 import InteractionNets.Arith.Solo
 import InteractionNets.Arith.TwoThreads
@@ -1956,6 +1957,14 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              reduces in `m + 1` steps to a normal form with
                              the numeral `m + n` on the result port, and the
                              reducer finds it
+* `INet.Addition.Config.steps`, `INet.Addition.add_correct`,
+  `INet.Addition.Rules`, `INet.Arith.rules`
+                             the same in any interaction system that has
+                             three symbols with the two rules of addition
+                             among its rules, whatever its other symbols
+                             and rules: the adder runs for `m + 1` steps
+                             and leaves the numeral `m + n`; `Arith` is the
+                             case of these symbols and rules only
 * `INet.Arith.sum_ok`, `INet.Arith.sum_correct`
                              the nets `Arith.sum m n` are valid for all `m`
                              and `n`, and on each of them the reducer takes
@@ -3213,6 +3222,20 @@ holds up to equality rather than up to renaming.
   leave round robin earlier.  The alternating run is followed while successors are left on
   the first argument only, so the count is a lower bound on the work of
   the whole run, not its work.
+* The proof that the adder adds is not about the system `Arith`.  It is
+  given in `Addition` for any system with three different symbols and
+  the two rules of unary addition among its rules (`Addition.Rules`);
+  numerals, towers and the situation that addition is about are defined
+  there from the arities and the three symbols, and the adder runs for
+  `m + 1` steps and leaves the numeral `m + n` and no adder
+  (`Addition.Config.steps`).  That what is left is a normal form needs
+  more: it holds when every rule of the system involves an adder
+  (`Addition.add_correct`), as in `Arith`.  The notions of `Arith` are
+  those of `Addition` at its symbols (`Arith.rules`).  What is proved
+  after that in `Arith` is still stated for `Arith`: the nets `sum m n`,
+  the runs of the threads on them, side by side, one addition after
+  another and expressions.  None of it has been carried to a larger
+  system yet.
 * An executable system (`XSys`) carries proofs: that its rules are the rules
   of a `System`, and that the slots of each right-hand side are listed.  For
   a system given as data (`SysData`) these follow from the evaluation of

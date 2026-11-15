@@ -1,4 +1,4 @@
-import InteractionNets.Examples
+import InteractionNets.Addition
 
 namespace INet
 
@@ -134,222 +134,65 @@ abbrev system : System Arith := xsys.sys
 theorem rule_add_zero : system.rule add zero = some addZero.toX.toRhs := rfl
 theorem rule_add_succ : system.rule add succ = some addSucc.toX.toRhs := rfl
 
+/-- **The system of `Arith` contains addition**, in the sense of
+`Addition.Rules`: what is proved in `Addition` for any such system holds
+in it.  The notions below are those of `Addition` at the symbols of
+`Arith`. -/
+theorem rules : Addition.Rules system zero succ add :=
+  ⟨by decide, by decide, by decide, rfl, rfl⟩
+
 /-- Agent `i` is the head of the numeral `k`. -/
-def Num (N : Net Arith) : Id → Nat → Prop
-  | i, 0 => N.agent i zero
-  | i, k + 1 => N.agent i succ ∧ ∃ i', N.Paired ar (i, 1) (i', 0) ∧ Num N i' k
+abbrev Num (N : Net Arith) : Id → Nat → Prop := Addition.Num ar zero succ N
 
 /-- The port `p` is wired to the numeral `k`. -/
-def IsNum (N : Net Arith) (p : Port) (k : Nat) : Prop :=
-  ∃ i, N.Paired ar p (i, 0) ∧ Num N i k
+abbrev IsNum (N : Net Arith) (p : Port) (k : Nat) : Prop := Addition.IsNum ar zero succ N p k
 
 /-- Above the port `x` there are `j` successors, the last of which has its
 principal port wired to `r`. -/
-def Tower (N : Net Arith) : Port → Nat → Port → Prop
-  | x, 0, r => x = r
-  | x, j + 1, r =>
-    ∃ u x', x = (u, 1) ∧ N.agent u succ ∧ N.Paired ar x' (u, 0) ∧ Tower N x' j r
+abbrev Tower (N : Net Arith) : Port → Nat → Port → Prop := Addition.Tower ar succ N
 
 variable {N M : Net Arith} {a s u : Id} {p q r : Port} {σ : Arith}
 
-theorem Num.label : ∀ {k : Nat} {i : Id}, Num N i k → N.agent i zero ∨ N.agent i succ
-  | 0, _, h => .inl h
-  | _ + 1, _, h => .inr h.1
+theorem Num.label : ∀ {k : Nat} {i : Id}, Num N i k → N.agent i zero ∨ N.agent i succ :=
+  Addition.Num.label
 
 /-- Numerals are observations. -/
-theorem Num.obs (ho : N.ObsEq ar M) : ∀ {k : Nat} {i : Id}, Num N i k → Num M i k
-  | 0, _, h => (ho.agent _ _).1 h
-  | _ + 1, _, ⟨hs, i', hp, hn⟩ =>
-    ⟨(ho.agent _ _).1 hs, i', (ho.paired _ _).1 hp, Num.obs ho hn⟩
+theorem Num.obs (ho : N.ObsEq ar M) : ∀ {k : Nat} {i : Id}, Num N i k → Num M i k :=
+  Addition.Num.obs ho
 
-theorem IsNum.obs (ho : N.ObsEq ar M) {p : Port} {k : Nat} (h : IsNum N p k) : IsNum M p k := by
-  obtain ⟨i, hp, hn⟩ := h
-  exact ⟨i, (ho.paired _ _).1 hp, hn.obs ho⟩
+theorem IsNum.obs (ho : N.ObsEq ar M) {p : Port} {k : Nat} (h : IsNum N p k) : IsNum M p k :=
+  Addition.IsNum.obs ho h
 
 /-- A numeral under a tower of `j` successors is a numeral `j` larger. -/
 theorem Tower.num : ∀ {j : Nat} {x : Port} {n : Nat},
-    Tower N x j r → IsNum N x n → IsNum N r (j + n)
-  | 0, x, n, ht, h => by
-    have e : x = r := ht
-    subst e
-    rw [Nat.zero_add]
-    exact h
-  | j + 1, x, n, ⟨u, x', e, hu, hp, ht⟩, h => by
-    subst e
-    obtain ⟨t, hpt, hnt⟩ := h
-    have h' : IsNum N x' (n + 1) := ⟨u, hp, hu, t, hpt, hnt⟩
-    have e : j + 1 + n = j + (n + 1) := by omega
-    rw [e]
-    exact Tower.num ht h'
-
-/-- An adder `a` whose principal port faces the agent `s`, which is not an
-adder. -/
-structure Adder (N : Net Arith) (a s : Id) (σ : Arith) : Prop where
-  wf : N.WF ar
-  ha : N.agent a add
-  hs : N.agent s σ
-  hσ : σ ≠ add
-  pair : N.Paired ar (a, 0) (s, 0)
-
-namespace Adder
-
-theorem ne_add (h : Adder N a s σ) {i : Id} {γ : Arith} (hi : N.agent i γ) (hγ : γ ≠ add) :
-    i ≠ a := by
-  rintro rfl
-  exact hγ (h.wf.agent_fun hi h.ha)
-
-theorem site (h : Adder N a s σ) : Site ar N a s add σ :=
-  ⟨h.wf, h.ha, h.hs, (h.ne_add h.hs h.hσ).symm, h.pair.2.2⟩
-
-/-- Only the adder is wired to the principal port of `s`. -/
-theorem not_s (h : Adder N a s σ) {q : Port} {i : Id} (hq : N.Paired ar q (i, 0))
-    (hne : q ≠ (a, 0)) : i ≠ s := by
-  rintro rfl
-  exact hne (hq.det_left h.wf h.pair)
-
-/-- A numeral that does not start at `s` survives the firing. -/
-theorem num_fire (h : Adder N a s σ) (R : Rhs Arith) :
-    ∀ {k : Nat} {i : Id}, Num N i k → i ≠ s → Num (N.fire a s R) i k
-  | 0, i, hz, hne => .inl ⟨hz, h.ne_add hz (by decide), hne⟩
-  | k + 1, i, ⟨hsu, i', hp, hn⟩, hne => by
-    have hia : i ≠ a := h.ne_add hsu (by decide)
-    have hi's : i' ≠ s := h.not_s hp (port_ne_snd (by decide))
-    have hi'a : i' ≠ a := by
-      rcases hn.label with hl | hl
-      · exact h.ne_add hl (by decide)
-      · exact h.ne_add hl (by decide)
-    exact ⟨.inl ⟨hsu, hia, hne⟩, i', h.site.paired_fire hp hia hne hi'a hi's,
-      num_fire h R hn hi's⟩
-
-/-- A tower that ends on a free port survives the firing. -/
-theorem tower_fire (h : Adder N a s σ) (R : Rhs Arith) (hr : N.free r) :
-    ∀ {j : Nat} {x : Port}, Tower N x j r → x.1 ≠ a ∧ x.1 ≠ s ∧ Tower (N.fire a s R) x j r
-  | 0, x, ht => by
-    have e : x = r := ht
-    subst e
-    exact ⟨fun e => h.wf.free_agent (i := x.1) (k := x.2) hr (e ▸ h.ha),
-      fun e => h.wf.free_agent (i := x.1) (k := x.2) hr (e ▸ h.hs), rfl⟩
-  | j + 1, x, ⟨u, x', e, hu, hp, ht⟩ => by
-    subst e
-    obtain ⟨hx'a, hx's, ht'⟩ := tower_fire h R hr ht
-    have hua : u ≠ a := h.ne_add hu (by decide)
-    have hus : u ≠ s := h.not_s hp (fun e => hx'a (congrArg Prod.fst e))
-    exact ⟨hua, hus, u, x', rfl, .inl ⟨hu, hua, hus⟩,
-      h.site.paired_fire hp hx'a hx's hua hus, ht'⟩
-
-end Adder
+    Tower N x j r → IsNum N x n → IsNum N r (j + n) :=
+  Addition.Tower.num
 
 /-- The situation that addition is about: the only adder `a` of the net has
 the numeral `m` as its first argument and the numeral `n` as its second, and
 its result goes up a tower of `j` successors to the free port `r`. -/
-structure Config (N : Net Arith) (a : Id) (j m n : Nat) (r : Port) : Prop where
-  wf : N.WF ar
-  ha : N.agent a add
-  only : ∀ i, N.agent i add → i = a
-  fst : IsNum N (a, 0) m
-  snd : IsNum N (a, 1) n
-  out : ∃ x, N.Paired ar (a, 2) x ∧ Tower N x j r
-  free : N.free r
+abbrev Config (N : Net Arith) (a : Id) (j m n : Nat) (r : Port) : Prop :=
+  Addition.Config ar zero succ add N a j m n r
 
 variable {j m n : Nat}
 
 /-- `0 + n = n`: the adder meets `zero`; one step later `r` carries the
 numeral `j + n` and the net has no adder left. -/
 theorem Config.zero_step (c : Config N a j 0 n r) :
-    ∃ N', Step system N N' ∧ IsNum N' r (j + n) ∧ ∀ i, ¬ N'.agent i add := by
-  obtain ⟨z, hpz, hz⟩ := c.fst
-  have hz' : N.agent z zero := hz
-  have h : Adder N a z zero := ⟨c.wf, c.ha, hz', by decide, hpz⟩
-  have red : Redex system N a z add zero addZero.toX.toRhs :=
-    ⟨c.ha, hz', h.site.ne, hpz.2.2, rule_add_zero⟩
-  have st : Step system N (N.fire a z addZero.toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
-  have hN' := Step.wf c.wf st
-  obtain ⟨t, hpt, hnt⟩ := c.snd
-  obtain ⟨x, hpx, htx⟩ := c.out
-  have hta : t ≠ a := by
-    rcases hnt.label with hl | hl
-    · exact h.ne_add hl (by decide)
-    · exact h.ne_add hl (by decide)
-  have hts : t ≠ z := h.not_s hpt (port_ne_snd (by decide))
-  obtain ⟨hxa, hxs, htx'⟩ := h.tower_fire addZero.toX.toRhs c.free htx
-  have hl : addZero.toX.toRhs.link (.ifc false 0) (.ifc false 1) := rfl
-  have hp : (N.fire a z addZero.toX.toRhs).Paired ar (t, 0) x :=
-    h.site.paired_fire_ifc_ifc hl (hpt.symm c.wf) (hpx.symm c.wf) hta hts hxa hxs
-  refine ⟨_, st, htx'.num ⟨t, hp.symm hN', h.num_fire _ hnt hts⟩, ?_⟩
-  rintro i (⟨hi, hia, -⟩ | ⟨o, j', -, hlab⟩)
-  · exact hia (c.only i hi)
-  · cases hlab
-
-theorem addSucc_lab_add {o : Option Bool} {j : Nat}
-    (h : addSucc.toX.toRhs.lab o j = some add) : o = some true ∧ j = 0 := by
-  have h' : assoc (o, j) addSucc.agents = some add := h
-  have hm := assoc_mem h'
-  simpa [addSucc, RuleData.ofWires] using hm
+    ∃ N', Step system N N' ∧ IsNum N' r (j + n) ∧ ∀ i, ¬ N'.agent i add :=
+  Addition.Config.zero_step rules c
 
 /-- `S m + n = S (m + n)`: the adder meets `succ`; one step later a new
 adder faces `m`, under a tower one successor higher. -/
 theorem Config.succ_step (c : Config N a j (m + 1) n r) :
-    ∃ N' a', Step system N N' ∧ Config N' a' (j + 1) m n r := by
-  obtain ⟨s, hps, hsu, s', hps', hns'⟩ := c.fst
-  have h : Adder N a s succ := ⟨c.wf, c.ha, hsu, by decide, hps⟩
-  have hR : addSucc.toX.toRhs.WF ar add succ := system.rule_wf rule_add_succ
-  have red : Redex system N a s add succ addSucc.toX.toRhs :=
-    ⟨c.ha, hsu, h.site.ne, hps.2.2, rule_add_succ⟩
-  have st : Step system N (N.fire a s addSucc.toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
-  have hN' := Step.wf c.wf st
-  obtain ⟨t, hpt, hnt⟩ := c.snd
-  obtain ⟨x, hpx, htx⟩ := c.out
-  have hta : t ≠ a := by
-    rcases hnt.label with hl | hl
-    · exact h.ne_add hl (by decide)
-    · exact h.ne_add hl (by decide)
-  have hts : t ≠ s := h.not_s hpt (port_ne_snd (by decide))
-  have hs'a : s' ≠ a := by
-    rcases hns'.label with hl | hl
-    · exact h.ne_add hl (by decide)
-    · exact h.ne_add hl (by decide)
-  have hs's : s' ≠ s := h.not_s hps' (port_ne_snd (by decide))
-  obtain ⟨hxa, hxs, htx'⟩ := h.tower_fire addSucc.toX.toRhs c.free htx
-  -- the four wires of the right-hand side
-  have p₁ : (N.fire a s addSucc.toX.toRhs).Paired ar x (child a s (some false) 0, 0) :=
-    h.site.paired_fire_ifc_new hR
-      (show addSucc.toX.toRhs.link (.ifc false 1) (.new (some false) 0 0) from rfl)
-      (hpx.symm c.wf) hxa hxs
-  have p₂ : (N.fire a s addSucc.toX.toRhs).Paired ar (child a s (some false) 0, 1)
-      (child a s (some true) 0, 2) :=
-    Site.paired_fire_new_new hR
-      (show addSucc.toX.toRhs.link (.new (some false) 0 1) (.new (some true) 0 2) from rfl)
-  have p₃ : (N.fire a s addSucc.toX.toRhs).Paired ar (s', 0) (child a s (some true) 0, 0) :=
-    h.site.paired_fire_ifc_new hR
-      (show addSucc.toX.toRhs.link (.ifc true 0) (.new (some true) 0 0) from rfl)
-      (hps'.symm c.wf) hs'a hs's
-  have p₄ : (N.fire a s addSucc.toX.toRhs).Paired ar (t, 0) (child a s (some true) 0, 1) :=
-    h.site.paired_fire_ifc_new hR
-      (show addSucc.toX.toRhs.link (.ifc false 0) (.new (some true) 0 1) from rfl)
-      (hpt.symm c.wf) hta hts
-  refine ⟨_, child a s (some true) 0, st, hN', .inr ⟨some true, 0, rfl, rfl⟩, ?_,
-    ⟨s', p₃.symm hN', h.num_fire _ hns' hs's⟩, ⟨t, p₄.symm hN', h.num_fire _ hnt hts⟩,
-    ⟨_, p₂.symm hN', child a s (some false) 0, x, rfl, .inr ⟨some false, 0, rfl, rfl⟩, p₁, htx'⟩,
-    c.free⟩
-  rintro i (⟨hi, hia, -⟩ | ⟨o, j', rfl, hlab⟩)
-  · exact absurd (c.only i hi) hia
-  · obtain ⟨rfl, rfl⟩ := addSucc_lab_add hlab
-    rfl
+    ∃ N' a', Step system N N' ∧ Config N' a' (j + 1) m n r :=
+  Addition.Config.succ_step rules c
 
 /-- The adder runs for `m + 1` steps, after which `r` carries the numeral
 `j + m + n` and the net has no adder left. -/
 theorem Config.steps : ∀ {m : Nat} {N : Net Arith} {a : Id} {j : Nat}, Config N a j m n r →
-    ∃ N', Steps (Step system) (m + 1) N N' ∧ IsNum N' r (j + m + n) ∧ ∀ i, ¬ N'.agent i add
-  | 0, N, a, j, c => by
-    obtain ⟨N', st, hnum, hno⟩ := c.zero_step
-    exact ⟨N', .single st, hnum, hno⟩
-  | m + 1, N, a, j, c => by
-    obtain ⟨N₁, a', st, c'⟩ := c.succ_step
-    obtain ⟨N', sts, hnum, hno⟩ := Config.steps c'
-    refine ⟨N', .head st sts, ?_, hno⟩
-    have e : j + (m + 1) + n = j + 1 + m + n := by omega
-    rw [e]
-    exact hnum
+    ∃ N', Steps (Step system) (m + 1) N N' ∧ IsNum N' r (j + m + n) ∧ ∀ i, ¬ N'.agent i add :=
+  fun c => Addition.Config.steps rules c
 
 /-- A net without adders is normal. -/
 theorem normal_of_no_add (h : ∀ i, ¬ N.agent i add) : Normal (Step system) N := by

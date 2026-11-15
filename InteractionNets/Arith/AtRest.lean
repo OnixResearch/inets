@@ -1049,8 +1049,8 @@ theorem numerals_cover {M : XNet Arith} {k₀ k₁ : Nat} (hN : M.toNet.WF ar)
   have hT' : ∀ p q, M.toNet.link p q → tagged 1 p.1 = tagged 1 q.1 := fun p q h => hT (p, q) h
   obtain ⟨i₀, p0, n0⟩ := h0
   obtain ⟨i₁, p1, n1⟩ := h1
-  obtain ⟨l₀, L0, e0⟩ := n0.list
-  obtain ⟨l₁, L1, e1⟩ := n1.list
+  obtain ⟨l₀, L0, e0⟩ := Num.list n0
+  obtain ⟨l₁, L1, e1⟩ := Num.list n1
   have z0 : tagged 1 ([0, 0] : Id) = false := rfl
   have z1 : tagged 1 ([0, 1] : Id) = true := rfl
   have t0 : ∀ a, a ∈ l₀ → tagged 1 a = false := fun a ha =>

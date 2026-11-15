@@ -80,7 +80,7 @@ theorem numerals_all {N : Net Arith} (hN : N.WF ar) :
   | (m₀, n₀) :: l, t, h => by
     obtain ⟨hnum, hT0⟩ := h 0 m₀ n₀ List.getElem?_cons_zero
     obtain ⟨i₀, hp, hn⟩ := hnum
-    obtain ⟨L, hL, eL⟩ := hn.list
+    obtain ⟨L, hL, eL⟩ := Num.list hn
     have ti : tagged (t + 0) i₀ = true := paired_tagc hT0 hp (tagged_self (t + 0) [0])
     have tL := hL.tagc hT0 ti
     have h' : ∀ j m n, l[j]? = some (m, n) → IsNum N ([0, t + 1 + j], 0) (m + n) ∧
