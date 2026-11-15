@@ -90,6 +90,85 @@ theorem XNet.pushOn_nodup {S : Type} {X : XNet S} {b : Nat} (hb : X.Below b) (γ
     omega
   · exact h
 
+namespace Core
+
+variable {S : Type} [DecidableEq S] {xsys : XSys S} {zero succ dup era : S}
+  [K : Core xsys.sys zero succ dup era]
+
+include K
+
+set_option linter.unusedSectionVars false
+
+local notation "IsNum" => Addition.IsNum xsys.sys.ar zero succ
+
+theorem lit_nodup : ∀ n, ((lit zero succ n).agents.map Prod.fst).Nodup
+  | 0 => List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩
+  | n + 1 => XNet.pushOn_nodup (good_lit (xsys := xsys) n).below succ _ (lit_nodup n)
+
+omit K in
+theorem openOp_nodup (γ : S) : ((openOp γ).agents.map Prod.fst).Nodup :=
+  List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩
+
+omit K in
+theorem openOp1_nodup (γ : S) : ((openOp1 γ).agents.map Prod.fst).Nodup :=
+  List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩
+
+/-- **The net of an expression lists no name twice.** -/
+theorem GExpr.net_nodup : ∀ e : GExpr xsys, (e.net.agents.map Prod.fst).Nodup
+  | .lit n => lit_nodup (xsys := xsys) n
+  | .app1 o e =>
+    XNet.three_nodup (GExpr.net_nodup e) List.nodup_nil (openOp1_nodup o.sym)
+  | .app2 o e₁ e₂ =>
+    XNet.three_nodup (GExpr.net_nodup e₁) (GExpr.net_nodup e₂) (openOp_nodup o.sym)
+
+/-- **How many actions an expression takes.**  `nt` threads that take
+turns on the net of an expression are at rest after
+
+    nt * ((nt + e.cost) * e.net.passBound e.cost C D + e.cost * 17 + 1)
+
+actions; from then on they have made `e.cost` interactions and the memory
+holds the value on the free port. -/
+theorem GExpr.rest_by {C D : Nat} (hb : xsys.Bounded C D) (e : GExpr xsys) {nt : Nat} (hnt : 0 < nt) :
+    ∀ i, nt * ((nt + e.cost) * e.net.passBound e.cost C D + e.cost * (C + D + 1) + 1) ≤ i →
+      ((XMach.init e.net nt).trace xsys (fun j => j % nt) i).1.resting = true ∧
+      ((XMach.init e.net nt).trace xsys (fun j => j % nt) i).2 = e.cost ∧
+      IsNum ((XMach.init e.net nt).trace xsys (fun j => j % nt) i).1.mem.toNet e.res
+        e.eval := by
+  intro i hi
+  obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
+  have hr := XMach.roundRobin_rest hX (GExpr.net_nodup e) hnt hb hs
+    ((normal_of_numerals hag : Normal (Step xsys.sys) _)) i hi
+  exact ⟨hr, e.rest hnt _ hr⟩
+
+/-- **The same for any schedule in which every thread acts in every
+window of `W` actions**: after `W` times the count, the threads are at
+rest with the value in memory. -/
+theorem GExpr.rest_within {C D : Nat} (hb : xsys.Bounded C D) (e : GExpr xsys) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {W : Nat}
+    (hwin : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ j < i + W ∧ σ j = u) :
+    ∀ i, W * ((nt + e.cost) * e.net.passBound e.cost C D + e.cost * (C + D + 1) + 1) ≤ i →
+      ((XMach.init e.net nt).trace xsys σ i).1.resting = true ∧
+      ((XMach.init e.net nt).trace xsys σ i).2 = e.cost ∧
+      IsNum ((XMach.init e.net nt).trace xsys σ i).1.mem.toNet e.res e.eval := by
+  intro i hi
+  obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
+  have hr := XMach.window_rest hX (GExpr.net_nodup e) hnt hb hs
+    ((normal_of_numerals hag : Normal (Step xsys.sys) _)) σ hwin i hi
+  exact ⟨hr, e.rest hnt _ hr⟩
+
+/-- **How many actions are enough to run an expression and read its
+value.**  Run for at least the bound of `Peano.GExpr.rest_by`, the
+segments of the net and of `e.cost` right-hand sides, and the length of
+the value, `nt` threads taking turns return the value. -/
+theorem GExpr.run_by {C D : Nat} (hb : xsys.Bounded C D) (e : GExpr xsys) {nt : Nat} (hnt : 0 < nt) (s : Nat)
+    (h₁ : nt * ((nt + e.cost) * e.net.passBound e.cost C D + e.cost * (C + D + 1) + 1) ≤ s)
+    (h₂ : e.net.wires.length + D * e.cost ≤ s) (h₃ : e.eval + 1 ≤ s) :
+    e.run nt s = some e.eval := by
+  obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
+  exact XNet.runRead_bound (zero := zero) (succ := succ) K.zero_ne_succ hX (GExpr.net_nodup e) hnt
+    hb hs ((normal_of_numerals hag : Normal (Step xsys.sys) _)) hA s h₁ h₂ h₃
+
+end Core
+
 namespace Peano
 
 open Core
@@ -100,69 +179,34 @@ theorem xsys_bounded : xsys.Bounded 4 12 := by
   intro α β R h
   cases α <;> cases β <;> (cases h <;> decide)
 
-theorem lit_nodup : ∀ n, ((Peano.lit n).agents.map Prod.fst).Nodup
-  | 0 => by decide
-  | n + 1 => XNet.pushOn_nodup (good_lit (xsys := xsys) n).below succ _ (lit_nodup n)
-
-theorem openOp_nodup (γ : Peano) : ((openOp γ).agents.map Prod.fst).Nodup :=
-  List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩
-
-theorem openOp1_nodup (γ : Peano) : ((openOp1 γ).agents.map Prod.fst).Nodup :=
-  List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩
-
 /-- **The net of an expression lists no name twice.** -/
-theorem GExpr.net_nodup : ∀ e : GExpr, (e.net.agents.map Prod.fst).Nodup
-  | .lit n => lit_nodup n
-  | .app1 o e =>
-    XNet.three_nodup (GExpr.net_nodup e) List.nodup_nil (openOp1_nodup o.sym)
-  | .app2 o e₁ e₂ =>
-    XNet.three_nodup (GExpr.net_nodup e₁) (GExpr.net_nodup e₂) (openOp_nodup o.sym)
+theorem GExpr.net_nodup (e : GExpr) : (e.net.agents.map Prod.fst).Nodup := Core.GExpr.net_nodup e
 
-/-- **How many actions an expression takes.**  `nt` threads that take
-turns on the net of an expression are at rest after
-
-    nt * ((nt + e.cost) * e.net.passBound e.cost 4 12 + e.cost * 17 + 1)
-
-actions; from then on they have made `e.cost` interactions and the memory
-holds the value on the free port. -/
+/-- **How many actions an expression takes**, in `Peano`. -/
 theorem GExpr.rest_by (e : GExpr) {nt : Nat} (hnt : 0 < nt) :
     ∀ i, nt * ((nt + e.cost) * e.net.passBound e.cost 4 12 + e.cost * (4 + 12 + 1) + 1) ≤ i →
       ((XMach.init e.net nt).trace xsys (fun j => j % nt) i).1.resting = true ∧
       ((XMach.init e.net nt).trace xsys (fun j => j % nt) i).2 = e.cost ∧
       IsNum ((XMach.init e.net nt).trace xsys (fun j => j % nt) i).1.mem.toNet e.res
-        e.eval := by
-  intro i hi
-  obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
-  have hr := XMach.roundRobin_rest hX (GExpr.net_nodup e) hnt xsys_bounded hs
-    (normal_of_numerals (system := system) hag) i hi
-  exact ⟨hr, e.rest hnt _ hr⟩
+        e.eval :=
+  Core.GExpr.rest_by xsys_bounded e hnt
 
-/-- **The same for any schedule in which every thread acts in every
-window of `W` actions**: after `W` times the count, the threads are at
-rest with the value in memory. -/
+/-- **The same for any schedule with a window**, in `Peano`. -/
 theorem GExpr.rest_within (e : GExpr) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {W : Nat}
     (hwin : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ j < i + W ∧ σ j = u) :
     ∀ i, W * ((nt + e.cost) * e.net.passBound e.cost 4 12 + e.cost * (4 + 12 + 1) + 1) ≤ i →
       ((XMach.init e.net nt).trace xsys σ i).1.resting = true ∧
       ((XMach.init e.net nt).trace xsys σ i).2 = e.cost ∧
-      IsNum ((XMach.init e.net nt).trace xsys σ i).1.mem.toNet e.res e.eval := by
-  intro i hi
-  obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
-  have hr := XMach.window_rest hX (GExpr.net_nodup e) hnt xsys_bounded hs
-    (normal_of_numerals (system := system) hag) σ hwin i hi
-  exact ⟨hr, e.rest hnt _ hr⟩
+      IsNum ((XMach.init e.net nt).trace xsys σ i).1.mem.toNet e.res e.eval :=
+  Core.GExpr.rest_within xsys_bounded e hnt σ hwin
 
 /-- **How many actions are enough to run an expression and read its
-value.**  Run for at least the bound of `Peano.GExpr.rest_by`, the
-segments of the net and of `e.cost` right-hand sides, and the length of
-the value, `nt` threads taking turns return the value. -/
+value**, in `Peano`. -/
 theorem GExpr.run_by (e : GExpr) {nt : Nat} (hnt : 0 < nt) (s : Nat)
     (h₁ : nt * ((nt + e.cost) * e.net.passBound e.cost 4 12 + e.cost * (4 + 12 + 1) + 1) ≤ s)
     (h₂ : e.net.wires.length + 12 * e.cost ≤ s) (h₃ : e.eval + 1 ≤ s) :
-    e.run nt s = some e.eval := by
-  obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
-  exact XNet.runRead_bound (zero := zero) (succ := succ) (by decide) hX (GExpr.net_nodup e) hnt
-    xsys_bounded hs (normal_of_numerals (system := system) hag) hA s h₁ h₂ h₃
+    e.run nt s = some e.eval :=
+  Core.GExpr.run_by xsys_bounded e hnt s h₁ h₂ h₃
 
 /-- **The same for the expressions of `+`, `*` and `^`.** -/
 theorem PExpr.run_by (e : PExpr) {nt : Nat} (hnt : 0 < nt) (s : Nat)
