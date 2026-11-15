@@ -48,6 +48,8 @@ import InteractionNets.Arith.Run
 import InteractionNets.Embed
 import InteractionNets.Arith.Carry
 import InteractionNets.Peano
+import InteractionNets.Keeps
+import InteractionNets.PeanoCopy
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.LongRun
@@ -1983,6 +1985,14 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              and every expression of additions comes out
                              right in it; that its multiplier multiplies
                              is not proved (`2 * 3` is evaluated)
+* `INet.Peano.erase`, `INet.Peano.copy`, `INet.Net.Keeps`,
+  `INet.Addition.IsNum.keeps`, `INet.Addition.gone_closed`
+                             erasing and copying a numeral, with any other
+                             agents in the net: an eraser on the numeral
+                             `n` is gone with it after `n + 1` steps, a
+                             copier leaves the numeral `n` on both of its
+                             ports after `n + 1` steps, and what was away
+                             from them is as it was
 * `INet.Arith.sum_ok`, `INet.Arith.sum_correct`
                              the nets `Arith.sum m n` are valid for all `m`
                              and `n`, and on each of them the reducer takes
@@ -3269,7 +3279,23 @@ holds up to equality rather than up to renaming.
   every expression of additions comes out right in it
   (`Peano.expr_rest`).  That its multiplier multiplies is not proved:
   the reducer is run on `2 * 3`, and leaves six successors and a zero
-  after 23 steps.
+  after 23 steps.  The two helpers of multiplication are proved, in a
+  net that may have any other agents.  An eraser facing a numeral `n`
+  runs for `n + 1` steps, after which it and the agents of the numeral
+  are gone and nothing new is there (`Peano.erase`); a copier facing a
+  numeral `n` runs for `n + 1` steps, after which the two ports its
+  copies were wired to, free or not, carry the numeral `n`
+  (`Peano.copy`).  Both say what the run leaves alone: `N.Keeps ar C N'`
+  holds when the agents of `N` with names outside `C`, and the pairs of
+  ends of `N` on names outside `C`, are in `N'`; one firing keeps
+  everything away from its two agents (`Site.keeps`).  Here `C` is the
+  eraser or copier, the agents of the numeral and the names not in use
+  (`Addition.gone`).  That set is closed, the principal port of each of
+  its names being wired to one of its names (`Addition.gone_closed`),
+  and a numeral held at a port outside a closed set lies outside it, so
+  it is kept (`Addition.IsNum.keeps`).  This is what a proof of
+  multiplication will use to carry the waiting adders and their
+  arguments through the copies; that proof is not done.
 * An executable system (`XSys`) carries proofs: that its rules are the rules
   of a `System`, and that the slots of each right-hand side are listed.  For
   a system given as data (`SysData`) these follow from the evaluation of
