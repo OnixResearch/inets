@@ -25,7 +25,6 @@ open Addition (gone gone2)
 variable {S : Type} [DecidableEq S] {xsys : XSys S} {zero succ dup era : S}
   [K : Core xsys.sys zero succ dup era]
 
-set_option linter.unusedSectionVars false
 
 local notation "system" => xsys.sys
 local notation "ar" => xsys.sys.ar
@@ -44,6 +43,7 @@ structure Unary (sys : System S) {zero succ dup era : S} [Core sys zero succ dup
   free : N.free r
   only : ∀ i γ, N.agent i γ → γ = zero ∨ γ = succ ∨ i = a
 
+omit [DecidableEq S] in
 /-- **An agent that computes is correct alone.**  A net in the situation
 `Peano.Unary` reduces in `c n` steps to a normal form in which `r`
 carries the numeral `f n`. -/
@@ -88,6 +88,7 @@ structure GoodUnary (sys : System S) {zero succ dup era : S} [Core sys zero succ
   config : Unary sys op X.toNet [1] n ([0], 0)
   below : X.Below c
 
+omit [DecidableEq S] in
 /-- One more successor on the argument. -/
 theorem GoodUnary.push {op : S} {X : XNet S} {n c : Nat} (g : GoodUnary system op X n c) :
     GoodUnary system op (X.pushOn succ ([1], 0) [c]) (n + 1) (c + 1) := by
@@ -128,6 +129,7 @@ def unaryT : XNet Arith :=
 
 theorem unaryT_ok : unaryT.Ok Arith.ar := by decide
 
+omit [DecidableEq S] in
 include K in
 /-- The net for `op 0` is valid for every agent of one argument: it is the
 net over `Arith`, checked once, relabelled. -/
@@ -144,6 +146,7 @@ theorem unaryBase_ok {op : S} (h : ar op = 1) (_h1 : succ ≠ op) : (unaryBase z
       exact K.ar_zero
     · exact absurd h3 List.not_mem_nil
 
+omit [DecidableEq S] in
 theorem good_unaryBase {op : S} (h : ar op = 1) (h1 : succ ≠ op) :
     GoodUnary system op (unaryBase zero op) 0 3 := by
   have hX := unaryBase_ok h h1
@@ -172,6 +175,7 @@ theorem good_unaryBase {op : S} (h : ar op = 1) (h1 : succ ≠ op) :
       decide
     exact hall i (XNet.mem_usedIds hi)
 
+omit [DecidableEq S] in
 /-- **The nets for `op n` are in the situation**, for all `n`. -/
 theorem good_unaryNet {op : S} (h : ar op = 1) (h1 : succ ≠ op) :
     ∀ n, GoodUnary system op (unaryNet zero succ op n) n (n + 3)
@@ -186,7 +190,8 @@ theorem unary_rest {op : S} {f c : Nat → Nat} (H : Computes1 system op f c) (h
     (h1 : succ ≠ op) (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).1.resting = true) :
     ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).2 = c n ∧
-      IsNum ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (f n) := by
+      IsNum ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (f n) :=
+          by
   have g := good_unaryNet har h1 n
   obtain ⟨N', hs, hn', hnum⟩ := unary_correct H g.config
   have L := XMach.trace_live σ (XMach.init_live (xs := xsys) g.ok.1 hnt) i
@@ -206,9 +211,11 @@ to rest after `c n` interactions with the numeral `f n` in memory. -/
 theorem unary_fair {op : S} {f c : Nat → Nat} (H : Computes1 system op f c) (har : ar op = 1)
     (h1 : succ ≠ op) (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
     (hfair : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ σ j = u) :
-    ∃ i₀, ∀ i, i₀ ≤ i → ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).1.resting = true ∧
+    ∃ i₀, ∀ i, i₀ ≤ i → ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).1.resting = true
+        ∧
       ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).2 = c n ∧
-      IsNum ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (f n) := by
+      IsNum ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (f n) :=
+          by
   have g := good_unaryNet har h1 n
   obtain ⟨N', hs, hn', hnum⟩ := unary_correct H g.config
   obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) g.ok.1 hnt hs hn' σ hfair
@@ -234,6 +241,7 @@ structure Binary (sys : System S) {zero succ dup era : S} [Core sys zero succ du
   free : N.free r
   only : ∀ i γ, N.agent i γ → γ = zero ∨ γ = succ ∨ i = a
 
+omit [DecidableEq S] in
 /-- **An agent of two arguments that computes is correct alone.** -/
 theorem binary_correct {op : S} {f c : Nat → Nat → Nat} (H : Computes2 system op f c) {a : Id}
     {m n : Nat} (u : Binary system op N a m n r) :
@@ -282,6 +290,7 @@ structure GoodBinary (sys : System S) {zero succ dup era : S} [Core sys zero suc
   config : Binary sys op X.toNet [1] m n ([0], 0)
   below : X.Below c
 
+omit [DecidableEq S] in
 /-- One more successor on the first argument. -/
 theorem GoodBinary.push_fst {op : S} {X : XNet S} {m n c : Nat}
     (g : GoodBinary system op X m n c) :
@@ -312,6 +321,7 @@ theorem GoodBinary.push_fst {op : S} {X : XNet S} {m n c : Nat}
       · exact cf.only i γ hi
       · exact .inr (.inl e')
 
+omit [DecidableEq S] in
 /-- One more successor on the second argument. -/
 theorem GoodBinary.push_snd {op : S} (h0 : zero ≠ op) (h1 : succ ≠ op) {X : XNet S}
     {m n c : Nat} (g : GoodBinary system op X m n c) :
@@ -357,6 +367,7 @@ def binaryT : XNet Arith :=
 
 theorem binaryT_ok : binaryT.Ok Arith.ar := by decide
 
+omit [DecidableEq S] in
 include K in
 /-- The net for `op 0 0` is valid for every agent of two arguments. -/
 theorem binaryBase_ok {op : S} (h : ar op = 2) : (binaryBase zero op).Ok ar := by
@@ -375,7 +386,9 @@ theorem binaryBase_ok {op : S} (h : ar op = 2) : (binaryBase zero op).Ok ar := b
         exact K.ar_zero
       · exact absurd h3 List.not_mem_nil
 
-theorem good_binaryBase {op : S} (h : ar op = 2) : GoodBinary system op (binaryBase zero op) 0 0 4 := by
+omit [DecidableEq S] in
+theorem good_binaryBase {op : S} (h : ar op = 2) : GoodBinary system op (binaryBase zero op) 0 0 4
+    := by
   have hX := binaryBase_ok h
   -- the wires, the free port and the names do not depend on the symbol
   have ew : (binaryBase zero op).wires = binaryT.wires := rfl
@@ -406,11 +419,13 @@ theorem good_binaryBase {op : S} (h : ar op = 2) : GoodBinary system op (binaryB
       decide
     exact hall i (XNet.mem_usedIds hi)
 
+omit [DecidableEq S] in
 theorem good_binarySnd {op : S} (h : ar op = 2) (h0 : zero ≠ op) (h1 : succ ≠ op) :
     ∀ n, GoodBinary system op (binarySnd zero succ op n) 0 n (n + 4)
   | 0 => good_binaryBase h
   | n + 1 => (good_binarySnd h h0 h1 n).push_snd h0 h1
 
+omit [DecidableEq S] in
 /-- **The nets for `op m n` are in the situation**, for all `m` and `n`. -/
 theorem good_binaryNet {op : S} (h : ar op = 2) (h0 : zero ≠ op) (h1 : succ ≠ op) :
     ∀ m n, GoodBinary system op (binaryNet zero succ op m n) m n (m + n + 4)

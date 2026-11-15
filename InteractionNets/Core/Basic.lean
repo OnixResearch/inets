@@ -109,21 +109,26 @@ variable {S : Type}
 def Computes2 (system : System S) {zero succ dup era : S} [Core system zero succ dup era]
     (op : S) (f c : Nat → Nat → Nat) : Prop :=
   ∀ (l₁ : List Id) {N : Net S} {a h₁ h₂ : Id} {l₂ : List Id} {r : Port} {m n : Nat},
-    N.WF system.ar → N.agent a op → N.Paired system.ar (a, 0) (h₁, 0) → Addition.NumList system.ar zero succ N h₁ l₁ →
-    N.Paired system.ar (a, 1) (h₂, 0) → Addition.NumList system.ar zero succ N h₂ l₂ → N.Paired system.ar (a, 2) r →
+    N.WF system.ar → N.agent a op → N.Paired system.ar (a, 0) (h₁, 0) → Addition.NumList system.ar
+        zero succ N h₁ l₁ →
+    N.Paired system.ar (a, 1) (h₂, 0) → Addition.NumList system.ar zero succ N h₂ l₂ → N.Paired
+        system.ar (a, 2) r →
     r.1 ≠ a ∧ ¬ r.1 ∈ l₁ ∧ ¬ r.1 ∈ l₂ → l₁.length = m + 1 → l₂.length = n + 1 →
     ∃ N', Steps (Step system) (c m n) N N' ∧
-      Addition.IsNumQ system.ar zero succ N' (fun i => ¬ N.Used i) r (f m n) ∧ N.Keeps system.ar (gone2 N a l₁ l₂) N' ∧
+      Addition.IsNumQ system.ar zero succ N' (fun i => ¬ N.Used i) r (f m n) ∧ N.Keeps system.ar
+          (gone2 N a l₁ l₂) N' ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ a)
 
 /-- **An agent that computes a function of one numeral, in any net.** -/
 def Computes1 (system : System S) {zero succ dup era : S} [Core system zero succ dup era]
     (op : S) (f c : Nat → Nat) : Prop :=
   ∀ (l : List Id) {N : Net S} {a h : Id} {r : Port} {n : Nat},
-    N.WF system.ar → N.agent a op → N.Paired system.ar (a, 0) (h, 0) → Addition.NumList system.ar zero succ N h l →
+    N.WF system.ar → N.agent a op → N.Paired system.ar (a, 0) (h, 0) → Addition.NumList system.ar
+        zero succ N h l →
     N.Paired system.ar (a, 1) r → r.1 ≠ a ∧ ¬ r.1 ∈ l → l.length = n + 1 →
     ∃ N', Steps (Step system) (c n) N N' ∧
-      Addition.IsNumQ system.ar zero succ N' (fun i => ¬ N.Used i) r (f n) ∧ N.Keeps system.ar (gone N a l) N' ∧
+      Addition.IsNumQ system.ar zero succ N' (fun i => ¬ N.Used i) r (f n) ∧ N.Keeps system.ar (gone
+          N a l) N' ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ a)
 
 /-- **The situation of an addition.**  The adder `a` has the numerals `m`

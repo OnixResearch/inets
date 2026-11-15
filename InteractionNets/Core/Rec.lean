@@ -60,8 +60,10 @@ def Combines2 (system : System S) {zero succ dup era : S} [Core system zero succ
     (op : S) (f c : Nat → Nat → Nat) : Prop :=
   ∀ (l₁ : List Id) (Q : Id → Prop) {N : Net S} {a h₁ h₂ : Id} {l₂ : List Id} {r : Port}
     {m n : Nat},
-    N.WF system.ar → N.agent a op → N.Paired system.ar (a, 0) (h₁, 0) → Addition.NumList system.ar zero succ N h₁ l₁ →
-    N.Paired system.ar (a, 1) (h₂, 0) → Addition.NumList system.ar zero succ N h₂ l₂ → N.Paired system.ar (a, 2) r →
+    N.WF system.ar → N.agent a op → N.Paired system.ar (a, 0) (h₁, 0) → Addition.NumList system.ar
+        zero succ N h₁ l₁ →
+    N.Paired system.ar (a, 1) (h₂, 0) → Addition.NumList system.ar zero succ N h₂ l₂ → N.Paired
+        system.ar (a, 2) r →
     r.1 ≠ a ∧ ¬ r.1 ∈ l₁ ∧ ¬ r.1 ∈ l₂ → l₁.length = m + 1 → l₂.length = n + 1 →
     (∀ i, i ∈ l₂ → Q i) → (∀ i, ¬ N.Used i → Q i) →
     ∃ N', Steps (Step system) (c m n) N N' ∧
@@ -158,9 +160,11 @@ def Zero2 (system : System S) {zero succ dup era : S} [Core system zero succ dup
     (op : S) (h c₀ : Nat → Nat) : Prop :=
   ∀ {N : Net S} {a z h₂ : Id} {l₂ : List Id} {r : Port} {n : Nat},
     N.WF system.ar → N.agent a op → N.Paired system.ar (a, 0) (z, 0) → N.agent z zero →
-    N.Paired system.ar (a, 1) (h₂, 0) → Addition.NumList system.ar zero succ N h₂ l₂ → N.Paired system.ar (a, 2) r →
+    N.Paired system.ar (a, 1) (h₂, 0) → Addition.NumList system.ar zero succ N h₂ l₂ → N.Paired
+        system.ar (a, 2) r →
     r.1 ≠ a ∧ r.1 ≠ z ∧ ¬ r.1 ∈ l₂ → l₂.length = n + 1 →
-    ∃ N', Steps (Step system) (c₀ n) N N' ∧ Addition.IsNumQ system.ar zero succ N' (fun i => ¬ N.Used i) r (h n) ∧
+    ∃ N', Steps (Step system) (c₀ n) N N' ∧ Addition.IsNumQ system.ar zero succ N' (fun i => ¬
+        N.Used i) r (h n) ∧
       N.Keeps system.ar (gone2 N a [z] l₂) N' ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ a)
 
@@ -171,7 +175,8 @@ def Zero1 (system : System S) {zero succ dup era : S} [Core system zero succ dup
   ∀ {N : Net S} {a z : Id} {r : Port},
     N.WF system.ar → N.agent a op → N.Paired system.ar (a, 0) (z, 0) → N.agent z zero →
     N.Paired system.ar (a, 1) r → r.1 ≠ a ∧ r.1 ≠ z →
-    ∃ N', Steps (Step system) c₀ N N' ∧ Addition.IsNumQ system.ar zero succ N' (fun i => ¬ N.Used i) r k ∧
+    ∃ N', Steps (Step system) c₀ N N' ∧ Addition.IsNumQ system.ar zero succ N' (fun i => ¬ N.Used i)
+        r k ∧
       N.Keeps system.ar (gone N a [z]) N' ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ a)
 
@@ -661,7 +666,8 @@ the rest of the argument, a successor `U` on the first copy, an agent `F`
 on the second copy, and a combiner `M` whose first argument is the result
 of `F`, whose second argument is `U`, and whose result is the old
 result. -/
-theorem primSucc_step {op g : S} (hs : system.rule op succ = some (primSucc succ dup op g).toX.toRhs)
+theorem primSucc_step {op g : S} (hs : system.rule op succ = some (primSucc succ dup op
+    g).toX.toRhs)
     {N : Net S} {a s h' : Id} {x : Port}
     (hA : Addition.Adder ar op N a s succ) (hpi : N.Paired ar (s, 1) (h', 0))
     (hpx : N.Paired ar (a, 1) x) (hh' : h' ≠ a ∧ h' ≠ s) (hx : x.1 ≠ a ∧ x.1 ≠ s) :
@@ -678,7 +684,8 @@ theorem primSucc_step {op g : S} (hs : system.rule op succ = some (primSucc succ
   have hR : (primSucc succ dup op g).toX.toRhs.WF ar op succ := system.rule_wf hs
   have red : Redex system N a s op succ (primSucc succ dup op g).toX.toRhs :=
     ⟨hA.ha, hA.hs, hA.site.ne, hA.pair.2.2, hs⟩
-  have st : Step system N (N.fire a s (primSucc succ dup op g).toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
+  have st : Step system N (N.fire a s (primSucc succ dup op g).toX.toRhs) := ⟨_, _, _, _, _, red,
+      rfl⟩
   have hN₁ := Step.wf hN st
   refine ⟨_, child a s (some false) 0, child a s (some false) 1, child a s (some false) 2,
     child a s (some true) 0, st, hA.site.keeps _, hA.site.not_used_child _ _,
@@ -720,7 +727,8 @@ successor the agent copies the rest of its argument; the agent left on
 one copy computes by this theorem, on the first argument of the combiner;
 the combiner then combines it with the successor of the other copy. -/
 theorem prim_computes {op g : S} {k c₀ : Nat} {fg cg : Nat → Nat → Nat}
-    (hs : system.rule op succ = some (primSucc succ dup op g).toX.toRhs) (hd : Apart zero succ dup op g)
+    (hs : system.rule op succ = some (primSucc succ dup op g).toX.toRhs) (hd : Apart zero succ dup
+        op g)
     (hz : Zero1 system op k c₀) (hg : Combines2 system g fg cg) :
     Computes1 system op (prim k fg) (primCost c₀ cg k fg)
   | [], _, _, _, _, _, _, _, _, hl, _, _, _ => by cases hl

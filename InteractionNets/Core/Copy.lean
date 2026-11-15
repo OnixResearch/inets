@@ -76,7 +76,8 @@ theorem dupZero_lab {zero : S} {o : Option Bool} {j : Nat} {γ : S}
 /-- The rule for copying a successor makes two successors and the new
 copier. -/
 theorem dupSucc_lab {succ dup : S} {o : Option Bool} {j : Nat} {γ : S}
-    (h : (dupSuccData succ dup).toX.toRhs.lab o j = some γ) : γ = succ ∨ (o = some true ∧ j = 0) := by
+    (h : (dupSuccData succ dup).toX.toRhs.lab o j = some γ) : γ = succ ∨ (o = some true ∧ j = 0) :=
+        by
   have h' : assoc (o, j) (dupSuccData succ dup).agents = some γ := h
   have hm : ((o, j), γ) ∈ [(((some false : Option Bool), 0), succ), ((some false, 1), succ),
       ((some true, 0), dup)] := assoc_mem h'
@@ -132,7 +133,8 @@ theorem erase : ∀ (l : List Id) {N : Net S} {e h : Id}, N.WF sys.ar → N.agen
       have hA : Addition.Adder sys.ar era N e h zero := ⟨hN, he, hz, H.zero_ne_era, hp⟩
       have red : Redex sys N e h era zero (eraZeroData (S := S)).toX.toRhs :=
         ⟨he, hz, hA.site.ne, hp.2.2, H.rule_era_zero⟩
-      have st : Step sys N (N.fire e h (eraZeroData (S := S)).toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
+      have st : Step sys N (N.fire e h (eraZeroData (S := S)).toX.toRhs) := ⟨_, _, _, _, _, red,
+          rfl⟩
       refine ⟨_, .single st, (hA.site.keeps _).mono ?_, ?_⟩
       · rintro i (e1 | e1)
         · exact .inl e1
@@ -155,7 +157,8 @@ theorem erase : ∀ (l : List Id) {N : Net S} {e h : Id}, N.WF sys.ar → N.agen
         · exact hA.ne_add hx H.succ_ne_era
       have hh'h : h' ≠ h := hA.not_s hpi (port_ne_snd (by decide))
       -- the new eraser faces the rest of the numeral
-      have pe : (N.fire e h (eraSuccData era).toX.toRhs).Paired sys.ar (h', 0) (child e h (some true) 0, 0) :=
+      have pe : (N.fire e h (eraSuccData era).toX.toRhs).Paired sys.ar (h', 0) (child e h (some
+          true) 0, 0) :=
         hA.site.paired_fire_ifc_new hR
           (show (eraSuccData era).toX.toRhs.link (.ifc true 0) (.new (some true) 0 0) from rfl)
           (hpi.symm hN) hh'e hh'h
@@ -234,20 +237,24 @@ theorem Copying.run {Q : Id → Prop} : ∀ (l : List Id) {N : Net S} {d : Id} {
       have red : Redex sys N d h dup zero (dupZeroData zero).toX.toRhs :=
         ⟨hd, hz, hA.site.ne, hfst.2.2, H.rule_dup_zero⟩
       have st : Step sys N (N.fire d h (dupZeroData zero).toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
-      obtain ⟨hx₁d, hx₁h, ht₁'⟩ := hA.towerQ_fire' H.succ_ne_dup (dupZeroData zero).toX.toRhs hp₁.2.1
+      obtain ⟨hx₁d, hx₁h, ht₁'⟩ := hA.towerQ_fire' H.succ_ne_dup (dupZeroData zero).toX.toRhs
+          hp₁.2.1
         (fun e => hp₁.2.2 (by
           rw [e]
           exact List.mem_cons_self)) ht₁
-      obtain ⟨hx₂d, hx₂h, ht₂'⟩ := hA.towerQ_fire' H.succ_ne_dup (dupZeroData zero).toX.toRhs hp₂.2.1
+      obtain ⟨hx₂d, hx₂h, ht₂'⟩ := hA.towerQ_fire' H.succ_ne_dup (dupZeroData zero).toX.toRhs
+          hp₂.2.1
         (fun e => hp₂.2.2 (by
           rw [e]
           exact List.mem_cons_self)) ht₂
       -- a new zero on each copy
-      have q₁ : (N.fire d h (dupZeroData zero).toX.toRhs).Paired sys.ar x₁ (child d h (some false) 0, 0) :=
+      have q₁ : (N.fire d h (dupZeroData zero).toX.toRhs).Paired sys.ar x₁ (child d h (some false)
+          0, 0) :=
         hA.site.paired_fire_ifc_new hR
           (show (dupZeroData zero).toX.toRhs.link (.ifc false 0) (.new (some false) 0 0) from rfl)
           (hpx₁.symm hN) hx₁d hx₁h
-      have q₂ : (N.fire d h (dupZeroData zero).toX.toRhs).Paired sys.ar x₂ (child d h (some true) 0, 0) :=
+      have q₂ : (N.fire d h (dupZeroData zero).toX.toRhs).Paired sys.ar x₂ (child d h (some true) 0,
+          0) :=
         hA.site.paired_fire_ifc_new hR
           (show (dupZeroData zero).toX.toRhs.link (.ifc false 1) (.new (some true) 0 0) from rfl)
           (hpx₂.symm hN) hx₂d hx₂h
@@ -281,39 +288,51 @@ theorem Copying.run {Q : Id → Prop} : ∀ (l : List Id) {N : Net S} {d : Id} {
       have hR : (dupSuccData succ dup).toX.toRhs.WF sys.ar dup succ := sys.rule_wf H.rule_dup_succ
       have red : Redex sys N d h dup succ (dupSuccData succ dup).toX.toRhs :=
         ⟨hd, hs, hA.site.ne, hfst.2.2, H.rule_dup_succ⟩
-      have st : Step sys N (N.fire d h (dupSuccData succ dup).toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
+      have st : Step sys N (N.fire d h (dupSuccData succ dup).toX.toRhs) := ⟨_, _, _, _, _, red,
+          rfl⟩
       have hN₁ := Step.wf hN st
       have hh'd : h' ≠ d := by
         rcases hl'.label h' hl'.head_mem with hx | hx
         · exact hA.ne_add hx H.zero_ne_dup
         · exact hA.ne_add hx H.succ_ne_dup
       have hh'h : h' ≠ h := hA.not_s hpi (port_ne_snd (by decide))
-      obtain ⟨hx₁d, hx₁h, ht₁'⟩ := hA.towerQ_fire' H.succ_ne_dup (dupSuccData succ dup).toX.toRhs hp₁.2.1
+      obtain ⟨hx₁d, hx₁h, ht₁'⟩ := hA.towerQ_fire' H.succ_ne_dup (dupSuccData succ dup).toX.toRhs
+          hp₁.2.1
         (fun e => hp₁.2.2 (by
           rw [e]
           exact List.mem_cons_self)) ht₁
-      obtain ⟨hx₂d, hx₂h, ht₂'⟩ := hA.towerQ_fire' H.succ_ne_dup (dupSuccData succ dup).toX.toRhs hp₂.2.1
+      obtain ⟨hx₂d, hx₂h, ht₂'⟩ := hA.towerQ_fire' H.succ_ne_dup (dupSuccData succ dup).toX.toRhs
+          hp₂.2.1
         (fun e => hp₂.2.2 (by
           rw [e]
           exact List.mem_cons_self)) ht₂
       -- the five wires of the right-hand side
-      have q₁ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar x₁ (child d h (some false) 0, 0) :=
+      have q₁ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar x₁ (child d h (some
+          false) 0, 0) :=
         hA.site.paired_fire_ifc_new hR
-          (show (dupSuccData succ dup).toX.toRhs.link (.ifc false 0) (.new (some false) 0 0) from rfl)
+          (show (dupSuccData succ dup).toX.toRhs.link (.ifc false 0) (.new (some false) 0 0) from
+              rfl)
           (hpx₁.symm hN) hx₁d hx₁h
-      have q₂ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar x₂ (child d h (some false) 1, 0) :=
+      have q₂ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar x₂ (child d h (some
+          false) 1, 0) :=
         hA.site.paired_fire_ifc_new hR
-          (show (dupSuccData succ dup).toX.toRhs.link (.ifc false 1) (.new (some false) 1 0) from rfl)
+          (show (dupSuccData succ dup).toX.toRhs.link (.ifc false 1) (.new (some false) 1 0) from
+              rfl)
           (hpx₂.symm hN) hx₂d hx₂h
-      have q₃ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar (child d h (some false) 0, 1)
+      have q₃ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar (child d h (some false)
+          0, 1)
           (child d h (some true) 0, 1) :=
         Site.paired_fire_new_new hR
-          (show (dupSuccData succ dup).toX.toRhs.link (.new (some false) 0 1) (.new (some true) 0 1) from rfl)
-      have q₄ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar (child d h (some false) 1, 1)
+          (show (dupSuccData succ dup).toX.toRhs.link (.new (some false) 0 1) (.new (some true) 0 1)
+              from rfl)
+      have q₄ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar (child d h (some false)
+          1, 1)
           (child d h (some true) 0, 2) :=
         Site.paired_fire_new_new hR
-          (show (dupSuccData succ dup).toX.toRhs.link (.new (some false) 1 1) (.new (some true) 0 2) from rfl)
-      have q₅ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar (h', 0) (child d h (some true) 0, 0) :=
+          (show (dupSuccData succ dup).toX.toRhs.link (.new (some false) 1 1) (.new (some true) 0 2)
+              from rfl)
+      have q₅ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar (h', 0) (child d h (some
+          true) 0, 0) :=
         hA.site.paired_fire_ifc_new hR
           (show (dupSuccData succ dup).toX.toRhs.link (.ifc true 0) (.new (some true) 0 0) from rfl)
           (hpi.symm hN) hh'd hh'h
@@ -381,11 +400,14 @@ numeral `n`, made of agents whose names were not in use, and which has
 kept everything away from the copier and the numeral; its agents are
 zeros, successors, or agents of the start other than the copier. -/
 theorem copy_fresh {N : Net S} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : Nat}
-    (hN : N.WF sys.ar) (hd : N.agent d dup) (hp : N.Paired sys.ar (d, 0) (h, 0)) (hl : Addition.NumList sys.ar zero succ N h l)
+    (hN : N.WF sys.ar) (hd : N.agent d dup) (hp : N.Paired sys.ar (d, 0) (h, 0)) (hl :
+        Addition.NumList sys.ar zero succ N h l)
     (hlen : l.length = n + 1) (h₁ : N.Paired sys.ar (d, 1) p₁) (h₂ : N.Paired sys.ar (d, 2) p₂)
     (hp₁ : p₁.1 ≠ d ∧ ¬ p₁.1 ∈ l) (hp₂ : p₂.1 ≠ d ∧ ¬ p₂.1 ∈ l) :
-    ∃ N', Steps (Step sys) (n + 1) N N' ∧ Addition.IsNumQ sys.ar zero succ N' (fun i => ¬ N.Used i) p₁ n ∧
-      Addition.IsNumQ sys.ar zero succ N' (fun i => ¬ N.Used i) p₂ n ∧ N.Keeps sys.ar (gone N d l) N' ∧
+    ∃ N', Steps (Step sys) (n + 1) N N' ∧ Addition.IsNumQ sys.ar zero succ N' (fun i => ¬ N.Used i)
+        p₁ n ∧
+      Addition.IsNumQ sys.ar zero succ N' (fun i => ¬ N.Used i) p₂ n ∧ N.Keeps sys.ar (gone N d l)
+          N' ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d) := by
   have c : Copying sys zero succ dup N (fun i => ¬ N.Used i) d 0 h l p₁ p₂ :=
     ⟨hN, hd, hp, hl, ⟨p₁, h₁, rfl⟩, ⟨p₂, h₂, rfl⟩, ⟨Net.End.used h₁.2.1, hp₁⟩,
@@ -397,10 +419,12 @@ theorem copy_fresh {N : Net S} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : 
 
 /-- The same, without the statement about the agents of the copies. -/
 theorem copy {N : Net S} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : Nat}
-    (hN : N.WF sys.ar) (hd : N.agent d dup) (hp : N.Paired sys.ar (d, 0) (h, 0)) (hl : Addition.NumList sys.ar zero succ N h l)
+    (hN : N.WF sys.ar) (hd : N.agent d dup) (hp : N.Paired sys.ar (d, 0) (h, 0)) (hl :
+        Addition.NumList sys.ar zero succ N h l)
     (hlen : l.length = n + 1) (h₁ : N.Paired sys.ar (d, 1) p₁) (h₂ : N.Paired sys.ar (d, 2) p₂)
     (hp₁ : p₁.1 ≠ d ∧ ¬ p₁.1 ∈ l) (hp₂ : p₂.1 ≠ d ∧ ¬ p₂.1 ∈ l) :
-    ∃ N', Steps (Step sys) (n + 1) N N' ∧ Addition.IsNum sys.ar zero succ N' p₁ n ∧ Addition.IsNum sys.ar zero succ N' p₂ n ∧
+    ∃ N', Steps (Step sys) (n + 1) N N' ∧ Addition.IsNum sys.ar zero succ N' p₁ n ∧ Addition.IsNum
+        sys.ar zero succ N' p₂ n ∧
       N.Keeps sys.ar (gone N d l) N' ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d) := by
   obtain ⟨N', sts, i₁, i₂, kp, hag⟩ := copy_fresh H hN hd hp hl hlen h₁ h₂ hp₁ hp₂

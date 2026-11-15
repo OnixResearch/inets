@@ -97,22 +97,25 @@ variable {S : Type} [DecidableEq S] {xsys : XSys S} {zero succ dup era : S}
 
 include K
 
-set_option linter.unusedSectionVars false
 
 local notation "IsNum" => Addition.IsNum xsys.sys.ar zero succ
 
+omit [DecidableEq S] in
 theorem lit_nodup : ∀ n, ((lit zero succ n).agents.map Prod.fst).Nodup
   | 0 => List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩
   | n + 1 => XNet.pushOn_nodup (good_lit (xsys := xsys) n).below succ _ (lit_nodup n)
 
+omit [DecidableEq S] in
 omit K in
 theorem openOp_nodup (γ : S) : ((openOp γ).agents.map Prod.fst).Nodup :=
   List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩
 
+omit [DecidableEq S] in
 omit K in
 theorem openOp1_nodup (γ : S) : ((openOp1 γ).agents.map Prod.fst).Nodup :=
   List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩
 
+omit [DecidableEq S] in
 /-- **The net of an expression lists no name twice.** -/
 theorem GExpr.net_nodup : ∀ e : GExpr xsys, (e.net.agents.map Prod.fst).Nodup
   | .lit n => lit_nodup (xsys := xsys) n
@@ -128,7 +131,8 @@ turns on the net of an expression are at rest after
 
 actions; from then on they have made `e.cost` interactions and the memory
 holds the value on the free port. -/
-theorem GExpr.rest_by {C D : Nat} (hb : xsys.Bounded C D) (e : GExpr xsys) {nt : Nat} (hnt : 0 < nt) :
+theorem GExpr.rest_by {C D : Nat} (hb : xsys.Bounded C D) (e : GExpr xsys) {nt : Nat} (hnt : 0 < nt)
+    :
     ∀ i, nt * ((nt + e.cost) * e.net.passBound e.cost C D + e.cost * (C + D + 1) + 1) ≤ i →
       ((XMach.init e.net nt).trace xsys (fun j => j % nt) i).1.resting = true ∧
       ((XMach.init e.net nt).trace xsys (fun j => j % nt) i).2 = e.cost ∧
@@ -143,7 +147,8 @@ theorem GExpr.rest_by {C D : Nat} (hb : xsys.Bounded C D) (e : GExpr xsys) {nt :
 /-- **The same for any schedule in which every thread acts in every
 window of `W` actions**: after `W` times the count, the threads are at
 rest with the value in memory. -/
-theorem GExpr.rest_within {C D : Nat} (hb : xsys.Bounded C D) (e : GExpr xsys) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {W : Nat}
+theorem GExpr.rest_within {C D : Nat} (hb : xsys.Bounded C D) (e : GExpr xsys) {nt : Nat} (hnt : 0 <
+    nt) (σ : Nat → Nat) {W : Nat}
     (hwin : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ j < i + W ∧ σ j = u) :
     ∀ i, W * ((nt + e.cost) * e.net.passBound e.cost C D + e.cost * (C + D + 1) + 1) ≤ i →
       ((XMach.init e.net nt).trace xsys σ i).1.resting = true ∧
@@ -159,7 +164,8 @@ theorem GExpr.rest_within {C D : Nat} (hb : xsys.Bounded C D) (e : GExpr xsys) {
 value.**  Run for at least the bound of `Peano.GExpr.rest_by`, the
 segments of the net and of `e.cost` right-hand sides, and the length of
 the value, `nt` threads taking turns return the value. -/
-theorem GExpr.run_by {C D : Nat} (hb : xsys.Bounded C D) (e : GExpr xsys) {nt : Nat} (hnt : 0 < nt) (s : Nat)
+theorem GExpr.run_by {C D : Nat} (hb : xsys.Bounded C D) (e : GExpr xsys) {nt : Nat} (hnt : 0 < nt)
+    (s : Nat)
     (h₁ : nt * ((nt + e.cost) * e.net.passBound e.cost C D + e.cost * (C + D + 1) + 1) ≤ s)
     (h₂ : e.net.wires.length + D * e.cost ≤ s) (h₃ : e.eval + 1 ≤ s) :
     e.run nt s = some e.eval := by

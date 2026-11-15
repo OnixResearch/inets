@@ -141,7 +141,6 @@ variable {S : Type} [DecidableEq S] {xsys : XSys S} {zero succ dup era : S}
 
 include K
 
-set_option linter.unusedSectionVars false
 
 local notation "system" => xsys.sys
 local notation "ar" => xsys.sys.ar
@@ -178,6 +177,7 @@ structure OpenOp (xs : XSys S) {zero succ dup era : S} [Core xs.sys zero succ du
   ne₂ : r ≠ q₁
   ne₃ : r ≠ q₂
 
+omit [DecidableEq S] in
 /-- **An operator on two nets that compute.**  Let a well-formed net be
 made of nets under tags: under `cA` a net that computes `v₁` on its free
 port `p₁`, under `cB` one that computes `v₂` on `p₂`, under `cD` an
@@ -377,6 +377,7 @@ structure GoodLit (xs : XSys S) {zero succ dup era : S} [Core xs.sys zero succ d
 def litT : XNet Arith :=
   XNet.ofWires [([1], .zero)] [([0], 0)] [(([0], 0), ([1], 0))]
 
+omit [DecidableEq S] in
 theorem good_litBase : GoodLit xsys (litBase zero) 0 2 := by
   have hT : litT.Ok Arith.ar := by decide
   have e : litBase zero = litT.relabel (ofArithAt zero zero) := rfl
@@ -402,6 +403,7 @@ theorem good_litBase : GoodLit xsys (litBase zero) 0 2 := by
       decide
     exact hall i (XNet.mem_usedIds hi)
 
+omit [DecidableEq S] in
 /-- One more successor on the free port. -/
 theorem GoodLit.push {X : XNet S} {n b : Nat} (g : GoodLit xsys X n b) :
     GoodLit xsys (X.pushOn succ ([0], 0) [b]) (n + 1) (b + 1) := by
@@ -427,6 +429,7 @@ theorem GoodLit.push {X : XNet S} {n b : Nat} (g : GoodLit xsys X n b) :
     · exact g.only i γ hi
     · exact .inr e
 
+omit [DecidableEq S] in
 theorem good_lit : ∀ n, GoodLit xsys (lit zero succ n) n (n + 2)
   | 0 => good_litBase
   | n + 1 => (good_lit n).push
@@ -446,6 +449,7 @@ def opNet (γ : S) (X₁ X₂ : XNet S) (p₁ p₂ : Port) : XNet S :=
   ((XNet.three X₁ X₂ (openOp γ)).plug2 (tagPort 0 p₁) ([2, 2], 0)).plug2 (tagPort 1 p₂)
     ([3, 2], 0)
 
+omit [DecidableEq S] in
 omit K in
 theorem opNet_toNet (γ : S) (X₁ X₂ : XNet S) (p₁ p₂ : Port) :
     (opNet γ X₁ X₂ p₁ p₂).toNet =
@@ -456,6 +460,7 @@ theorem opNet_toNet (γ : S) (X₁ X₂ : XNet S) (p₁ p₂ : Port) :
   rw [XNet.plug2_toNet, XNet.plug2_toNet]
   rfl
 
+omit [DecidableEq S] in
 omit K in
 theorem parts3_none {A B D : Net S} : ∀ c, c ≠ 0 → c ≠ 1 → c ≠ 2 → ∀ i γ,
     ¬ (parts3 A B D c).agent i γ
@@ -499,6 +504,7 @@ structure Op2 (xsys : XSys S) {zero succ dup era : S} [Core xsys.sys zero succ d
     ∃ N', Steps (Step xsys.sys) (c m n) N N' ∧ Addition.IsNum xsys.sys.ar zero succ N' r (f m n) ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ
 
+omit [DecidableEq S] in
 /-- What is left of an agent that computes: the numeral and the
 numerals. -/
 theorem unary_steps {op : S} {f c : Nat → Nat} (H : Computes1 system op f c) {a : Id} {n : Nat}
@@ -522,6 +528,7 @@ theorem unary_steps {op : S} {f c : Nat → Nat} (H : Computes1 system op f c) {
     · exact .inr hsu
     · exact absurd e' hne
 
+omit [DecidableEq S] in
 /-- The same for two arguments. -/
 theorem binary_steps {op : S} {f c : Nat → Nat → Nat} (H : Computes2 system op f c) {a : Id}
     {m n : Nat} (u : Binary system op N a m n r) :
@@ -573,6 +580,7 @@ structure OpenOp1 (xs : XSys S) {zero succ dup era : S} [Core xs.sys zero succ d
   free : N.free r
   ne : r ≠ q₁
 
+omit [DecidableEq S] in
 /-- **An operator of one argument on a net that computes.**  Let a
 well-formed net be made of nets under tags: under `cA` a net that
 computes `v` on its free port `p₁`, under `cD` an operator waiting for
@@ -661,6 +669,7 @@ theorem op_setup1 {U : Net S} {P : Nat → Net S} (hU : U.WF ar) (hm : U.Made P)
     · rw [setPart_ne _ _ h1] at hx'
       exact absurd hx' (hO c h1 h3 x' γ)
 
+omit [DecidableEq S] in
 /-- **An operator of one argument on a net that computes** computes its
 function, in the steps of the net and its cost more. -/
 theorem op1_evals (o : Op1 xsys) {U : Net S} {P : Nat → Net S} (hU : U.WF ar)
@@ -674,6 +683,7 @@ theorem op1_evals (o : Op1 xsys) {U : Net S} {P : Nat → Net S} (hU : U.WF ar)
   obtain ⟨N', sts', hnum, hag⟩ := o.steps ⟨hW, hd, h1, hout, hfr, honly⟩
   exact ⟨hW0, fr0, N', sts.trans sts', hnum, hag⟩
 
+omit [DecidableEq S] in
 /-- **An operator of two arguments on two nets that compute** computes
 its function, in the steps of the two nets and its cost more. -/
 theorem op2_evals (o : Op2 xsys) {U : Net S} {P : Nat → Net S} (hU : U.WF ar)
@@ -701,12 +711,15 @@ def emptyX : XNet S := XNet.ofWires [] [] []
 /-- The empty memory, over the symbols of `Arith`. -/
 def emptyT : XNet Arith := XNet.ofWires [] [] []
 
-theorem emptyX_ok : (emptyX : XNet S).Ok ar := by
+omit K [DecidableEq S] in
+/-- The empty memory is valid; `z` is any symbol. -/
+theorem emptyX_ok (z : S) : (emptyX : XNet S).Ok ar := by
   have hT : emptyT.Ok Arith.ar := by decide
-  have e : (emptyX : XNet S) = emptyT.relabel (ofArithAt zero zero) := rfl
+  have e : (emptyX : XNet S) = emptyT.relabel (ofArithAt z z) := rfl
   rw [e]
-  exact hT.relabel (ofArithAt zero zero) fun i γ hi => absurd hi List.not_mem_nil
+  exact hT.relabel (ofArithAt z z) fun i γ hi => absurd hi List.not_mem_nil
 
+omit [DecidableEq S] in
 omit K in
 theorem emptyX_none (i : Id) (γ : S) : ¬ emptyX.toNet.agent i γ :=
   fun h => List.not_mem_nil h
@@ -724,15 +737,18 @@ def openOp1T : XNet Arith :=
   XNet.ofWires [([1], .succ)] [([0], 0), ([2], 0)]
     [(([1], 0), ([2], 0)), (([1], 1), ([0], 0))]
 
+omit K in
+omit [DecidableEq S] in
 theorem openOp1_ok {γ : S} (h : ar γ = 1) : (openOp1 γ).Ok ar := by
   have hT : openOp1T.Ok Arith.ar := by decide
-  have e : openOp1 γ = openOp1T.relabel (ofArithAt zero γ) := rfl
+  have e : openOp1 γ = openOp1T.relabel (ofArithAt γ γ) := rfl
   rw [e]
-  refine hT.relabel (ofArithAt zero γ) fun i γ' hi => ?_
+  refine hT.relabel (ofArithAt γ γ) fun i γ' hi => ?_
   have hi' : (i, γ') ∈ [(([1] : Id), Arith.succ)] := hi
   rw [(Prod.mk.inj (List.mem_singleton.1 hi')).2]
   exact h
 
+omit [DecidableEq S] in
 theorem openOp1_spec {γ : S} (h : ar γ = 1) :
     OpenOp1 xsys (openOp1 γ).toNet γ [1] ([2], 0) ([0], 0) := by
   have hX := openOp1_ok h
@@ -758,6 +774,7 @@ operator. -/
 def opNet1 (γ : S) (X : XNet S) (p : Port) : XNet S :=
   (XNet.three X emptyX (openOp1 γ)).plug2 (tagPort 0 p) ([2, 2], 0)
 
+omit [DecidableEq S] in
 omit K in
 theorem opNet1_toNet (γ : S) (X : XNet S) (p : Port) :
     (opNet1 γ X p).toNet =
@@ -773,15 +790,18 @@ def openOpT : XNet Arith :=
   XNet.ofWires [([1], .add)] [([0], 0), ([2], 0), ([3], 0)]
     [(([1], 0), ([2], 0)), (([1], 1), ([3], 0)), (([1], 2), ([0], 0))]
 
+omit K in
+omit [DecidableEq S] in
 theorem openOp_ok {γ : S} (h : ar γ = 2) : (openOp γ).Ok ar := by
   have hT : openOpT.Ok Arith.ar := by decide
-  have e : openOp γ = openOpT.relabel (ofArithAt zero γ) := rfl
+  have e : openOp γ = openOpT.relabel (ofArithAt γ γ) := rfl
   rw [e]
-  refine hT.relabel (ofArithAt zero γ) fun i γ' hi => ?_
+  refine hT.relabel (ofArithAt γ γ) fun i γ' hi => ?_
   have hi' : (i, γ') ∈ [(([1] : Id), Arith.add)] := hi
   rw [(Prod.mk.inj (List.mem_singleton.1 hi')).2]
   exact h
 
+omit [DecidableEq S] in
 theorem openOp_spec {γ : S} (h : ar γ = 2) :
     OpenOp xsys (openOp γ).toNet γ [1] ([2], 0) ([3], 0) ([0], 0) := by
   have hX := openOp_ok h
@@ -803,6 +823,7 @@ theorem openOp_spec {γ : S} (h : ar γ = 2) :
     rw [ef]
     decide
 
+omit [DecidableEq S] in
 omit K in
 theorem parts3_none1 {A D : Net S} : ∀ c, c ≠ 0 → c ≠ 2 → ∀ i γ,
     ¬ (parts3 A emptyX.toNet D c).agent i γ
@@ -850,9 +871,11 @@ def GExpr.net : GExpr xsys → XNet S
   | .app1 o e => opNet1 o.sym e.net e.res
   | .app2 o e₁ e₂ => opNet o.sym e₁.net e₂.net e₁.res e₂.res
 
+omit [DecidableEq S] in
 /-- **The net of an expression is well formed and computes its value**,
 in the interactions counted by `GExpr.cost`. -/
-theorem GExpr.good : ∀ e : GExpr xsys, e.net.toNet.WF ar ∧ Evals xsys e.net.toNet e.cost e.eval e.res
+theorem GExpr.good : ∀ e : GExpr xsys, e.net.toNet.WF ar ∧ Evals xsys e.net.toNet e.cost e.eval
+    e.res
   | .lit n =>
     ⟨(good_lit (xsys := xsys) n).ok.1, (good_lit (xsys := xsys) n).free,
       (Core.lit zero succ n).toNet, .refl _, (good_lit (xsys := xsys) n).num,
@@ -860,7 +883,7 @@ theorem GExpr.good : ∀ e : GExpr xsys, e.net.toNet.WF ar ∧ Evals xsys e.net.
   | .app1 o e => by
     obtain ⟨w, ev⟩ := GExpr.good e
     have hm := XNet.three_made e.net emptyX (openOp1 o.sym)
-    have hP := parts3_wf w emptyX_ok.1 (openOp1_ok o.ar_eq).1
+    have hP := parts3_wf w (emptyX_ok o.sym).1 (openOp1_ok o.ar_eq).1
     show (opNet1 o.sym e.net e.res).toNet.WF ar ∧
       Evals xsys (opNet1 o.sym e.net e.res).toNet (e.cost + o.c e.eval) (o.f e.eval)
         (tagPort 2 ([0], 0))
@@ -906,7 +929,8 @@ theorem GExpr.fair (e : GExpr xsys) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
       ((XMach.init e.net nt).trace xsys σ i).2 = e.cost ∧
       IsNum ((XMach.init e.net nt).trace xsys σ i).1.mem.toNet e.res e.eval := by
   obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
-  obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) hX hnt hs ((normal_of_numerals hag : Normal (Step xsys.sys) _)) σ hfair
+  obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) hX hnt hs ((normal_of_numerals hag : Normal
+      (Step xsys.sys) _)) σ hfair
   refine ⟨i₀, fun i hi => ?_⟩
   obtain ⟨h₁, h₂, h₃⟩ := h i hi
   refine ⟨h₁, h₂, ?_⟩
@@ -921,7 +945,8 @@ def GExpr.run (e : GExpr xsys) (nt steps : Nat) : Option Nat :=
 theorem GExpr.run_sound (e : GExpr xsys) {nt steps v : Nat} (hnt : 0 < nt)
     (h : e.run nt steps = some v) : v = e.eval := by
   obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
-  exact XNet.runRead_sound (zero := zero) (succ := succ) xsys K.zero_ne_succ (Nat.le_of_eq K.ar_succ.symm) hX hs
+  exact XNet.runRead_sound (zero := zero) (succ := succ) xsys K.zero_ne_succ (Nat.le_of_eq
+      K.ar_succ.symm) hX hs
     ((normal_of_numerals hag : Normal (Step xsys.sys) _)) hA hnt h
 
 /-- **Given enough actions, the run returns the value of the
@@ -967,7 +992,8 @@ theorem Op2.fair (o : Op2 xsys) (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat 
         (o.f m n) := by
   have g := good_binaryNet (xsys := xsys) o.ar_eq o.ne0 o.ne1 m n
   obtain ⟨N', hs, hnum, hag⟩ := o.steps g.config
-  obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) g.ok.1 hnt hs ((normal_of_numerals hag : Normal (Step xsys.sys) _))
+  obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) g.ok.1 hnt hs ((normal_of_numerals hag : Normal
+      (Step xsys.sys) _))
     σ hfair
   refine ⟨i₀, fun i hi => ?_⟩
   obtain ⟨h₁, h₂, h₃⟩ := h i hi
@@ -1005,7 +1031,8 @@ theorem Op1.fair (o : Op1 xsys) (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat �
         (o.f n) := by
   have g := good_unaryNet (xsys := xsys) o.ar_eq o.ne1 n
   obtain ⟨N', hs, hnum, hag⟩ := o.steps g.config
-  obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) g.ok.1 hnt hs ((normal_of_numerals hag : Normal (Step xsys.sys) _))
+  obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) g.ok.1 hnt hs ((normal_of_numerals hag : Normal
+      (Step xsys.sys) _))
     σ hfair
   refine ⟨i₀, fun i hi => ?_⟩
   obtain ⟨h₁, h₂, h₃⟩ := h i hi
