@@ -14,7 +14,8 @@ A copier on a numeral `n`, with its two copies wired to the ports `p₁`
 and `p₂`, runs for `n + 1` steps, after which both ports carry the
 numeral `n`, and what was away from the copier and the numeral is as it
 was (`Peano.copy`).  The ports may be free ports or ports of other
-agents.
+agents.  The two copies are made of agents whose names were not in use
+(`Peano.copy_fresh`).
 -/
 
 namespace INet
@@ -34,6 +35,15 @@ abbrev NumList (N : Net Peano) (i : Id) (l : List Id) : Prop :=
 principal port wired to `r`. -/
 abbrev Tower (N : Net Peano) (x : Port) (j : Nat) (r : Port) : Prop :=
   Addition.Tower ar succ N x j r
+
+/-- The port `p` is wired to the numeral `k`, all of whose agents satisfy
+`Q`. -/
+abbrev IsNumQ (N : Net Peano) (Q : Id → Prop) (p : Port) (k : Nat) : Prop :=
+  Addition.IsNumQ ar zero succ N Q p k
+
+/-- A tower all of whose agents satisfy `Q`. -/
+abbrev TowerQ (N : Net Peano) (Q : Id → Prop) (x : Port) (j : Nat) (r : Port) : Prop :=
+  Addition.TowerQ ar succ N Q x j r
 
 theorem rule_era_zero : system.rule era zero = some eraZero.toX.toRhs := rfl
 theorem rule_era_succ : system.rule era succ = some eraSucc.toX.toRhs := rfl
@@ -176,26 +186,29 @@ theorem erase_num {N : Net Peano} {e : Id} {n : Nat} (hN : N.WF ar) (he : N.agen
 of what is left of the numeral, with the agents `l`; above each of its
 two copies there are already `j` successors, up to the ports `p₁` and
 `p₂`, which are on names in use that are neither the copier nor agents of
-the numeral. -/
-structure Copying (N : Net Peano) (d : Id) (j : Nat) (h : Id) (l : List Id) (p₁ p₂ : Port) :
-    Prop where
+the numeral.  Those successors satisfy `Q`, and so does every name not in
+use. -/
+structure Copying (N : Net Peano) (Q : Id → Prop) (d : Id) (j : Nat) (h : Id) (l : List Id)
+    (p₁ p₂ : Port) : Prop where
   wf : N.WF ar
   hd : N.agent d dup
   fst : N.Paired ar (d, 0) (h, 0)
   num : NumList N h l
-  out₁ : ∃ x, N.Paired ar (d, 1) x ∧ Tower N x j p₁
-  out₂ : ∃ x, N.Paired ar (d, 2) x ∧ Tower N x j p₂
+  out₁ : ∃ x, N.Paired ar (d, 1) x ∧ TowerQ N Q x j p₁
+  out₂ : ∃ x, N.Paired ar (d, 2) x ∧ TowerQ N Q x j p₂
   hp₁ : N.Used p₁.1 ∧ p₁.1 ≠ d ∧ ¬ p₁.1 ∈ l
   hp₂ : N.Used p₂.1 ∧ p₂.1 ≠ d ∧ ¬ p₂.1 ∈ l
+  hQ : ∀ i, ¬ N.Used i → Q i
 
 /-- The copier runs for as many steps as the numeral has agents left,
-after which both ports carry the numeral, with the successors already
-made; everything away from the copier and the numeral is kept, and the
-agents of the net are zeros, successors, or agents of the start other
-than the copier. -/
-theorem Copying.run : ∀ (l : List Id) {N : Net Peano} {d : Id} {j : Nat} {h : Id}
-    {p₁ p₂ : Port} {n : Nat}, Copying N d j h l p₁ p₂ → l.length = n + 1 →
-    ∃ N', Steps (Step system) l.length N N' ∧ IsNum N' p₁ (j + n) ∧ IsNum N' p₂ (j + n) ∧
+after which both ports carry the numeral, made of the successors already
+there and of new agents; everything away from the copier and the numeral
+is kept, and the agents of the net are zeros, successors, or agents of
+the start other than the copier. -/
+theorem Copying.run {Q : Id → Prop} : ∀ (l : List Id) {N : Net Peano} {d : Id} {j : Nat}
+    {h : Id} {p₁ p₂ : Port} {n : Nat}, Copying N Q d j h l p₁ p₂ → l.length = n + 1 →
+    ∃ N', Steps (Step system) l.length N N' ∧ IsNumQ N' Q p₁ (j + n) ∧
+      IsNumQ N' Q p₂ (j + n) ∧
       N.Keeps ar (gone N d l) N' ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d)
   | [], _, _, _, _, _, _, _, c, _ => by cases c.num
@@ -216,11 +229,11 @@ theorem Copying.run : ∀ (l : List Id) {N : Net Peano} {d : Id} {j : Nat} {h : 
       have red : Redex system N d h dup zero dupZero.toX.toRhs :=
         ⟨hd, hz, hA.site.ne, hfst.2.2, rule_dup_zero⟩
       have st : Step system N (N.fire d h dupZero.toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
-      obtain ⟨hx₁d, hx₁h, ht₁'⟩ := hA.tower_fire' (by decide) dupZero.toX.toRhs hp₁.2.1
+      obtain ⟨hx₁d, hx₁h, ht₁'⟩ := hA.towerQ_fire' (by decide) dupZero.toX.toRhs hp₁.2.1
         (fun e => hp₁.2.2 (by
           rw [e]
           exact List.mem_cons_self)) ht₁
-      obtain ⟨hx₂d, hx₂h, ht₂'⟩ := hA.tower_fire' (by decide) dupZero.toX.toRhs hp₂.2.1
+      obtain ⟨hx₂d, hx₂h, ht₂'⟩ := hA.towerQ_fire' (by decide) dupZero.toX.toRhs hp₂.2.1
         (fun e => hp₂.2.2 (by
           rw [e]
           exact List.mem_cons_self)) ht₂
@@ -233,10 +246,14 @@ theorem Copying.run : ∀ (l : List Id) {N : Net Peano} {d : Id} {j : Nat} {h : 
         hA.site.paired_fire_ifc_new hR
           (show dupZero.toX.toRhs.link (.ifc false 1) (.new (some true) 0 0) from rfl)
           (hpx₂.symm hN) hx₂d hx₂h
-      have n₁ : IsNum (N.fire d h dupZero.toX.toRhs) x₁ 0 :=
-        ⟨_, q₁, .inr ⟨some false, 0, rfl, rfl⟩⟩
-      have n₂ : IsNum (N.fire d h dupZero.toX.toRhs) x₂ 0 :=
-        ⟨_, q₂, .inr ⟨some true, 0, rfl, rfl⟩⟩
+      have n₁ : IsNumQ (N.fire d h dupZero.toX.toRhs) Q x₁ 0 :=
+        ⟨_, [_], q₁, .last (.inr ⟨some false, 0, rfl, rfl⟩), rfl, fun i hi => by
+          rw [List.mem_singleton.1 hi]
+          exact c.hQ _ (hA.site.not_used_child (some false) 0)⟩
+      have n₂ : IsNumQ (N.fire d h dupZero.toX.toRhs) Q x₂ 0 :=
+        ⟨_, [_], q₂, .last (.inr ⟨some true, 0, rfl, rfl⟩), rfl, fun i hi => by
+          rw [List.mem_singleton.1 hi]
+          exact c.hQ _ (hA.site.not_used_child (some true) 0)⟩
       refine ⟨_, .single st, ?_, ?_, (hA.site.keeps _).mono ?_, ?_⟩
       · rw [hn]
         exact ht₁'.num n₁
@@ -266,11 +283,11 @@ theorem Copying.run : ∀ (l : List Id) {N : Net Peano} {d : Id} {j : Nat} {h : 
         · exact hA.ne_add hx (by decide)
         · exact hA.ne_add hx (by decide)
       have hh'h : h' ≠ h := hA.not_s hpi (port_ne_snd (by decide))
-      obtain ⟨hx₁d, hx₁h, ht₁'⟩ := hA.tower_fire' (by decide) dupSucc.toX.toRhs hp₁.2.1
+      obtain ⟨hx₁d, hx₁h, ht₁'⟩ := hA.towerQ_fire' (by decide) dupSucc.toX.toRhs hp₁.2.1
         (fun e => hp₁.2.2 (by
           rw [e]
           exact List.mem_cons_self)) ht₁
-      obtain ⟨hx₂d, hx₂h, ht₂'⟩ := hA.tower_fire' (by decide) dupSucc.toX.toRhs hp₂.2.1
+      obtain ⟨hx₂d, hx₂h, ht₂'⟩ := hA.towerQ_fire' (by decide) dupSucc.toX.toRhs hp₂.2.1
         (fun e => hp₂.2.2 (by
           rw [e]
           exact List.mem_cons_self)) ht₂
@@ -304,22 +321,25 @@ theorem Copying.run : ∀ (l : List Id) {N : Net Peano} {d : Id} {j : Nat} {h : 
           · exact absurd (hN.agent_fun hx hd) (by decide)
         · rw [e1] at hi
           exact Addition.NumList.not_mem hN hfst hl' hpi (port_ne_snd (by decide)) hi
-      have c' : Copying (N.fire d h dupSucc.toX.toRhs) (child d h (some true) 0) (j + 1) h' l'
-          p₁ p₂ :=
+      have c' : Copying (N.fire d h dupSucc.toX.toRhs) Q (child d h (some true) 0) (j + 1) h'
+          l' p₁ p₂ :=
         { wf := hN₁
           hd := .inr ⟨some true, 0, rfl, rfl⟩
           fst := q₅.symm hN₁
           num := hl'.keeps (hA.site.keeps _) hav
           out₁ := ⟨_, q₃.symm hN₁, child d h (some false) 0, x₁, rfl,
-            .inr ⟨some false, 0, rfl, rfl⟩, q₁, ht₁'⟩
+            c.hQ _ (hA.site.not_used_child (some false) 0), .inr ⟨some false, 0, rfl, rfl⟩, q₁,
+            ht₁'⟩
           out₂ := ⟨_, q₄.symm hN₁, child d h (some false) 1, x₂, rfl,
-            .inr ⟨some false, 1, rfl, rfl⟩, q₂, ht₂'⟩
+            c.hQ _ (hA.site.not_used_child (some false) 1), .inr ⟨some false, 1, rfl, rfl⟩, q₂,
+            ht₂'⟩
           hp₁ := ⟨Net.used_fire hN hp₁.1 _ _ _, fun e => hA.site.not_used_child (some true) 0 (by
             rw [← e]
             exact hp₁.1), fun hm => hp₁.2.2 (List.mem_cons_of_mem _ hm)⟩
           hp₂ := ⟨Net.used_fire hN hp₂.1 _ _ _, fun e => hA.site.not_used_child (some true) 0 (by
             rw [← e]
-            exact hp₂.1), fun hm => hp₂.2.2 (List.mem_cons_of_mem _ hm)⟩ }
+            exact hp₂.1), fun hm => hp₂.2.2 (List.mem_cons_of_mem _ hm)⟩
+          hQ := fun i hu => c.hQ i fun hu' => hu (Net.used_fire hN hu' _ _ _) }
       obtain ⟨N', sts, i₁, i₂, kp, hag⟩ := Copying.run l' c' ek
       have e : j + n = j + 1 + k := by omega
       refine ⟨N', .head st sts, ?_, ?_, ((hA.site.keeps _).trans kp).mono ?_, ?_⟩
@@ -351,9 +371,25 @@ theorem Copying.run : ∀ (l : List Id) {N : Net Peano} {d : Id} {j : Nat} {h : 
 numeral `n`, with the agents `l`, and let its two copies be wired to the
 ports `p₁` and `p₂`, neither on the copier or on an agent of the numeral.
 The net reduces, in `n + 1` steps, to a net in which both ports carry the
-numeral `n`, and which has kept everything away from the copier and the
-numeral; its agents are zeros, successors, or agents of the start other
-than the copier. -/
+numeral `n`, made of agents whose names were not in use, and which has
+kept everything away from the copier and the numeral; its agents are
+zeros, successors, or agents of the start other than the copier. -/
+theorem copy_fresh {N : Net Peano} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : Nat}
+    (hN : N.WF ar) (hd : N.agent d dup) (hp : N.Paired ar (d, 0) (h, 0)) (hl : NumList N h l)
+    (hlen : l.length = n + 1) (h₁ : N.Paired ar (d, 1) p₁) (h₂ : N.Paired ar (d, 2) p₂)
+    (hp₁ : p₁.1 ≠ d ∧ ¬ p₁.1 ∈ l) (hp₂ : p₂.1 ≠ d ∧ ¬ p₂.1 ∈ l) :
+    ∃ N', Steps (Step system) (n + 1) N N' ∧ IsNumQ N' (fun i => ¬ N.Used i) p₁ n ∧
+      IsNumQ N' (fun i => ¬ N.Used i) p₂ n ∧ N.Keeps ar (gone N d l) N' ∧
+      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d) := by
+  have c : Copying N (fun i => ¬ N.Used i) d 0 h l p₁ p₂ :=
+    ⟨hN, hd, hp, hl, ⟨p₁, h₁, rfl⟩, ⟨p₂, h₂, rfl⟩, ⟨Net.End.used h₁.2.1, hp₁⟩,
+      ⟨Net.End.used h₂.2.1, hp₂⟩, fun _ hu => hu⟩
+  obtain ⟨N', sts, i₁, i₂, kp, hag⟩ := Copying.run l c hlen
+  rw [hlen] at sts
+  rw [Nat.zero_add] at i₁ i₂
+  exact ⟨N', sts, i₁, i₂, kp, hag⟩
+
+/-- The same, without the statement about the agents of the copies. -/
 theorem copy {N : Net Peano} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : Nat}
     (hN : N.WF ar) (hd : N.agent d dup) (hp : N.Paired ar (d, 0) (h, 0)) (hl : NumList N h l)
     (hlen : l.length = n + 1) (h₁ : N.Paired ar (d, 1) p₁) (h₂ : N.Paired ar (d, 2) p₂)
@@ -361,13 +397,8 @@ theorem copy {N : Net Peano} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : Na
     ∃ N', Steps (Step system) (n + 1) N N' ∧ IsNum N' p₁ n ∧ IsNum N' p₂ n ∧
       N.Keeps ar (gone N d l) N' ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d) := by
-  have c : Copying N d 0 h l p₁ p₂ :=
-    ⟨hN, hd, hp, hl, ⟨p₁, h₁, rfl⟩, ⟨p₂, h₂, rfl⟩, ⟨Net.End.used h₁.2.1, hp₁⟩,
-      ⟨Net.End.used h₂.2.1, hp₂⟩⟩
-  obtain ⟨N', sts, i₁, i₂, kp, hag⟩ := Copying.run l c hlen
-  rw [hlen] at sts
-  rw [Nat.zero_add] at i₁ i₂
-  exact ⟨N', sts, i₁, i₂, kp, hag⟩
+  obtain ⟨N', sts, i₁, i₂, kp, hag⟩ := copy_fresh hN hd hp hl hlen h₁ h₂ hp₁ hp₂
+  exact ⟨N', sts, i₁.isNum, i₂.isNum, kp, hag⟩
 
 /-! ### Two small runs -/
 

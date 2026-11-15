@@ -2000,14 +2000,16 @@ An executable reducer.  `XNet` is a finite net without history, as data;
 * `INet.Addition.Adding.run`
                              the adder adds with any other agents in the
                              net and its result wired to any port
-* `INet.Peano.mul_correct`, `INet.Peano.Product`, `INet.Peano.Stack`,
-  `INet.Peano.MState.run`, `INet.Peano.SState.run`
+* `INet.Peano.mul_correct`, `INet.Peano.Product`,
+  `INet.Peano.Multiplying.run`, `INet.Peano.copy_fresh`
                              the multiplier multiplies: a net whose
                              multiplier has the numerals `m` and `n` as
                              arguments reduces, in
                              `(m + 1) * (n + 2) + m * (n + 1)` steps, to a
                              normal form with the numeral `m * n` on the
-                             result port
+                             result port; and it does so with any other
+                             agents in the net and its result wired to
+                             any port, leaving the rest alone
 * `INet.Peano.prod_ok`, `INet.Peano.good_prod`, `INet.Peano.prod_rest`,
   `INet.Peano.prod_fair`
                              the nets `Peano.prod m n` are valid for all
@@ -3335,20 +3337,30 @@ holds up to equality rather than up to renaming.
   setting: with any other agents in the net, other adders among them,
   and its result wired to any port, it runs for as many steps as its
   first argument has agents and leaves the sum on that port
-  (`Addition.Adding.run`).
+  (`Addition.Adding.run`).  The results of these runs are numerals given
+  with the list of their agents and a predicate that the agents satisfy
+  (`Addition.IsNumQ`); it is used to say that the agents are new, their
+  names not having been in use at the start (`Peano.copy_fresh`).  A
+  later run consumes such a numeral, and that its agents are new is what
+  shows that the later run leaves the rest of the first net alone.
 * The multiplier multiplies (`Peano.mul_correct`): a net whose multiplier
   has the numerals `m` and `n` as arguments and a free port as result
   (`Peano.Product`) reduces to a normal form with the numeral `m * n` on
-  that port, in exactly `(m + 1) * (n + 2) + m * (n + 1)` steps.  The
-  run has two parts.  In the first the multiplier walks down its first
-  argument; on each successor it leaves an adder behind and copies its
-  second argument, one copy for the adder and one for itself, and on
-  the zero it puts a zero on its result and erases its second argument
-  (`Peano.MState.run`).  The adders left behind wait in a stack, each
-  with a copy of `n` and with the result of the next as its second
-  argument (`Peano.Stack`); the frame lemmas carry the stack through
-  each copy.  In the second part the adders run, the last one made
-  first, each adding `n` (`Peano.SState.run`).  The nets
+  that port, in exactly `(m + 1) * (n + 2) + m * (n + 1)` steps.  This
+  is a case of a theorem about a multiplier in any net
+  (`Peano.Multiplying.run`): the net may have any other agents and the
+  result may be wired to any port that is not on the multiplier or its
+  arguments; the port then carries the numeral `m * n`, made of new
+  agents, everything away from the multiplier and its two arguments is
+  kept (`Net.Keeps` for `Addition.gone2`, a closed set), and the agents
+  of the net are zeros, successors, or agents of the start other than
+  the multiplier.  The proof is by recursion on the first argument.  On
+  a zero, the multiplier puts a zero on its result and erases its
+  second argument.  On a successor it leaves an adder and a new
+  multiplier behind and copies its second argument, one copy for each;
+  the new multiplier computes the product of the rest on the second
+  argument of the adder, by the theorem itself, and the adder then adds
+  its copy.  The nets
   `Peano.prod m n`, built by putting successors on the arguments of the
   multiplier of `0 * 0`, are valid and are such multiplications for all
   `m` and `n` (`Peano.good_prod`), so the theorems about the machine

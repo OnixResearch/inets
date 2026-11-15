@@ -3,35 +3,34 @@ import InteractionNets.PeanoCopy
 /-! # The multiplier multiplies
 
 In the system `Peano`, a multiplier whose arguments are the numerals `m`
-and `n` and whose result is a free port reduces to the numeral `m * n`,
-for all `m` and `n` (`Peano.mul_correct`).
+and `n` reduces to the numeral `m * n`, for all `m` and `n`.
 
-The run has two parts.
+The main theorem is about a multiplier in any net
+(`Peano.Multiplying.run`): the net may have any other agents, and the
+result may be wired to any port.  The proof is by recursion on the first
+argument.  On a zero, the multiplier puts a zero on its result and erases
+its second argument.  On a successor, it leaves an adder and a new
+multiplier behind and copies its second argument, one copy for each; the
+new multiplier computes the product of the rest, on the second argument
+of the adder; the adder then adds its copy.  The theorem says what the
+run leaves alone (`Net.Keeps`), and that the result is made of new
+agents, which is what lets it be used inside itself and inside other
+runs.
 
-In the first, the multiplier walks down its first argument.  On each
-successor it leaves an adder behind, copies its second argument, and
-gives one copy to the adder and keeps the other
-(`Peano.MState.succ_round`); on the zero it puts a zero on its result and
-erases its second argument (`Peano.MState.zero_round`).  The adders left
-behind wait in a stack: each has a copy of `n` as its first argument, and
-its second argument is the result of the next one (`Peano.Stack`).
+For a net that has nothing else, with the result on a free port
+(`Peano.Product`), the result is a normal form (`Peano.mul_correct`).
 
-In the second, the adders run, from the last one made to the first
-(`Peano.SState.pop`), each adding `n` to what is below it.
+The count of steps is exact: `(m + 1) * (n + 2) + m * (n + 1)`.
 
-The count of steps is exact: `(m + 1) * (n + 2)` for the first part and
-`m * (n + 1)` for the second.
-
-Scope.  The net has no other agents than the multiplier and its two
-arguments.  The theorem is about reduction of nets; the machine is not
-involved here.
+The theorems are about reduction of nets; the machine is not involved
+here.
 -/
 
 namespace INet
 
 namespace Peano
 
-open Addition (gone)
+open Addition (gone gone2)
 
 theorem rule_mul_zero : system.rule mul zero = some mulZero.toX.toRhs := rfl
 theorem rule_mul_succ : system.rule mul succ = some mulSucc.toX.toRhs := rfl
@@ -184,375 +183,262 @@ theorem mulZero_step {N : Net Peano} {a z t : Id} {x : Port}
       · exact .inr (.inl e)
       · exact .inr (.inr e)
 
-/-! ### The stack of waiting adders -/
+/-! ### The multiplier, with anything else around -/
 
-/-- **The adders that wait for the product.**  The port `x` is where the
-multiplier delivers.  With no adder waiting it is the result port `r`.
-Otherwise it is the second argument of the adder `A`, whose first
-argument is the numeral `n` and whose result is the port of the rest of
-the stack. -/
-def Stack (N : Net Peano) (n : Nat) : Port → List Id → Port → Prop
-  | x, [], r => x = r
-  | x, A :: As, r => x = (A, 1) ∧ N.agent A add ∧ IsNum N (A, 0) n ∧
-      ∃ x', N.Paired ar (A, 2) x' ∧ Stack N n x' As r
+/-- The number of interactions of `m * n`. -/
+def prodCost (m n : Nat) : Nat := (m + 1) * (n + 2) + m * (n + 1)
+
+/-- The agents of a numeral are in use. -/
+theorem numList_used {N : Net Peano} {h : Id} {l : List Id} (hl : NumList N h l) {j : Id}
+    (hj : j ∈ l) : N.Used j :=
+  (hl.label j hj).elim (fun h => .inl ⟨_, h⟩) fun h => .inl ⟨_, h⟩
+
+theorem not_gone2 {N : Net Peano} {a i : Id} {l₁ l₂ : List Id} (h1 : i ≠ a) (h2 : ¬ i ∈ l₁)
+    (h3 : ¬ i ∈ l₂) (h4 : N.Used i) : ¬ gone2 N a l₁ l₂ i := by
+  rintro (e | hm | hm | hu)
+  · exact h1 e
+  · exact h2 hm
+  · exact h3 hm
+  · exact hu h4
+
+/-- **The situation of a multiplication, with anything else in the net.**
+The multiplier `a` faces the head `h₁` of its first argument, a numeral
+with the agents `l₁`; its second argument is a numeral with the head `h₂`
+and the agents `l₂`; its result is wired to the port `r`, which is not on
+the multiplier or on an agent of the two numerals.  The port `r` need not
+be free. -/
+structure Multiplying (N : Net Peano) (a : Id) (h₁ : Id) (l₁ : List Id) (h₂ : Id)
+    (l₂ : List Id) (r : Port) : Prop where
+  wf : N.WF ar
+  ha : N.agent a mul
+  fst : N.Paired ar (a, 0) (h₁, 0)
+  num₁ : NumList N h₁ l₁
+  snd : N.Paired ar (a, 1) (h₂, 0)
+  num₂ : NumList N h₂ l₂
+  out : N.Paired ar (a, 2) r
+  hr : r.1 ≠ a ∧ ¬ r.1 ∈ l₁ ∧ ¬ r.1 ∈ l₂
 
 variable {N N' : Net Peano} {n : Nat} {r : Port}
 
-theorem Stack.agent : ∀ {As : List Id} {x : Port}, Stack N n x As r →
-    ∀ A, A ∈ As → N.agent A add
-  | [], _, _, _, hA => absurd hA List.not_mem_nil
-  | B :: _, _, ⟨_, hB, _, _, _, hs⟩, A, hA => by
-    rcases List.mem_cons.1 hA with e | hA'
-    · rw [e]
-      exact hB
-    · exact Stack.agent hs A hA'
+/-- **The multiplier multiplies, with anything else around.**  With the
+numerals `m` and `n` as arguments, the net reduces in `prodCost m n`
+steps to a net in which the port `r` carries the numeral `m * n`, made of
+agents whose names were not in use.  Everything away from the multiplier
+and its two arguments is kept, and the agents of the net are zeros,
+successors, or agents of the start other than the multiplier.
 
-/-- The port of a stack is the result port or the second argument of one
-of its adders. -/
-theorem Stack.port : ∀ {As : List Id} {x : Port}, Stack N n x As r →
-    x = r ∨ ∃ A, A ∈ As ∧ x = (A, 1)
-  | [], _, h => .inl h
-  | A :: _, _, ⟨e, _⟩ => .inr ⟨A, List.mem_cons_self, e⟩
-
-/-- The port of a stack is on a name in use. -/
-theorem Stack.port_used {As : List Id} {x : Port} (hr : N.free r) (hs : Stack N n x As r) :
-    N.Used x.1 := by
-  rcases hs.port with e | ⟨B, hB, e⟩
-  · rw [e]
-    exact .inr (.inr ⟨r.2, hr⟩)
-  · rw [e]
-    exact .inl ⟨add, hs.agent B hB⟩
-
-/-- The port of a stack is not on an agent that is not an adder. -/
-theorem Stack.port_ne {As : List Id} {x : Port} (hN : N.WF ar) (hr : N.free r)
-    (hs : Stack N n x As r) {i : Id} {γ : Peano} (hi : N.agent i γ) (hγ : γ ≠ add) :
-    x.1 ≠ i := by
-  intro e
-  rcases hs.port with e' | ⟨B, hB, e'⟩
-  · rw [e'] at e
-    rw [← e] at hi
-    exact hN.free_agent (i := r.1) (k := r.2) hr hi
-  · rw [e'] at e
-    have e'' : B = i := e
-    rw [← e''] at hi
-    exact hγ (hN.agent_fun hi (hs.agent B hB))
-
-/-- **A stack away from a closed set is kept.** -/
-theorem Stack.keeps {C : Id → Prop} (k : N.Keeps ar C N') (hC : Addition.Closed ar C N)
-    (hr : ¬ C r.1) : ∀ {As : List Id} {x : Port}, Stack N n x As r →
-      (∀ A, A ∈ As → ¬ C A) → Stack N' n x As r
-  | [], _, h, _ => h
-  | A :: _, _, ⟨e, hA, hn, x', hp, hs⟩, hAs => by
-    have hA' : ¬ C A := hAs A List.mem_cons_self
-    have hx' : ¬ C x'.1 := by
-      rcases hs.port with e' | ⟨B, hB, e'⟩
-      · rw [e']
-        exact hr
-      · rw [e']
-        exact hAs B (List.mem_cons_of_mem _ hB)
-    exact ⟨e, k.agent hA hA', Addition.IsNum.keeps k hC hn hA', x', k.paired hp hA' hx',
-      Stack.keeps k hC hr hs fun B hB => hAs B (List.mem_cons_of_mem _ hB)⟩
-
-/-! ### The two parts of the run -/
-
-/-- **The multiplier at work.**  The multiplier `a` has the numerals `m`
-and `n` as arguments, and delivers to the stack of the adders `As`, which
-ends on the free port `r`.  The net has nothing else. -/
-structure MState (N : Net Peano) (a : Id) (m n : Nat) (As : List Id) (r : Port) : Prop where
-  wf : N.WF ar
-  ha : N.agent a mul
-  fst : IsNum N (a, 0) m
-  snd : IsNum N (a, 1) n
-  out : ∃ x, N.Paired ar (a, 2) x ∧ Stack N n x As r
-  free : N.free r
-  nodup : As.Nodup
-  only : ∀ i γ, N.agent i γ → γ = zero ∨ γ = succ ∨ i = a ∨ i ∈ As
-
-/-- **The adders at work.**  The numeral `v` is delivered to the stack of
-the adders `As`, which ends on the free port `r`.  The net has nothing
-else. -/
-structure SState (N : Net Peano) (v n : Nat) (As : List Id) (r : Port) : Prop where
-  wf : N.WF ar
-  val : ∃ x, IsNum N x v ∧ Stack N n x As r
-  free : N.free r
-  nodup : As.Nodup
-  only : ∀ i γ, N.agent i γ → γ = zero ∨ γ = succ ∨ i ∈ As
-
-/-- The agents of a numeral are in use. -/
-theorem numList_used {h : Id} {l : List Id} (hl : NumList N h l) {j : Id} (hj : j ∈ l) :
-    N.Used j :=
-  (hl.label j hj).elim (fun h => .inl ⟨_, h⟩) fun h => .inl ⟨_, h⟩
-
-/-- **A round of the multiplier on a successor**: one firing and a copy,
-`n + 2` steps, after which there is one more adder waiting. -/
-theorem MState.succ_round {a : Id} {m : Nat} {As : List Id}
-    (c : MState N a (m + 1) n As r) :
-    ∃ N' a' A, Steps (Step system) (n + 2) N N' ∧ MState N' a' m n (A :: As) r := by
-  have hN := c.wf
-  have ha := c.ha
-  obtain ⟨s, hps, hs, h', hpi, hnh'⟩ := c.fst
-  obtain ⟨t, hpt, hnt⟩ := c.snd
-  obtain ⟨x, hpx, hst⟩ := c.out
-  have hA : Addition.Adder ar mul N a s succ := ⟨hN, ha, hs, by decide, hps⟩
-  have hh'a : h' ≠ a := by
-    rcases Addition.Num.label hnh' with hx' | hx'
-    · exact hA.ne_add hx' (by decide)
-    · exact hA.ne_add hx' (by decide)
-  have hh's : h' ≠ s := hA.not_s hpi (port_ne_snd (by decide))
-  have hta : t ≠ a := by
-    rcases Addition.Num.label hnt with hx' | hx'
-    · exact hA.ne_add hx' (by decide)
-    · exact hA.ne_add hx' (by decide)
-  have hts : t ≠ s := hA.not_s hpt (port_ne_snd (by decide))
-  have hxa : x.1 ≠ a := hst.port_ne hN c.free ha (by decide)
-  have hxs : x.1 ≠ s := hst.port_ne hN c.free hs (by decide)
-  obtain ⟨N₁, D, A, M, st, k₁, hD, hA', hM, aD, aA, aM, pDt, pDA, pDM, pMh, pMA, pAx, hused,
-    hag₁⟩ := mulSucc_step hA hpi hpt hpx ⟨hh'a, hh's⟩ ⟨hta, hts⟩ ⟨hxa, hxs⟩
-  have hN₁ := Step.wf hN st
-  -- the second argument, in the net after the firing
-  obtain ⟨l, hl, el⟩ := Addition.Num.list hnt
-  have hav : ∀ j, j ∈ l → ¬ (j = a ∨ j = s) := by
-    intro j hj hc
-    rcases hc with e1 | e1
-    · rw [e1] at hj
-      rcases hl.label a hj with hx' | hx'
-      · exact absurd (hN.agent_fun hx' ha) (by decide)
-      · exact absurd (hN.agent_fun hx' ha) (by decide)
-    · rw [e1] at hj
-      exact Addition.NumList.not_mem hN hps hl hpt (port_ne_snd (by decide)) hj
-  have hl₁ : NumList N₁ t l := hl.keeps k₁ hav
-  -- the rest of the first argument, in the net after the firing
-  obtain ⟨lh, hlh, elh⟩ := Addition.Num.list hnh'
-  have havh : ∀ j, j ∈ lh → ¬ (j = a ∨ j = s) := by
-    intro j hj hc
-    rcases hc with e1 | e1
-    · rw [e1] at hj
-      rcases hlh.label a hj with hx' | hx'
-      · exact absurd (hN.agent_fun hx' ha) (by decide)
-      · exact absurd (hN.agent_fun hx' ha) (by decide)
-    · rw [e1] at hj
-      exact Addition.NumList.not_mem hN hps hlh hpi (port_ne_snd (by decide)) hj
-  obtain ⟨m', em', hm'⟩ := (hlh.keeps k₁ havh).num
-  have emm : m' = m := by omega
-  rw [emm] at hm'
-  -- the copy
-  have hAl : ¬ A ∈ l := fun hm => hA' (numList_used hl hm)
-  have hMl : ¬ M ∈ l := fun hm => hM (numList_used hl hm)
-  obtain ⟨N₂, sts, i₁, i₂, k₂, hag₂⟩ := copy hN₁ aD pDt hl₁ el pDA pDM
-    ⟨ne_of_agent hN₁ aA aD (by decide), hAl⟩ ⟨ne_of_agent hN₁ aM aD (by decide), hMl⟩
-  have hC₂ : Addition.Closed ar (gone N₁ D l) N₁ := Addition.gone_closed hN₁ pDt hl₁
-  have ngA : ¬ gone N₁ D l A := not_gone (ne_of_agent hN₁ aA aD (by decide)) hAl (.inl ⟨_, aA⟩)
-  have ngM : ¬ gone N₁ D l M := not_gone (ne_of_agent hN₁ aM aD (by decide)) hMl (.inl ⟨_, aM⟩)
-  -- what was there before and is not in the second argument is not used up
-  have ngold : ∀ i, N.Used i → ¬ i ∈ l → ¬ gone N₁ D l i := fun i hu hl' =>
-    not_gone (fun e => hD (e ▸ hu)) hl' (hused i hu)
-  have hxl : ¬ x.1 ∈ l := fun hm =>
-    (hl.label _ hm).elim (fun h => hst.port_ne hN c.free h (by decide) rfl)
-      fun h => hst.port_ne hN c.free h (by decide) rfl
-  have hrl : ¬ r.1 ∈ l := fun hm =>
-    (hl.label _ hm).elim (fun h => hN.free_agent (i := r.1) (k := r.2) c.free h)
-      fun h => hN.free_agent (i := r.1) (k := r.2) c.free h
-  have hAsl : ∀ B, B ∈ As → ¬ B ∈ l := fun B hB hm =>
-    (hl.label _ hm).elim (fun h => absurd (hN.agent_fun h (hst.agent B hB)) (by decide))
-      fun h => absurd (hN.agent_fun h (hst.agent B hB)) (by decide)
-  have hst₁ : Stack N₁ n x As r :=
-    hst.keeps k₁ hA.closed
-      (fun hc => hc.elim (fun e => hN.free_agent (i := r.1) (k := r.2) c.free (e ▸ ha))
-        fun e => hN.free_agent (i := r.1) (k := r.2) c.free (e ▸ hs))
-      fun B hB hc => hc.elim (ne_of_agent hN (hst.agent B hB) ha (by decide))
-        (ne_of_agent hN (hst.agent B hB) hs (by decide))
-  have hst₂ : Stack N₂ n x As r :=
-    hst₁.keeps k₂ hC₂ (ngold _ (.inr (.inr ⟨r.2, c.free⟩)) hrl)
-      fun B hB => ngold B (.inl ⟨_, hst.agent B hB⟩) (hAsl B hB)
-  have ngx : ¬ gone N₁ D l x.1 := ngold _ (hst.port_used c.free) hxl
-  refine ⟨N₂, M, A, .head st sts, Steps.wf hN₁ sts, k₂.agent aM ngM,
-    Addition.IsNum.keeps k₂ hC₂ ⟨h', pMh, hm'⟩ ngM, i₂,
-    ⟨(A, 1), k₂.paired pMA ngM ngA, rfl, k₂.agent aA ngA, i₁, x, k₂.paired pAx ngA ngx, hst₂⟩,
-    ?_, List.nodup_cons.2 ⟨fun hm => hA' (.inl ⟨_, hst.agent A hm⟩), c.nodup⟩, ?_⟩
-  · rw [sts.free, st.free]
-    exact c.free
-  · intro i γ hi
-    rcases hag₂ i γ hi with hz | hsu | ⟨hi₁, hne⟩
-    · exact .inl hz
-    · exact .inr (.inl hsu)
-    · rcases hag₁ i γ hi₁ with ⟨hi₀, hia, -⟩ | e | e | e
-      · rcases c.only i γ hi₀ with hz | hsu | e | hm
-        · exact .inl hz
+On a zero, the multiplier puts a zero on its result and erases its second
+argument.  On a successor it copies its second argument; the product of
+the rest of the first argument and one copy is computed first, and the
+other copy is then added to it. -/
+theorem Multiplying.run : ∀ (l₁ : List Id) {N : Net Peano} {a h₁ h₂ : Id} {l₂ : List Id}
+    {r : Port} {m n : Nat}, Multiplying N a h₁ l₁ h₂ l₂ r → l₁.length = m + 1 →
+    l₂.length = n + 1 →
+    ∃ N', Steps (Step system) (prodCost m n) N N' ∧
+      IsNumQ N' (fun i => ¬ N.Used i) r (m * n) ∧ N.Keeps ar (gone2 N a l₁ l₂) N' ∧
+      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ a)
+  | [], _, _, _, _, _, _, _, _, c, _, _ => by cases c.num₁
+  | s :: l', N, a, _, h₂, l₂, r, m, n, c, hlen, hlen₂ => by
+    have hN := c.wf
+    have ha := c.ha
+    have hps := c.fst
+    have hpt := c.snd
+    have hpx := c.out
+    have hl₂ := c.num₂
+    obtain ⟨hra, hrl₁, hrl₂⟩ := c.hr
+    have hru : N.Used r.1 := Net.End.used hpx.2.1
+    have hrs : r.1 ≠ s := fun e => hrl₁ (by
+      rw [e]
+      exact List.mem_cons_self)
+    have hta : h₂ ≠ a := by
+      rcases hl₂.label h₂ hl₂.head_mem with hx' | hx'
+      · exact ne_of_agent hN hx' ha (by decide)
+      · exact ne_of_agent hN hx' ha (by decide)
+    -- the second argument is away from the multiplier and the head of the first
+    have hav : ∀ t, N.Paired ar (a, 0) (t, 0) → ∀ j, j ∈ l₂ → ¬ (j = a ∨ j = t) := by
+      intro t hpt' j hj hc
+      rcases hc with e1 | e1
+      · rw [e1] at hj
+        rcases hl₂.label a hj with hx' | hx'
+        · exact absurd (hN.agent_fun hx' ha) (by decide)
+        · exact absurd (hN.agent_fun hx' ha) (by decide)
+      · rw [e1] at hj
+        exact Addition.NumList.not_mem hN hpt' hl₂ hpt (port_ne_snd (by decide)) hj
+    have hnum := c.num₁
+    cases hnum with
+    | last hz =>
+      have hm : m = 0 := Nat.succ.inj hlen.symm
+      have hA : Addition.Adder ar mul N a s zero := ⟨hN, ha, hz, by decide, hps⟩
+      have hts : h₂ ≠ s := hA.not_s hpt (port_ne_snd (by decide))
+      obtain ⟨N₁, Z, E, st, k₁, hZ, hE, aZ, aE, pxZ, pEt, hused, hag₁⟩ :=
+        mulZero_step hA hpt hpx ⟨hta, hts⟩ ⟨hra, hrs⟩
+      have hN₁ := Step.wf hN st
+      have hl₂₁ : NumList N₁ h₂ l₂ := hl₂.keeps k₁ (hav s hps)
+      obtain ⟨N₂, sts, k₂, hag₂⟩ := erase l₂ hN₁ aE pEt hl₂₁
+      rw [hlen₂] at sts
+      have ngZ : ¬ gone N₁ E l₂ Z :=
+        not_gone (ne_of_agent hN₁ aZ aE (by decide)) (fun hm => hZ (numList_used hl₂ hm))
+          (.inl ⟨_, aZ⟩)
+      have ngr : ¬ gone N₁ E l₂ r.1 := not_gone (fun e => hE (e ▸ hru)) hrl₂ (hused _ hru)
+      have e : prodCost m n = n + 1 + 1 := by
+        rw [hm]
+        unfold prodCost
+        omega
+      refine ⟨N₂, ?_, ⟨Z, [Z], k₂.paired pxZ ngr ngZ, .last (k₂.agent aZ ngZ), ?_, ?_⟩,
+        (k₁.trans k₂).mono ?_, ?_⟩
+      · rw [e]
+        exact .head st sts
+      · rw [hm, Nat.zero_mul]
+        rfl
+      · intro i hi
+        rw [List.mem_singleton.1 hi]
+        exact hZ
+      · rintro i ((e1 | e1) | e1 | hm' | hu)
+        · exact .inl e1
+        · exact .inr (.inl (by
+            rw [e1]
+            exact List.mem_cons_self))
+        · exact .inr (.inr (.inr (by
+            rw [e1]
+            exact hE)))
+        · exact .inr (.inr (.inl hm'))
+        · exact .inr (.inr (.inr fun hu' => hu (hused i hu')))
+      · intro i γ hi
+        obtain ⟨hi₁, hne, -⟩ := hag₂ i γ hi
+        rcases hag₁ i γ hi₁ with ⟨hi₀, hia, -⟩ | e1 | e1
+        · exact .inr (.inr ⟨hi₀, hia⟩)
+        · rw [e1] at hi₁
+          exact .inl (hN₁.agent_fun hi₁ aZ)
+        · exact absurd e1 hne
+    | @next _ h' _ hs hpi hl' =>
+      obtain ⟨k, ek, -⟩ := hl'.num
+      have hm : m = k + 1 := by
+        have e : l'.length + 1 = m + 1 := hlen
+        omega
+      have hA : Addition.Adder ar mul N a s succ := ⟨hN, ha, hs, by decide, hps⟩
+      have hh'a : h' ≠ a := by
+        rcases hl'.label h' hl'.head_mem with hx' | hx'
+        · exact hA.ne_add hx' (by decide)
+        · exact hA.ne_add hx' (by decide)
+      have hh's : h' ≠ s := hA.not_s hpi (port_ne_snd (by decide))
+      have hts : h₂ ≠ s := hA.not_s hpt (port_ne_snd (by decide))
+      obtain ⟨N₁, D, A, M, st, k₁, hD, hA', hM, aD, aA, aM, pDt, pDA, pDM, pMh, pMA, pAx,
+        hused, hag₁⟩ := mulSucc_step hA hpi hpt hpx ⟨hh'a, hh's⟩ ⟨hta, hts⟩ ⟨hra, hrs⟩
+      have hN₁ := Step.wf hN st
+      have hl₂₁ : NumList N₁ h₂ l₂ := hl₂.keeps k₁ (hav s hps)
+      have havh : ∀ j, j ∈ l' → ¬ (j = a ∨ j = s) := by
+        intro j hj hc
+        rcases hc with e1 | e1
+        · rw [e1] at hj
+          rcases hl'.label a hj with hx' | hx'
+          · exact absurd (hN.agent_fun hx' ha) (by decide)
+          · exact absurd (hN.agent_fun hx' ha) (by decide)
+        · rw [e1] at hj
+          exact Addition.NumList.not_mem hN hps hl' hpi (port_ne_snd (by decide)) hj
+      have hl'₁ : NumList N₁ h' l' := hl'.keeps k₁ havh
+      -- the copy
+      have hAl : ¬ A ∈ l₂ := fun hm => hA' (numList_used hl₂ hm)
+      have hMl : ¬ M ∈ l₂ := fun hm => hM (numList_used hl₂ hm)
+      obtain ⟨N₂, sts₂, ⟨cA, lA, pA, hlA, elA, fA⟩, ⟨cM, lM, pM, hlM, elM, fM⟩, k₂, hag₂⟩ :=
+        copy_fresh hN₁ aD pDt hl₂₁ hlen₂ pDA pDM
+          ⟨ne_of_agent hN₁ aA aD (by decide), hAl⟩ ⟨ne_of_agent hN₁ aM aD (by decide), hMl⟩
+      have hN₂ := Steps.wf hN₁ sts₂
+      have U₂ : ∀ i, N.Used i → N₂.Used i := fun i hu => Steps.used hN₁ sts₂ (hused i hu)
+      have hC₂ : Addition.Closed ar (gone N₁ D l₂) N₁ := Addition.gone_closed hN₁ pDt hl₂₁
+      have ngA : ¬ gone N₁ D l₂ A :=
+        not_gone (ne_of_agent hN₁ aA aD (by decide)) hAl (.inl ⟨_, aA⟩)
+      have ngM : ¬ gone N₁ D l₂ M :=
+        not_gone (ne_of_agent hN₁ aM aD (by decide)) hMl (.inl ⟨_, aM⟩)
+      have ngr : ¬ gone N₁ D l₂ r.1 := not_gone (fun e => hD (e ▸ hru)) hrl₂ (hused _ hru)
+      -- what the copy keeps: the rest of the first argument, the adder and the multiplier
+      have havl' : ∀ j, j ∈ l' → ¬ gone N₁ D l₂ j := hl'₁.avoid hC₂ pMh ngM
+      have hl'₂ : NumList N₂ h' l' := hl'₁.keeps k₂ havl'
+      have pMh₂ : N₂.Paired ar (M, 0) (h', 0) := k₂.paired pMh ngM (havl' h' hl'₁.head_mem)
+      have aM₂ : N₂.agent M mul := k₂.agent aM ngM
+      have aA₂ : N₂.agent A add := k₂.agent aA ngA
+      have pMA₂ : N₂.Paired ar (M, 2) (A, 1) := k₂.paired pMA ngM ngA
+      have pAx₂ : N₂.Paired ar (A, 2) r := k₂.paired pAx ngA ngr
+      -- the product of the rest, with its result on the second argument of the adder
+      have hAl' : ¬ A ∈ l' := fun hm => hA' (numList_used hl' hm)
+      have hAlM : ¬ A ∈ lM := fun hm =>
+        (hlM.label _ hm).elim (fun h => absurd (hN₂.agent_fun h aA₂) (by decide))
+          fun h => absurd (hN₂.agent_fun h aA₂) (by decide)
+      have hAM : A ≠ M := ne_of_agent hN₂ aA₂ aM₂ (by decide)
+      have cM' : Multiplying N₂ M h' l' cM lM (A, 1) :=
+        ⟨hN₂, aM₂, pMh₂, hl'₂, pM, hlM, pMA₂, hAM, hAl', hAlM⟩
+      obtain ⟨N₃, sts₃, ⟨cv, lv, pv, hlv, elv, fv⟩, k₃, hag₃⟩ := Multiplying.run l' cM' ek elM
+      have hN₃ := Steps.wf hN₂ sts₃
+      have U₃ : ∀ i, N.Used i → N₃.Used i := fun i hu => Steps.used hN₂ sts₃ (U₂ i hu)
+      have hC₃ : Addition.Closed ar (gone2 N₂ M l' lM) N₂ :=
+        Addition.gone2_closed hN₂ pMh₂ hl'₂ pM hlM
+      -- what it keeps: the adder, its first argument and the result port
+      have ng3A : ¬ gone2 N₂ M l' lM A := not_gone2 hAM hAl' hAlM (.inl ⟨_, aA₂⟩)
+      have havlA : ∀ j, j ∈ lA → ¬ gone2 N₂ M l' lM j := hlA.avoid hC₃ pA ng3A
+      have hlA₃ : NumList N₃ cA lA := hlA.keeps k₃ havlA
+      have pA₃ : N₃.Paired ar (A, 0) (cA, 0) := k₃.paired pA ng3A (havlA cA hlA.head_mem)
+      have aA₃ : N₃.agent A add := k₃.agent aA₂ ng3A
+      have hru₁ : N₁.Used r.1 := hused _ hru
+      have ng3r : ¬ gone2 N₂ M l' lM r.1 :=
+        not_gone2 (fun e => hM (e ▸ hru)) (fun hm => hrl₁ (List.mem_cons_of_mem _ hm))
+          (fun hm => fM _ hm hru₁) (U₂ _ hru)
+      have pAx₃ : N₃.Paired ar (A, 2) r := k₃.paired pAx₂ ng3A ng3r
+      -- the adder adds the other copy
+      have cAdd : Addition.Adding ar zero succ add N₃ (fun i => ¬ N.Used i) A 0 cA lA (k * n)
+          r :=
+        ⟨hN₃, aA₃, pA₃, hlA₃, ⟨cv, lv, pv, hlv, elv, fun i hi hu => fv i hi (U₂ i hu)⟩,
+          ⟨r, pAx₃, rfl⟩, ⟨U₃ _ hru, fun e => hA' (e ▸ hru), fun hm => fA _ hm hru₁⟩,
+          fun i hu hu' => hu (U₃ i hu')⟩
+      obtain ⟨N₄, sts₄, hres, k₄, hag₄⟩ := Addition.Adding.run rules lA cAdd elA
+      rw [elA] at sts₄
+      rw [Nat.zero_add] at hres
+      have e₁ : (k + 1 + 1) * (n + 2) = (k + 1) * (n + 2) + (n + 2) := Nat.succ_mul _ _
+      have e₂ : (k + 1) * (n + 1) = k * (n + 1) + (n + 1) := Nat.succ_mul _ _
+      have e : prodCost m n = n + 1 + 1 + prodCost k n + (n + 1) := by
+        rw [hm]
+        unfold prodCost
+        omega
+      have ev : m * n = n + k * n := by
+        rw [hm, Nat.succ_mul, Nat.add_comm]
+      refine ⟨N₄, ?_, ?_, (((k₁.trans k₂).trans k₃).trans k₄).mono ?_, ?_⟩
+      · rw [e]
+        exact ((Steps.head st sts₂).trans sts₃).trans sts₄
+      · rw [ev]
+        exact hres
+      · rintro i ((((e1 | e1) | (e1 | hm' | hu)) | (e1 | hm' | hm' | hu)) | (e1 | hm' | hu))
+        · exact .inl e1
+        · exact .inr (.inl (by
+            rw [e1]
+            exact List.mem_cons_self))
+        · exact .inr (.inr (.inr (by
+            rw [e1]
+            exact hD)))
+        · exact .inr (.inr (.inl hm'))
+        · exact .inr (.inr (.inr fun hu' => hu (hused i hu')))
+        · exact .inr (.inr (.inr (by
+            rw [e1]
+            exact hM)))
+        · exact .inr (.inl (List.mem_cons_of_mem _ hm'))
+        · exact .inr (.inr (.inr fun hu' => fM i hm' (hused i hu')))
+        · exact .inr (.inr (.inr fun hu' => hu (U₂ i hu')))
+        · exact .inr (.inr (.inr (by
+            rw [e1]
+            exact hA')))
+        · exact .inr (.inr (.inr fun hu' => fA i hm' (hused i hu')))
+        · exact .inr (.inr (.inr fun hu' => hu (U₃ i hu')))
+      · intro i γ hi
+        rcases hag₄ i γ hi with hsu | ⟨hi₃, hneA⟩
         · exact .inr (.inl hsu)
-        · exact absurd e hia
-        · exact .inr (.inr (.inr (List.mem_cons_of_mem _ hm)))
-      · exact absurd e hne
-      · exact .inr (.inr (.inr (by
-          rw [e]
-          exact List.mem_cons_self)))
-      · exact .inr (.inr (.inl e))
-
-/-- **The round of the multiplier on the zero**: one firing and an
-erasure, `n + 2` steps, after which the stack is given a zero. -/
-theorem MState.zero_round {a : Id} {As : List Id} (c : MState N a 0 n As r) :
-    ∃ N', Steps (Step system) (n + 2) N N' ∧ SState N' 0 n As r := by
-  have hN := c.wf
-  have ha := c.ha
-  obtain ⟨z, hpz, hz⟩ := c.fst
-  have hz' : N.agent z zero := hz
-  obtain ⟨t, hpt, hnt⟩ := c.snd
-  obtain ⟨x, hpx, hst⟩ := c.out
-  have hA : Addition.Adder ar mul N a z zero := ⟨hN, ha, hz', by decide, hpz⟩
-  have hta : t ≠ a := by
-    rcases Addition.Num.label hnt with hx' | hx'
-    · exact hA.ne_add hx' (by decide)
-    · exact hA.ne_add hx' (by decide)
-  have htz : t ≠ z := hA.not_s hpt (port_ne_snd (by decide))
-  have hxa : x.1 ≠ a := hst.port_ne hN c.free ha (by decide)
-  have hxz : x.1 ≠ z := hst.port_ne hN c.free hz' (by decide)
-  obtain ⟨N₁, Z, E, st, k₁, hZ, hE, aZ, aE, pxZ, pEt, hused, hag₁⟩ :=
-    mulZero_step hA hpt hpx ⟨hta, htz⟩ ⟨hxa, hxz⟩
-  have hN₁ := Step.wf hN st
-  obtain ⟨l, hl, el⟩ := Addition.Num.list hnt
-  have hav : ∀ j, j ∈ l → ¬ (j = a ∨ j = z) := by
-    intro j hj hc
-    rcases hc with e1 | e1
-    · rw [e1] at hj
-      rcases hl.label a hj with hx' | hx'
-      · exact absurd (hN.agent_fun hx' ha) (by decide)
-      · exact absurd (hN.agent_fun hx' ha) (by decide)
-    · rw [e1] at hj
-      exact Addition.NumList.not_mem hN hpz hl hpt (port_ne_snd (by decide)) hj
-  have hl₁ : NumList N₁ t l := hl.keeps k₁ hav
-  obtain ⟨N₂, sts, k₂, hag₂⟩ := erase l hN₁ aE pEt hl₁
-  rw [el] at sts
-  have hC₂ : Addition.Closed ar (gone N₁ E l) N₁ := Addition.gone_closed hN₁ pEt hl₁
-  have ngZ : ¬ gone N₁ E l Z :=
-    not_gone (ne_of_agent hN₁ aZ aE (by decide)) (fun hm => hZ (numList_used hl hm))
-      (.inl ⟨_, aZ⟩)
-  have ngold : ∀ i, N.Used i → ¬ i ∈ l → ¬ gone N₁ E l i := fun i hu hl' =>
-    not_gone (fun e => hE (e ▸ hu)) hl' (hused i hu)
-  have hxl : ¬ x.1 ∈ l := fun hm =>
-    (hl.label _ hm).elim (fun h => hst.port_ne hN c.free h (by decide) rfl)
-      fun h => hst.port_ne hN c.free h (by decide) rfl
-  have hrl : ¬ r.1 ∈ l := fun hm =>
-    (hl.label _ hm).elim (fun h => hN.free_agent (i := r.1) (k := r.2) c.free h)
-      fun h => hN.free_agent (i := r.1) (k := r.2) c.free h
-  have hAsl : ∀ B, B ∈ As → ¬ B ∈ l := fun B hB hm =>
-    (hl.label _ hm).elim (fun h => absurd (hN.agent_fun h (hst.agent B hB)) (by decide))
-      fun h => absurd (hN.agent_fun h (hst.agent B hB)) (by decide)
-  have hst₁ : Stack N₁ n x As r :=
-    hst.keeps k₁ hA.closed
-      (fun hc => hc.elim (fun e => hN.free_agent (i := r.1) (k := r.2) c.free (e ▸ ha))
-        fun e => hN.free_agent (i := r.1) (k := r.2) c.free (e ▸ hz'))
-      fun B hB hc => hc.elim (ne_of_agent hN (hst.agent B hB) ha (by decide))
-        (ne_of_agent hN (hst.agent B hB) hz' (by decide))
-  have hst₂ : Stack N₂ n x As r :=
-    hst₁.keeps k₂ hC₂ (ngold _ (.inr (.inr ⟨r.2, c.free⟩)) hrl)
-      fun B hB => ngold B (.inl ⟨_, hst.agent B hB⟩) (hAsl B hB)
-  have ngx : ¬ gone N₁ E l x.1 := ngold _ (hst.port_used c.free) hxl
-  refine ⟨N₂, .head st sts, Steps.wf hN₁ sts,
-    ⟨x, ⟨Z, k₂.paired pxZ ngx ngZ, k₂.agent aZ ngZ⟩, hst₂⟩, ?_, c.nodup, ?_⟩
-  · rw [sts.free, st.free]
-    exact c.free
-  · intro i γ hi
-    obtain ⟨hi₁, hne, -⟩ := hag₂ i γ hi
-    rcases hag₁ i γ hi₁ with ⟨hi₀, hia, -⟩ | e | e
-    · rcases c.only i γ hi₀ with hz | hsu | e | hm
-      · exact .inl hz
-      · exact .inr (.inl hsu)
-      · exact absurd e hia
-      · exact .inr (.inr hm)
-    · rw [e] at hi₁
-      exact .inl (hN₁.agent_fun hi₁ aZ)
-    · exact absurd e hne
-
-/-- **The first adder of the stack runs**: `n + 1` steps, after which the
-rest of the stack is given `n` more. -/
-theorem SState.pop {v : Nat} {A : Id} {As : List Id} (c : SState N v n (A :: As) r) :
-    ∃ N', Steps (Step system) (n + 1) N N' ∧ SState N' (n + v) n As r := by
-  have hN := c.wf
-  obtain ⟨x, hv, e, hA, ⟨h, hph, hnh⟩, x', hpx', hst'⟩ := c.val
-  subst e
-  have hAAs : ¬ A ∈ As := (List.nodup_cons.1 c.nodup).1
-  obtain ⟨l, hl, el⟩ := Addition.Num.list hnh
-  have hx'A : x'.1 ≠ A := by
-    intro e
-    rcases hst'.port with e' | ⟨B, hB, e'⟩
-    · rw [e'] at e
-      exact hN.free_agent (i := r.1) (k := r.2) c.free (e ▸ hA)
-    · rw [e'] at e
-      have e'' : B = A := e
-      exact hAAs (e'' ▸ hB)
-  have hx'l : ¬ x'.1 ∈ l := fun hm =>
-    (hl.label _ hm).elim (fun h => hst'.port_ne hN c.free h (by decide) rfl)
-      fun h => hst'.port_ne hN c.free h (by decide) rfl
-  have cA : Addition.Adding ar zero succ add N A 0 h l v x' :=
-    ⟨hN, hA, hph, hl, hv, ⟨x', hpx', rfl⟩, ⟨hst'.port_used c.free, hx'A, hx'l⟩⟩
-  obtain ⟨N', sts, inum, kp, hag⟩ := Addition.Adding.run rules l cA el
-  rw [el] at sts
-  rw [Nat.zero_add] at inum
-  have hC : Addition.Closed ar (gone N A l) N := Addition.gone_closed hN hph hl
-  have hrl : ¬ r.1 ∈ l := fun hm =>
-    (hl.label _ hm).elim (fun h => hN.free_agent (i := r.1) (k := r.2) c.free h)
-      fun h => hN.free_agent (i := r.1) (k := r.2) c.free h
-  have hst₁ : Stack N' n x' As r :=
-    hst'.keeps kp hC
-      (not_gone (fun e => hN.free_agent (i := r.1) (k := r.2) c.free (e ▸ hA)) hrl
-        (.inr (.inr ⟨r.2, c.free⟩)))
-      fun B hB => not_gone (fun e => hAAs (e ▸ hB))
-        (fun hm => (hl.label _ hm).elim
-          (fun h => absurd (hN.agent_fun h (hst'.agent B hB)) (by decide))
-          fun h => absurd (hN.agent_fun h (hst'.agent B hB)) (by decide))
-        (.inl ⟨_, hst'.agent B hB⟩)
-  refine ⟨N', sts, Steps.wf hN sts, ⟨x', inum, hst₁⟩, ?_, (List.nodup_cons.1 c.nodup).2, ?_⟩
-  · rw [sts.free]
-    exact c.free
-  · intro i γ hi
-    rcases hag i γ hi with hsu | ⟨hi₀, hne⟩
-    · exact .inr (.inl hsu)
-    · rcases c.only i γ hi₀ with hz | hsu | hm
-      · exact .inl hz
-      · exact .inr (.inl hsu)
-      · rcases List.mem_cons.1 hm with e | hm'
-        · exact absurd e hne
-        · exact .inr (.inr hm')
-
-/-- **The first part**: the multiplier walks down its first argument, in
-`(m + 1) * (n + 2)` steps, and leaves `m` adders waiting on a zero. -/
-theorem MState.run : ∀ (m : Nat) {N : Net Peano} {a : Id} {n : Nat} {As : List Id} {r : Port},
-    MState N a m n As r →
-    ∃ N' As', Steps (Step system) ((m + 1) * (n + 2)) N N' ∧ SState N' 0 n As' r ∧
-      As'.length = As.length + m
-  | 0, _, _, n, As, _, c => by
-    obtain ⟨N', sts, s⟩ := c.zero_round
-    have e : (0 + 1) * (n + 2) = n + 2 := by omega
-    rw [e]
-    exact ⟨N', As, sts, s, rfl⟩
-  | m + 1, _, _, n, As, _, c => by
-    obtain ⟨N₁, a', A, sts₁, c₁⟩ := c.succ_round
-    obtain ⟨N', As', sts₂, s, e'⟩ := MState.run m c₁
-    have e : (m + 1 + 1) * (n + 2) = (n + 2) + (m + 1) * (n + 2) := by
-      rw [Nat.succ_mul, Nat.add_comm]
-    rw [e]
-    exact ⟨N', As', sts₁.trans sts₂, s, by
-      rw [e', List.length_cons]
-      omega⟩
-
-/-- **The second part**: the waiting adders run, in `n + 1` steps each. -/
-theorem SState.run : ∀ (As : List Id) {N : Net Peano} {v n : Nat} {r : Port},
-    SState N v n As r →
-    ∃ N', Steps (Step system) (As.length * (n + 1)) N N' ∧ SState N' (As.length * n + v) n [] r
-  | [], N, v, n, _, c => by
-    have e₁ : ([] : List Id).length * (n + 1) = 0 := Nat.zero_mul _
-    have e₂ : ([] : List Id).length * n + v = v := by
-      rw [List.length_nil, Nat.zero_mul, Nat.zero_add]
-    rw [e₁, e₂]
-    exact ⟨N, .refl _, c⟩
-  | A :: As, _, v, n, _, c => by
-    obtain ⟨N₁, sts₁, c₁⟩ := c.pop
-    obtain ⟨N', sts₂, c₂⟩ := SState.run As c₁
-    have e₁ : (A :: As).length * (n + 1) = (n + 1) + As.length * (n + 1) := by
-      rw [List.length_cons, Nat.succ_mul, Nat.add_comm]
-    have e₂ : (A :: As).length * n + v = As.length * n + (n + v) := by
-      rw [List.length_cons, Nat.succ_mul, Nat.add_assoc]
-    rw [e₁, e₂]
-    exact ⟨N', sts₁.trans sts₂, c₂⟩
+        · rcases hag₃ i γ hi₃ with hz | hsu | ⟨hi₂, hneM⟩
+          · exact .inl hz
+          · exact .inr (.inl hsu)
+          · rcases hag₂ i γ hi₂ with hz | hsu | ⟨hi₁, hneD⟩
+            · exact .inl hz
+            · exact .inr (.inl hsu)
+            · rcases hag₁ i γ hi₁ with ⟨hi₀, hia, -⟩ | e1 | e1 | e1
+              · exact .inr (.inr ⟨hi₀, hia⟩)
+              · exact absurd e1 hneD
+              · exact absurd e1 hneA
+              · exact absurd e1 hneM
 
 /-! ### Multiplication is correct -/
 
@@ -569,31 +455,32 @@ structure Product (N : Net Peano) (a : Id) (m n : Nat) (r : Port) : Prop where
   free : N.free r
   only : ∀ i γ, N.agent i γ → γ = zero ∨ γ = succ ∨ i = a
 
-/-- The number of interactions of `m * n`. -/
-def prodCost (m n : Nat) : Nat := (m + 1) * (n + 2) + m * (n + 1)
-
 /-- **The run of a multiplication**: in `prodCost m n` steps the net
 becomes one that has the numeral `m * n` on the result port and whose
 agents are successors and zeros. -/
 theorem mul_steps {a : Id} {m : Nat} (c : Product N a m n r) :
     ∃ N', Steps (Step system) (prodCost m n) N N' ∧ IsNum N' r (m * n) ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ := by
-  have c₀ : MState N a m n [] r :=
-    ⟨c.wf, c.ha, c.fst, c.snd, ⟨r, c.out, rfl⟩, c.free, List.nodup_nil, fun i γ hi =>
-      (c.only i γ hi).elim .inl fun h => h.elim (fun h => .inr (.inl h))
-        fun h => .inr (.inr (.inl h))⟩
-  obtain ⟨N₁, As, sts₁, c₁, eAs⟩ := c₀.run m
-  obtain ⟨N', sts₂, c₂⟩ := c₁.run As
-  have eAs' : As.length = m := by rw [eAs, List.length_nil, Nat.zero_add]
-  rw [eAs'] at sts₂ c₂
-  obtain ⟨x, hx, e⟩ := c₂.val
-  have e' : x = r := e
-  rw [e', Nat.add_zero] at hx
-  refine ⟨N', sts₁.trans sts₂, hx, fun i γ hi => ?_⟩
-  rcases c₂.only i γ hi with h | h | h
-  · exact .inl h
-  · exact .inr h
-  · exact absurd h List.not_mem_nil
+  have hN := c.wf
+  obtain ⟨h₁, hp₁, hn₁⟩ := c.fst
+  obtain ⟨l₁, hl₁, e₁⟩ := Addition.Num.list hn₁
+  obtain ⟨h₂, hp₂, hn₂⟩ := c.snd
+  obtain ⟨l₂, hl₂, e₂⟩ := Addition.Num.list hn₂
+  have hrl : ∀ (h : Id) (l : List Id), NumList N h l → ¬ r.1 ∈ l := fun h l hl hm =>
+    (hl.label _ hm).elim (fun h => hN.free_agent (i := r.1) (k := r.2) c.free h)
+      fun h => hN.free_agent (i := r.1) (k := r.2) c.free h
+  have cM : Multiplying N a h₁ l₁ h₂ l₂ r :=
+    ⟨hN, c.ha, hp₁, hl₁, hp₂, hl₂, c.out,
+      fun e => hN.free_agent (i := r.1) (k := r.2) c.free (e ▸ c.ha), hrl _ _ hl₁, hrl _ _ hl₂⟩
+  obtain ⟨N', sts, hres, -, hag⟩ := Multiplying.run l₁ cM e₁ e₂
+  refine ⟨N', sts, hres.isNum, fun i γ hi => ?_⟩
+  rcases hag i γ hi with hz | hsu | ⟨hi₀, hne⟩
+  · exact .inl hz
+  · exact .inr hsu
+  · rcases c.only i γ hi₀ with hz | hsu | e
+    · exact .inl hz
+    · exact .inr hsu
+    · exact absurd e hne
 
 /-- **Multiplication is correct, for all inputs.**  A net whose multiplier
 has the numerals `m` and `n` as arguments and the free port `r` as result
@@ -629,13 +516,13 @@ theorem add_steps' {a : Id} {m : Nat} (c : Sum N a m n r) :
   have hrl : ¬ r.1 ∈ l := fun hm =>
     (hl.label _ hm).elim (fun h => hN.free_agent (i := r.1) (k := r.2) c.free h)
       fun h => hN.free_agent (i := r.1) (k := r.2) c.free h
-  have cA : Addition.Adding ar zero succ add N a 0 h l n r :=
-    ⟨hN, c.ha, hph, hl, c.snd, ⟨r, c.out, rfl⟩, ⟨.inr (.inr ⟨r.2, c.free⟩),
-      fun e => hN.free_agent (i := r.1) (k := r.2) c.free (e ▸ c.ha), hrl⟩⟩
+  have cA : Addition.Adding ar zero succ add N (fun _ => True) a 0 h l n r :=
+    ⟨hN, c.ha, hph, hl, Addition.IsNum.isNumQ c.snd, ⟨r, c.out, rfl⟩, ⟨.inr (.inr ⟨r.2, c.free⟩),
+      fun e => hN.free_agent (i := r.1) (k := r.2) c.free (e ▸ c.ha), hrl⟩, fun _ _ => trivial⟩
   obtain ⟨N', sts, inum, -, hag⟩ := Addition.Adding.run rules l cA el
   rw [el] at sts
   rw [Nat.zero_add] at inum
-  refine ⟨N', sts, inum, fun i γ hi => ?_⟩
+  refine ⟨N', sts, inum.isNum, fun i γ hi => ?_⟩
   rcases hag i γ hi with hsu | ⟨hi₀, hne⟩
   · exact .inr hsu
   · rcases c.only i γ hi₀ with hz | hsu | e
