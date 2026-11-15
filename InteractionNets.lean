@@ -3401,10 +3401,12 @@ holds up to equality rather than up to renaming.
   expression of additions the bound needs no evaluated run, the claims
   that join being at most the additions as for `WMach`
   (`JMach.joined_le_census`, `Arith.Expr.jrun_by`).  The bound does not
-  show what is measured.  With `k` pairs `0 + y` behind a numeral it is
+  show what is measured.  With `k` pairs `0 + y` behind a numeral and one
+  thread it is
   80,822 actions for `k = 10` and 1,253,252 for `k = 40`, where the bound
   of `WMach` is 6,662 and 92,612, while the runs take 163 and 643
-  against 443 and 5,363.  A walk is charged every segment of the normal
+  against 443 and 5,363 (`Peano.inertThenJoins_bounds`).  A walk is
+  charged every segment of the normal
   form, where it covers a few; a bound that shows the gain would charge
   the walks over the whole run, the shorter side of each, and is not
   attempted here.

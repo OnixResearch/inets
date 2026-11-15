@@ -58,5 +58,28 @@ example :
   (JMach.exec_agrees (f := 10) (by decide +kernel) (by decide +kernel) (by decide +kernel)
     (by decide +kernel)).1
 
+/-- The bound of `WMach.fair_bound` for one thread, `F = 1`, as a function
+of the agents `a` and segments `w` of the net, the steps `n`, the bounds
+`C` and `D` of the rules and the claims `m` that join. -/
+def wBound (a w n C D m : Nat) : Nat :=
+  (7 * a + (w + D * n)) + n * (C + D + 1) + m * (7 * (a + (C - 2) * n) + (w + D * n)) +
+    (7 * (C * n) + (w + D * n)) + 1
+
+/-- The bound of `JMach.fair_bound` for one thread, `F = 1`. -/
+def jBound (a w n C D m : Nat) : Nat :=
+  wBound a w n C D m + m * (D * (3 * (w + D * n) + 12))
+
+/-- **The proved bounds against the runs** on `inertThenJoins k`, where every
+one of the `k` claims joins (`C = 4`, `D = 12`, `Peano.xsys_bounded`): for
+`k = 10` and `40`, `WMach` is bounded by 6,662 and 92,612 actions and
+`JMach` by 80,822 and 1,253,252, while the runs take 443 and 5,363 and 163
+and 643. -/
+theorem inertThenJoins_bounds :
+    (inertThenJoins 10).agents.length = 31 ∧ (inertThenJoins 10).wires.length = 82 ∧
+      (inertThenJoins 40).agents.length = 121 ∧ (inertThenJoins 40).wires.length = 322 ∧
+      wBound 31 82 10 4 12 10 = 6662 ∧ jBound 31 82 10 4 12 10 = 80822 ∧
+      wBound 121 322 40 4 12 40 = 92612 ∧ jBound 121 322 40 4 12 40 = 1253252 := by
+  decide +kernel
+
 end Peano
 end INet

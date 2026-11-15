@@ -1359,7 +1359,7 @@ section Read
 variable {zero succ : S}
 
 /-- **How many actions are enough to run with `JMach` and read.**  As
-`XNet.wrunRead_bound`, with the walks of each claim that joins in place of
+`XNet.wrunRead_bound`, with the walks of each claim that joins added to
 its pass. -/
 theorem XNet.jrunRead_bound (hzs : zero ≠ succ) {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
     (hnd : (X.agents.map Prod.fst).Nodup) {nt : Nat} (hnt : 0 < nt) {C D : Nat}
