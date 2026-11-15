@@ -9,7 +9,7 @@ steps as it made claims, whatever the schedule and the number of threads
 known beforehand.  `XNet.jrunRead` runs it with threads that take turns and
 reads a numeral at rest, and whatever it returns is the numeral of the
 normal form (`XNet.jrunRead_sound`).  That a fair run comes to rest, and
-when, is not proved here.
+when, is in `JoinBound.lean`.
 -/
 
 namespace INet

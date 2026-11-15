@@ -84,6 +84,7 @@ import InteractionNets.WorkRun
 import InteractionNets.Arith.WorkRun
 import InteractionNets.JoinLive
 import InteractionNets.JoinRun
+import InteractionNets.JoinBound
 import InteractionNets.Arith.JoinRun
 
 /-!
@@ -3386,12 +3387,27 @@ holds up to equality rather than up to renaming.
   `JMach.rest_steps`), and the run with threads taking turns and the
   reading are carried over: whatever `XNet.jrunRead` returns is the
   numeral of the normal form (`XNet.jrunRead_sound`,
-  `Arith.Expr.jrun_sound`).  That a fair run comes to rest, and a bound
-  on its actions, are not proved.  A bound in the shape of
-  `WMach.fair_bound`, a walk of at most every segment for each joined
-  segment, would not be smaller than the rescan it replaces, and would
-  not show what is measured; what would is a bound on the walks over a
-  whole run, which is not attempted here.
+  `Arith.Expr.jrun_sound`).  Every fair run comes to rest
+  (`JMach.fair_bound`, `JoinBound.lean`): the measure of a thread is
+  that of `WMach` and a budget for its walks, for each joined segment
+  still to walk two sides and the agent a walk may put in front of the
+  list, `3 * K + 12`, and for a walk under way what each side can still
+  cover in the normal form, as for a thread that follows a wire
+  (`JCur.left`, `JCur.left_go`, `JMach.act_pot`).  So the bound is that
+  of `WMach.fair_bound` with `D * (3 * K + 12)` more for each claim that
+  joins, the same for a system whose rules join nothing
+  (`JMach.fair_bound_nojoin`); the run and the reading are complete
+  (`XNet.jrunRead_bound`, `XNet.jrunRead_complete`), and for an
+  expression of additions the bound needs no evaluated run, the claims
+  that join being at most the additions as for `WMach`
+  (`JMach.joined_le_census`, `Arith.Expr.jrun_by`).  The bound does not
+  show what is measured.  With `k` pairs `0 + y` behind a numeral it is
+  80,822 actions for `k = 10` and 1,253,252 for `k = 40`, where the bound
+  of `WMach` is 6,662 and 92,612, while the runs take 163 and 643
+  against 443 and 5,363.  A walk is charged every segment of the normal
+  form, where it covers a few; a bound that shows the gain would charge
+  the walks over the whole run, the shorter side of each, and is not
+  attempted here.
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers
