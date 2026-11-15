@@ -54,6 +54,7 @@ import InteractionNets.PeanoCopy
 import InteractionNets.PeanoMul
 import InteractionNets.PeanoProd
 import InteractionNets.PeanoPow
+import InteractionNets.PeanoFact
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.PeanoExpr
@@ -2028,6 +2029,17 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              net `Peano.power e b` that is at rest has
                              made exactly that many interactions and
                              holds `b ^ e`
+* `INet.Peano.Computes2`, `INet.Peano.Computes1`, `INet.Peano.mul_computes`,
+  `INet.Peano.pow_computes`, `INet.Peano.fac_computes`,
+  `INet.Peano.fac_correct`, `INet.Peano.fac_rest`, `INet.Peano.fac_fair`
+                             what it is for an agent to compute a
+                             function in any net, stated once; the
+                             multiplier and the power are cases, and so
+                             is a factorial agent, proved through that
+                             statement for the multiplier; on the
+                             machine, a run on the net `Peano.facNet n`
+                             that is at rest has made exactly `facCost n`
+                             interactions and holds `n!`
 * `INet.Peano.PExpr.rest`, `INet.Peano.PExpr.fair`, `INet.Peano.PExpr.good`,
   `INet.Peano.add_evals`, `INet.Peano.mul_evals`, `INet.Peano.system_sided`
                              every expression built from numerals with
@@ -3326,8 +3338,8 @@ holds up to equality rather than up to renaming.
   and with the same numerals (`Arith.carry_rest`).  This covers nets
   whose agents all come from the smaller system; a net that also has
   other agents is the business of `Addition`.  The system `Peano` has
-  both: four more symbols, for multiplying, copying, erasing and
-  powers, and the rules for them.  It contains addition (`Peano.rules`,
+  both: five more symbols, for multiplying, copying, erasing, powers
+  and factorials, and the rules for them.  It contains addition (`Peano.rules`,
   `Peano.add_steps`) and has `Arith` inside it (`Peano.embeds`), so
   every expression of additions comes out right in it
   (`Peano.expr_rest`).  The two helpers of multiplication are proved, in
@@ -3400,6 +3412,29 @@ holds up to equality rather than up to renaming.
   (`Peano.power_fair`).  The count is given by a recursion, not in
   closed form: `powCost 0 b = b + 2`, and `powCost (e + 1) b` is
   `b + 2`, `powCost e b` and `prodCost b (b ^ e)` together.
+* What the theorems for the multiplier and the power say is stated once
+  (`Peano.Computes2`): in any net, an agent with the symbol whose two
+  arguments are the numerals `m` and `n`, with its result wired to any
+  port not on it or on its arguments, reduces in `c m n` steps to a net
+  in which that port carries the numeral `f m n`, made of new agents,
+  with everything away from the agent and its arguments kept and no new
+  agents but zeros and successors.  `Peano.mul_computes` and
+  `Peano.pow_computes` are the two theorems in this form, and
+  `Peano.Computes1` is the form for one argument.  The factorial is the
+  test of it.  The agent `fac` has the rules `0! = 1` and
+  `(S x)! = x! * S x`, the second with a copier, a new successor, a
+  multiplier and a new `fac`.  It computes the factorial
+  (`Peano.fac_computes`): the proof is by recursion on the argument,
+  uses itself for the factorial of the rest, with its result on the
+  first argument of the multiplier, and then uses the multiplier only
+  through `Peano.mul_computes`, on that result and on the new successor
+  with its copy.  For the nets `Peano.facNet n` the result is a normal
+  form (`Peano.fac_correct`) and the theorems about the machine apply
+  (`Peano.fac_rest`, `Peano.fac_fair`); `3!` takes 52 interactions.  The
+  adder is not of this form: its result contains the agents of its
+  second argument, so it is not made of new agents only
+  (`Addition.Adding.run` says what it is made of).  The expressions of
+  the next item do not have factorials.
 * Expressions built from numerals with `+`, `*` and `^` (`Peano.PExpr`)
   have nets (`PExpr.net`): the nets of the two arguments and an adder, a
   multiplier or a power that waits, side by side under the tags `0`,
