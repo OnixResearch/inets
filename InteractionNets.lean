@@ -87,6 +87,8 @@ import InteractionNets.JoinRun
 import InteractionNets.JoinBound
 import InteractionNets.Arith.JoinRun
 import InteractionNets.MeasureJoin
+import InteractionNets.Core.JoinBound
+import InteractionNets.Peano.JoinBound
 
 /-!
 # Interaction nets
@@ -3417,6 +3419,12 @@ holds up to equality rather than up to renaming.
   311,683, and about 144 for each addition on `((5 + 0) + 0) + …`,
   46,074 for 320 additions where `WMach` takes 245,454; with two threads
   the sums take 82,870 and 162,430 actions for 320 and 640 additions.
+  Both programs run expressions in any system with the core, with a
+  bound stated before the run, at most every claim joining
+  (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
+  `Core.GExpr.jrun_sound`), and so the expressions of `+`, `*` and `^` of
+  `Peano` (`Peano.PExpr.wrun_by`, `Peano.PExpr.jrun_by`); `2 * 3` and
+  `2 ^ 3` on two threads of `JMach` are checked in the kernel.
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers
