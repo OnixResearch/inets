@@ -57,6 +57,7 @@ import InteractionNets.PeanoPow
 import InteractionNets.PeanoFact
 import InteractionNets.PeanoRec
 import InteractionNets.PeanoRun
+import InteractionNets.PeanoGExpr
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.PeanoExpr
@@ -2061,6 +2062,14 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              run at rest has made exactly the counted
                              interactions and holds the value; a fair
                              run comes to rest
+* `INet.Peano.GExpr.rest`, `INet.Peano.GExpr.fair`, `INet.Peano.GExpr.good`,
+  `INet.Peano.Op1`, `INet.Peano.Op2`, `INet.Peano.PExpr.toG_net`,
+  `INet.Peano.sum_rest`
+                             expressions over any operators that
+                             compute, the factorial and the lazy
+                             caterer among them, with the guarantees of
+                             the expressions of `+`, `*` and `^`, which
+                             are a case; the adder alone on the machine
 * `INet.Peano.PExpr.rest`, `INet.Peano.PExpr.fair`, `INet.Peano.PExpr.good`,
   `INet.Peano.add_evals`, `INet.Peano.mul_evals`, `INet.Peano.system_sided`
                              every expression built from numerals with
@@ -3491,8 +3500,26 @@ holds up to equality rather than up to renaming.
   `Peano.power_rest'`, `Peano.fac_rest'`, `Peano.cater_rest`, and the
   fair versions), through the theorems derived from recursion, so for
   them the chain from the rules to the machine goes through the general
-  theorems alone.  The adder is not a case: its result is not made of
-  new agents only.
+  theorems alone.  The adder is not a case of these: its result is not
+  made of new agents only.  It is a case of the next item.
+* Expressions over any operators that compute (`PeanoGExpr`).  An
+  operator is data (`Peano.Op1`, `Peano.Op2`): a symbol, its function,
+  its cost and the proof that alone with numerals it reduces in that
+  cost to the numeral of the value.  Every agent that computes gives one
+  (`Peano.Op1.ofComputes`, `Peano.Op2.ofComputes`), and so does the adder
+  (`Peano.addOp`).  Expressions (`Peano.GExpr`) are numerals and
+  operators of one or two arguments applied to expressions; an operator
+  of one argument waits on its argument as one of two does
+  (`Peano.op_setup1`).  Every expression has a net that is well formed
+  and computes its value in exactly `GExpr.cost` interactions
+  (`GExpr.good`), on the machine under any schedule (`GExpr.rest`) and
+  under fair ones (`GExpr.fair`), and it can be run and read
+  (`GExpr.run_sound`, `GExpr.run_complete`).  The expressions of `+`, `*`
+  and `^` are a case, with the same nets, values and costs
+  (`PExpr.toG`, `PExpr.rest'`).  `c 2 + 2!` is run by two threads in the
+  kernel and gives `6` in its 41 interactions.  A single operator on the
+  machine (`Peano.Op2.rest`, `Peano.Op1.rest`, and the fair versions)
+  brings in the adder (`Peano.sum_rest`, `Peano.sum_fair`).
 * Expressions built from numerals with `+`, `*` and `^` (`Peano.PExpr`)
   have nets (`PExpr.net`): the nets of the two arguments and an adder, a
   multiplier or a power that waits, side by side under the tags `0`,
