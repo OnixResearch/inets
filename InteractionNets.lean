@@ -65,6 +65,7 @@ import InteractionNets.Peano.Bound
 import InteractionNets.Keeps
 import InteractionNets.RoundRobin
 import InteractionNets.Extra
+import InteractionNets.Arith.Bound
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.LongRun
@@ -3275,9 +3276,9 @@ holds up to equality rather than up to renaming.
   (`XMach.trace_rest_eq`), and `readNum` returns every numeral of a
   well-formed memory given enough fuel (`XNet.readNum_complete`).  How
   many actions are enough is bounded for threads that take turns on any
-  net that lists no name twice (`XNet.runRead_bound`, see below), but the
-  bound is not instantiated for these expressions; two runs are
-  evaluated in the
+  net that lists no name twice (`XNet.runRead_bound`, see below), and
+  for these expressions in particular (`Arith.Expr.run_by`, with
+  `Arith.Expr.net_nodup`); two runs are evaluated in the
   kernel.  The reader and the run are for any system with a zero and a
   successor (`XNet.runRead`): when the net of a memory reduces to a
   normal form with the numeral `v` on a port, whatever the run returns
