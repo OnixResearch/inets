@@ -1,12 +1,13 @@
 import InteractionNets.Arith.Carry
 
-/-! # A larger system: addition, multiplication, copying and erasing
+/-! # A larger system: addition, multiplication, powers, copying and erasing
 
-Six symbols: `zero`, `succ` and `add` as in `Arith`, a multiplier `mul`,
-and the two agents that multiplication needs because it uses its second
-argument once for every successor of the first: `dup`, which copies a
-numeral, and `era`, which erases one.  The system is given as data and
-validated by evaluating `SysData.check`.
+Seven symbols: `zero`, `succ` and `add` as in `Arith`, a multiplier
+`mul`, the two agents that multiplication needs because it uses its
+second argument once for every successor of the first: `dup`, which
+copies a numeral, and `era`, which erases one; and `pow`, for powers,
+which uses the multiplier as the multiplier uses the adder.  The system
+is given as data and validated by evaluating `SysData.check`.
 
 It contains addition (`Peano.rules`), so the adder adds in it, with
 multipliers and copiers around (`Addition.Config.steps`); and the system
@@ -19,9 +20,10 @@ inputs, is `Peano.mul_correct`, in `PeanoMul`.
 
 namespace INet
 
-/-- The symbols: numbers, addition, multiplication, copying, erasing. -/
+/-- The symbols: numbers, addition, multiplication, copying, erasing, and
+powers. -/
 inductive Peano
-  | zero | succ | add | mul | dup | era
+  | zero | succ | add | mul | dup | era | pow
   deriving DecidableEq, Repr
 
 namespace Peano
@@ -29,7 +31,8 @@ namespace Peano
 /-- The principal port of `add` and of `mul` is the first argument, the
 auxiliary ports are the second argument and the result.  The principal
 port of `dup` is what it copies, its auxiliary ports are the two copies;
-`era` has only the port of what it erases. -/
+`era` has only the port of what it erases.  The principal port of `pow`
+is the exponent, its auxiliary ports are the base and the result. -/
 def ar : Peano → Nat
   | zero => 0
   | succ => 1
@@ -37,6 +40,7 @@ def ar : Peano → Nat
   | mul => 2
   | dup => 2
   | era => 0
+  | pow => 2
 
 /-- `0 * y = 0`: a new `zero` on the result, and `y` is erased. -/
 def mulZero : RuleData Peano :=
@@ -78,6 +82,26 @@ def eraZero : RuleData Peano := RuleData.ofWires [] []
 def eraSucc : RuleData Peano :=
   RuleData.ofWires [((some true, 0), era)] [(.ifc true 0, .new (some true) 0 0)]
 
+/-- `y ^ 0 = 1`: a new `succ` on a new `zero` on the result, and `y` is
+erased. -/
+def powZero : RuleData Peano :=
+  RuleData.ofWires [((some false, 0), succ), ((some false, 1), zero), ((some true, 0), era)]
+    [(.ifc false 1, .new (some false) 0 0),            -- result — the new `succ`
+      (.new (some false) 0 1, .new (some false) 1 0),   -- its argument — the new `zero`
+      (.ifc false 0, .new (some true) 0 0)]             -- `y` — the new `era`
+
+/-- `y ^ S x = y * y ^ x`: `y` is copied; one copy is the first argument
+of a new multiplier, the other the base of a new power on `x`, whose
+result is the second argument of the multiplier. -/
+def powSucc : RuleData Peano :=
+  RuleData.ofWires [((some false, 0), dup), ((some false, 1), mul), ((some true, 0), pow)]
+    [(.ifc false 0, .new (some false) 0 0),            -- `y` — the new `dup`
+      (.new (some false) 0 1, .new (some false) 1 0),   -- first copy — first argument of `mul`
+      (.new (some false) 0 2, .new (some true) 0 1),    -- second copy — base of `pow`
+      (.ifc true 0, .new (some true) 0 0),              -- `x` — exponent of `pow`
+      (.new (some true) 0 2, .new (some false) 1 1),    -- result of `pow` — second argument of `mul`
+      (.new (some false) 1 2, .ifc false 1)]            -- result of `mul` — result
+
 def data : SysData Peano :=
   ⟨ar, [((add, zero), Addition.zeroData), ((zero, add), Addition.zeroData.swap),
     ((add, succ), Addition.succData succ add), ((succ, add), (Addition.succData succ add).swap),
@@ -86,7 +110,9 @@ def data : SysData Peano :=
     ((dup, zero), dupZero), ((zero, dup), dupZero.swap),
     ((dup, succ), dupSucc), ((succ, dup), dupSucc.swap),
     ((era, zero), eraZero), ((zero, era), eraZero.swap),
-    ((era, succ), eraSucc), ((succ, era), eraSucc.swap)]⟩
+    ((era, succ), eraSucc), ((succ, era), eraSucc.swap),
+    ((pow, zero), powZero), ((zero, pow), powZero.swap),
+    ((pow, succ), powSucc), ((succ, pow), powSucc.swap)]⟩
 
 /-- The system, by evaluation of the check. -/
 def xsys : XSys Peano := data.toXSys (by decide)

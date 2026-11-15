@@ -53,6 +53,7 @@ import InteractionNets.Keeps
 import InteractionNets.PeanoCopy
 import InteractionNets.PeanoMul
 import InteractionNets.PeanoProd
+import InteractionNets.PeanoPow
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.PeanoExpr
@@ -2018,6 +2019,15 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              that is at rest has made exactly that many
                              interactions and holds the numeral `m * n`,
                              and under a fair schedule it comes to rest
+* `INet.Peano.pow_correct`, `INet.Peano.Powering.run`,
+  `INet.Peano.power_rest`, `INet.Peano.power_fair`
+                             powers: the agent `pow` with the numerals
+                             `e` and `b` as exponent and base reduces to
+                             the numeral `b ^ e`, in `powCost e b` steps,
+                             in any net; on the machine, a run on the
+                             net `Peano.power e b` that is at rest has
+                             made exactly that many interactions and
+                             holds `b ^ e`
 * `INet.Peano.PExpr.rest`, `INet.Peano.PExpr.fair`, `INet.Peano.PExpr.good`,
   `INet.Peano.add_evals`, `INet.Peano.mul_evals`, `INet.Peano.system_sided`
                              every expression built from numerals with
@@ -3315,8 +3325,8 @@ holds up to equality rather than up to renaming.
   and with the same numerals (`Arith.carry_rest`).  This covers nets
   whose agents all come from the smaller system; a net that also has
   other agents is the business of `Addition`.  The system `Peano` has
-  both: three more symbols, for multiplying, copying and erasing, and
-  the rules for them.  It contains addition (`Peano.rules`,
+  both: four more symbols, for multiplying, copying, erasing and
+  powers, and the rules for them.  It contains addition (`Peano.rules`,
   `Peano.add_steps`) and has `Arith` inside it (`Peano.embeds`), so
   every expression of additions comes out right in it
   (`Peano.expr_rest`).  The two helpers of multiplication are proved, in
@@ -3369,6 +3379,27 @@ holds up to equality rather than up to renaming.
   holds the numeral `m * n` on the free port (`Peano.prod_rest`), and a
   fair run comes to rest (`Peano.prod_fair`).  The net of `mul_correct`
   has only the multiplier and its two arguments.
+* Powers (`Peano.pow_correct`).  The system has an agent `pow` whose
+  rules use the multiplier as the rules of the multiplier use the
+  adder: `y ^ 0 = 1`, with `y` erased, and `y ^ S x = y * y ^ x`, with
+  `y` copied.  In any net, with any other agents and its result wired
+  to any port not on it or on its arguments, the agent with the
+  numerals `e` and `b` as exponent and base reduces in `powCost e b`
+  steps to a net in which that port carries the numeral `b ^ e`, made
+  of new agents, and everything away from the agent and its arguments
+  is kept (`Peano.Powering.run`).  The proof is by recursion on the
+  exponent and uses the theorem for itself, for the power of the rest,
+  and `Peano.Multiplying.run` for the multiplication, in a net that has
+  other agents and with the result where the power needs it; this is
+  what the statements about what a run leaves alone, and about results
+  being made of new agents, are for.  For the nets `Peano.power e b`
+  the theorems about the machine apply: a run at rest has made exactly
+  `powCost e b` interactions and holds the numeral `b ^ e`
+  (`Peano.power_rest`), and a fair run comes to rest
+  (`Peano.power_fair`).  The count is given by a recursion, not in
+  closed form: `powCost 0 b = b + 2`, and `powCost (e + 1) b` is
+  `b + 2`, `powCost e b` and `prodCost b (b ^ e)` together.  The
+  expressions of the next item do not have powers.
 * Expressions built from numerals with `+` and `*` (`Peano.PExpr`) have
   nets (`PExpr.net`): the nets of the two arguments and an adder or a
   multiplier that waits, side by side under the tags `0`, `1` and `2`
