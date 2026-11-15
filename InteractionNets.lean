@@ -89,6 +89,7 @@ import InteractionNets.Arith.JoinRun
 import InteractionNets.MeasureJoin
 import InteractionNets.Arith.JoinChain
 import InteractionNets.WireFar
+import InteractionNets.JoinFast
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
 
@@ -3442,6 +3443,13 @@ holds up to equality rather than up to renaming.
   half of its points at least double.  That charge is not yet proved; it
   has only been measured to hold on the nets of `MeasureJoin`, on rings of
   adders and on Peano expressions.
+  For one thread the bound over a run reduces to that charge, one claim at
+  a time: if every rule joins one segment at most (`XSys.OneJoin`, true of
+  every shipped system, whose only joining rule is adding zero) and each
+  claim pays for its walk with `c₀` and the growth of a measure `Φ`
+  (`XSys.WalkPaid`), then the actions of walks along the run are at most
+  `c₀` per claim plus the growth of `Φ` from the first goal
+  (`JMach.walked_le`).
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
