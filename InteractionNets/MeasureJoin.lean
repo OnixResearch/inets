@@ -30,14 +30,26 @@ on `0 + (0 + (… + 5))` its walks cost about twice the rescans, and both
 are linear.  `XMach` is linear on the sums nested either way: after each
 claim the pair it needs next is at the head of its fresh list.
 
-Two threads, `JMach`: `((5 + 0) + 0) + …` with 40, 80, 160, 320 and 640
-additions takes 9,677, 11,579, 36,790, 82,870 and 162,430 actions
-(`WMach` 37,393 and 129,813 for 80 and 160), and `inertThenJoins` 80,
-160, 320 takes 1,689, 3,369 and 6,729.  From 160 additions on the count
-about doubles with the size; between 80 and 160 it more than triples,
-which turns on where the two threads are when the joins come.  With three
-threads the sums take 12,010, 15,985, 48,059 and 106,139 for 40 to 320
-additions. -/
+Several threads, `JMach`.  Turns go to the threads in order whether or
+not they are at rest, and a turn of a thread at rest changes nothing; the
+counts of actions until rest include those turns, so they jump with where
+the threads happen to be when the work runs out.  The work, the actions of
+threads that are not at rest, is linear (`jStats`):
+
+    net                      threads  claims   actions    work    walk
+    ((5 + 0) + 0) + …, 40          2     240     9,677   5,983     512
+    ((5 + 0) + 0) + …, 80          2     480    11,579  11,574   1,032
+    ((5 + 0) + 0) + …, 160         2     960    36,790  24,002   2,064
+    ((5 + 0) + 0) + …, 320         2   1,920    82,870  48,050   4,144
+    ((5 + 0) + 0) + …, 40          3     240    12,010   6,297     512
+    ((5 + 0) + 0) + …, 320         3   1,920   106,139  50,148   4,144
+    inertThenJoins 320             2     320     6,729   6,728   1,280
+    0 + (0 + (… + 5)), 320         2     320    13,928  13,921   6,371
+
+With one thread no turn is at rest, and the walks take 2,072 of the
+23,034 actions on the sums with 160 additions (about two for each claim),
+1,280 of 5,123 on `inertThenJoins 320` (four for each join) and 3,832 of
+8,650 on `0 + (0 + (… + 5))` with 320 additions (twelve for each join). -/
 
 namespace INet
 
@@ -79,6 +91,31 @@ def Arith.lnest : Nat → Arith.Expr
 def Arith.rnest : Nat → Arith.Expr
   | 0 => .lit 5
   | k + 1 => .add (.lit 0) (Arith.rnest k)
+
+/-- Actions until rest of `JMach`, threads taking turns, with the claims,
+the turns of threads at rest, and the actions of walks (starting one or
+stepping it). -/
+def jStats (xs : XSys S) (nt : Nat) (M : JMach S) (fuel : Nat) : Nat × Nat × Nat × Nat :=
+  Id.run do
+  let mut cur := M
+  let mut c := 0
+  let mut idle := 0
+  let mut walks := 0
+  for i in [0:fuel] do
+    if cur.resting then return (i, c, idle, walks)
+    let t := i % nt
+    match cur.ths[t]? with
+    | some T =>
+      if T.todo.isEmpty && T.st.isIdle then idle := idle + 1
+      if T.walk.isSome then walks := walks + 1
+      match T.st, T.walk, T.joins with
+      | .write [] [], none, _ :: _ => if T.again then walks := walks + 1
+      | _, _, _ => pure ()
+    | none => pure ()
+    let (M', d) := cur.step xs t
+    cur := M'
+    c := c + d
+  return (fuel, c, idle, walks)
 
 /-- One line of the table: claims and actions of the three programs. -/
 def joinRow (xs : XSys S) (name : String) (X : XNet S) (nt : Nat) (doX : Bool) : IO Unit := do

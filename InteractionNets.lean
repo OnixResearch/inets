@@ -2367,11 +2367,12 @@ holds up to equality rather than up to renaming.
   chain (`Chain.work_chain`, `Chain.work_bound_le`); how far the number
   is from the bound elsewhere is not known, and no lower bound has
   several threads that write.
-  There is still no work list of active pairs: a thread walks the whole
-  list of agents on every pass.  A work list would have to find the far
-  ends of the wires a firing rewires, and in this memory a wire is a
-  chain of segments that is only ever added to, so that is a walk too;
-  none is attempted here.
+  There is still no work list of active pairs here: a thread walks the
+  whole list of agents on every pass.  A work list would have to find
+  the far ends of the wires a firing rewires, and in this memory a wire
+  is a chain of segments that is only ever added to, so that is a walk
+  too.  `WMach` and `JMach`, below, keep a list of what a rule touched;
+  `JMach` walks the joined wires, both sides in turn.
 * Lazy lists.  `LMach` removes the reading of the log from the indexed
   program: taking the agents afresh costs one.  It is proved to do,
   action by action, what the program on lists does (`LMach.act_sim`,
@@ -3411,14 +3412,18 @@ holds up to equality rather than up to renaming.
   against 443 and 5,363 (`Peano.inertThenJoins_bounds`).  A walk is
   charged every segment of the normal
   form, where it covers a few; a bound that shows the gain would charge
-  the walks over the whole run, the shorter side of each, and is not
-  attempted here.
+  the walks over the whole run, and is not attempted here.  It would not
+  be twice the shorter side of each: a side that reaches a principal port
+  waits for the other side to end.
   Run as programs at sizes the kernel does not reach, which is measured
   and not proved (`MeasureJoin.lean`): one thread takes `16 * k + 3`
   actions on `k` such pairs, 5,123 for `k = 320` where `WMach` takes
   311,683, and about 144 for each addition on `((5 + 0) + 0) + …`,
   46,074 for 320 additions where `WMach` takes 245,454; with two threads
-  the sums take 82,870 and 162,430 actions for 320 and 640 additions.
+  the sums take 82,870 and 162,430 actions for 320 and 640 additions,
+  of which the turns of a thread already at rest are 34,820 for 320: the
+  work of the threads, 48,050, is linear, and the walks are about two
+  actions for each claim.
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
@@ -3672,7 +3677,9 @@ holds up to equality rather than up to renaming.
   with different contents, is rejected even if the entries that lookups
   find describe a rule.
 * Not in this development: multi-threaded code that runs, proved against `Mach`;
-  weak memory; a work list of active pairs for the program with threads.
+  weak memory; a bound on the actions of `JMach` that charges its walks
+  by what they cover over a run, which is what would show the gain that
+  is measured.
 
 ## Checking
 
