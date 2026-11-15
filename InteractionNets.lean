@@ -45,6 +45,9 @@ import InteractionNets.Plug
 import InteractionNets.Arith.Compose
 import InteractionNets.Arith.Expr
 import InteractionNets.Arith.Run
+import InteractionNets.Embed
+import InteractionNets.Arith.Carry
+import InteractionNets.Peano
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.LongRun
@@ -1965,6 +1968,21 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              and rules: the adder runs for `m + 1` steps
                              and leaves the numeral `m + n`; `Arith` is the
                              case of these symbols and rules only
+* `INet.XMach.relabel_rest`, `INet.Steps.relabel`,
+  `INet.Net.relabel_normal`, `INet.Arith.carry_rest`,
+  `INet.Arith.Expr.rest_embed`
+                             a system inside another: a net of the smaller
+                             system, relabelled, reduces in the larger one
+                             step for step and to the same normal form, so
+                             what is proved for the nets of `Arith` holds
+                             for them in any system that `Arith` is inside
+* `INet.Peano.rules`, `INet.Peano.embeds`, `INet.Peano.add_steps`,
+  `INet.Peano.expr_rest`
+                             a system with addition, multiplication,
+                             copying and erasing: the adder adds in it,
+                             and every expression of additions comes out
+                             right in it; that its multiplier multiplies
+                             is not proved (`2 * 3` is evaluated)
 * `INet.Arith.sum_ok`, `INet.Arith.sum_correct`
                              the nets `Arith.sum m n` are valid for all `m`
                              and `n`, and on each of them the reducer takes
@@ -3234,8 +3252,24 @@ holds up to equality rather than up to renaming.
   those of `Addition` at its symbols (`Arith.rules`).  What is proved
   after that in `Arith` is still stated for `Arith`: the nets `sum m n`,
   the runs of the threads on them, side by side, one addition after
-  another and expressions.  None of it has been carried to a larger
-  system yet.
+  another and expressions.  It reaches a larger system in another way.
+  A map of symbols that keeps the arities and the rules puts one system
+  inside another (`System.Embeds`); a net of the smaller system with its
+  symbols relabelled then reduces in the larger one step for step
+  (`Steps.relabel`), is well formed and is normal when the net is
+  (`Net.WF.relabel`, `Net.relabel_normal`), so the thread machine of the
+  larger system reaches on the relabelled memory what the net reduces
+  to, with the same claims (`XMach.relabel_rest`, `XMach.relabel_fair`),
+  and with the same numerals (`Arith.carry_rest`).  This covers nets
+  whose agents all come from the smaller system; a net that also has
+  other agents is the business of `Addition`.  The system `Peano` has
+  both: three more symbols, for multiplying, copying and erasing, and
+  the rules for them.  It contains addition (`Peano.rules`,
+  `Peano.add_steps`) and has `Arith` inside it (`Peano.embeds`), so
+  every expression of additions comes out right in it
+  (`Peano.expr_rest`).  That its multiplier multiplies is not proved:
+  the reducer is run on `2 * 3`, and leaves six successors and a zero
+  after 23 steps.
 * An executable system (`XSys`) carries proofs: that its rules are the rules
   of a `System`, and that the slots of each right-hand side are listed.  For
   a system given as data (`SysData`) these follow from the evaluation of
