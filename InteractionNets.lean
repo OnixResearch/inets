@@ -44,6 +44,7 @@ import InteractionNets.Arith.AnyNets
 import InteractionNets.Plug
 import InteractionNets.Arith.Compose
 import InteractionNets.Arith.Expr
+import InteractionNets.ReadBack
 import InteractionNets.Arith.Run
 import InteractionNets.Embed
 import InteractionNets.Arith.Carry
@@ -1797,8 +1798,9 @@ Two threads.  A second thread can make the program slower.
                                 makes exactly the value of the first
                                 term more claims, under any schedules
 * `INet.Arith.Expr.run_sound`, `INet.Arith.Expr.run_complete`,
-  `INet.Arith.readNum_sound`, `INet.Arith.readNum_complete`,
-  `INet.Arith.IsNum.unique`
+  `INet.XNet.runRead_sound`, `INet.XNet.runRead_complete`,
+  `INet.XNet.readNum_sound`, `INet.XNet.readNum_complete`,
+  `INet.Addition.IsNum.unique`
                                 an expression can be run: threads take
                                 turns on its net for a number of
                                 actions and the result is read off the
@@ -2022,6 +2024,11 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              a run on its net that is at rest has made
                              exactly `PExpr.cost` interactions and holds
                              the numeral of its value
+* `INet.Peano.PExpr.run_sound`, `INet.Peano.PExpr.run_complete`
+                             such an expression can be run and its
+                             result read off the memory: whatever is
+                             returned is its value, and with enough
+                             actions the value is returned
 * `INet.Arith.sum_ok`, `INet.Arith.sum_correct`
                              the nets `Arith.sum m n` are valid for all `m`
                              and `n`, and on each of them the reducer takes
@@ -3218,18 +3225,22 @@ holds up to equality rather than up to renaming.
   nothing is said about how many actions the threads take.  An
   expression can be run (`Arith.Expr.run`): a number of threads take
   turns on its net for a number of actions, and if they are then at
-  rest the numeral on the free port is read by `Arith.readNum`, which
+  rest the numeral on the free port is read by `XNet.readNum`, which
   follows wires of several segments as a thread does.  What `readNum`
-  returns is a numeral of the net (`Arith.readNum_sound`), and a port
-  carries at most one (`Arith.IsNum.unique`), so whatever the run
+  returns is a numeral of the net (`XNet.readNum_sound`), and a port
+  carries at most one (`Addition.IsNum.unique`), so whatever the run
   returns is the value of the expression (`Arith.Expr.run_sound`).
   Given enough actions the run does return it
   (`Arith.Expr.run_complete`): threads that take turns are scheduled
   fairly, so they come to rest; from then on the memory does not change
   (`XMach.trace_rest_eq`), and `readNum` returns every numeral of a
-  well-formed memory given enough fuel (`Arith.readNum_complete`).  How
+  well-formed memory given enough fuel (`XNet.readNum_complete`).  How
   many actions are enough is not bounded; two runs are evaluated in the
-  kernel.
+  kernel.  The reader and the run are for any system with a zero and a
+  successor (`XNet.runRead`): when the net of a memory reduces to a
+  normal form with the numeral `v` on a port, whatever the run returns
+  for that port is `v` (`XNet.runRead_sound`), and with enough actions
+  it returns `v` (`XNet.runRead_complete`).
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers
@@ -3362,10 +3373,13 @@ holds up to equality rather than up to renaming.
   numeral of the value on its free port (`PExpr.rest`); a fair run comes
   to rest (`PExpr.fair`).  The cost counts `e₁ + 1` for an addition and
   `prodCost e₁ e₂` for a multiplication, on the values of the arguments.
-  Scope: the operators are evaluated on numerals, so this is one order
-  of reduction, and the count is the same for every order because the
-  system is confluent; there is no evaluator that reads the result back
-  for these expressions, as there is for additions (`Arith.Expr.run`).
+  The proof evaluates the operators on numerals, which is one order of
+  reduction; the count is the same for every order because the system
+  is confluent.  These expressions can be run too (`PExpr.run`):
+  whatever the run returns is the value (`PExpr.run_sound`), and with
+  enough actions it returns the value (`PExpr.run_complete`); two runs
+  are evaluated in the kernel.  How many actions are enough is not
+  bounded.
 * An executable system (`XSys`) carries proofs: that its rules are the rules
   of a `System`, and that the slots of each right-hand side are listed.  For
   a system given as data (`SysData`) these follow from the evaluation of

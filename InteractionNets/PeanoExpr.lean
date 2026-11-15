@@ -1,5 +1,6 @@
 import InteractionNets.PeanoProd
 import InteractionNets.Union
+import InteractionNets.ReadBack
 
 /-! # Every expression of additions and multiplications
 
@@ -21,6 +22,11 @@ On the machine: with any number of threads and any schedule, a run on the
 net of an expression that is at rest has made exactly `PExpr.cost`
 interactions and holds the numeral of the value (`PExpr.rest`); under a
 fair schedule the run comes to rest (`PExpr.fair`).
+
+An expression can be run (`PExpr.run`): threads take turns on its net for
+a number of actions and the numeral on the free port is read.  Whatever
+is returned is the value of the expression (`PExpr.run_sound`), and with
+enough actions the value is returned (`PExpr.run_complete`).
 -/
 
 namespace INet
@@ -598,6 +604,28 @@ theorem PExpr.fair (e : PExpr) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
   rw [h₃]
   exact hA
 
+/-! ### Running an expression -/
+
+/-- **Run an expression.**  `nt` threads take turns on the net of the
+expression for `steps` actions; if they are then at rest, the numeral on
+the free port is read. -/
+def PExpr.run (e : PExpr) (nt steps : Nat) : Option Nat :=
+  XNet.runRead xsys zero succ e.net e.res nt steps
+
+/-- **Whatever the run returns is the value of the expression.** -/
+theorem PExpr.run_sound (e : PExpr) {nt steps v : Nat} (hnt : 0 < nt)
+    (h : e.run nt steps = some v) : v = e.eval := by
+  obtain ⟨hX, -, N', hs, hA, hag⟩ := PExpr.good e
+  exact XNet.runRead_sound (zero := zero) (succ := succ) xsys (by decide) (Nat.le_refl 1) hX hs (normal_of_numerals hag) hA
+    hnt h
+
+/-- **Given enough actions, the run returns the value of the
+expression.** -/
+theorem PExpr.run_complete (e : PExpr) {nt : Nat} (hnt : 0 < nt) :
+    ∃ s₀, ∀ s, s₀ ≤ s → e.run nt s = some e.eval := by
+  obtain ⟨hX, -, N', hs, hA, hag⟩ := PExpr.good e
+  exact XNet.runRead_complete (zero := zero) (succ := succ) xsys (by decide) hX hs (normal_of_numerals hag) hA hnt
+
 /-- `(2 + 1) * (3 * 2)` has the value 18 and costs 81 interactions. -/
 example : (PExpr.mul (.add (.lit 2) (.lit 1)) (.mul (.lit 3) (.lit 2))).eval = 18 ∧
     (PExpr.mul (.add (.lit 2) (.lit 1)) (.mul (.lit 3) (.lit 2))).cost = 81 := by
@@ -613,6 +641,18 @@ example :
     ((XMach.init (PExpr.add (.mul (.lit 2) (.lit 2)) (.lit 1)).net 2).trace xsys
       (fun j => j % 2) 1000).2 = 23 ∧
     (PExpr.add (.mul (.lit 2) (.lit 2)) (.lit 1)).cost = 23 := by
+  decide +kernel
+
+set_option maxRecDepth 100000 in
+/-- `(2 * 2) + 1` run by two threads taking turns: after 1000 actions
+they are at rest and the result read is `5`. -/
+example : (PExpr.add (.mul (.lit 2) (.lit 2)) (.lit 1)).run 2 1000 = some 5 := by
+  decide +kernel
+
+set_option maxRecDepth 100000 in
+/-- `2 * (1 + 2)` run by three threads taking turns: after 1500 actions
+they are at rest and the result read is `6`. -/
+example : (PExpr.mul (.lit 2) (.add (.lit 1) (.lit 2))).run 3 1500 = some 6 := by
   decide +kernel
 
 end Peano
