@@ -27,7 +27,8 @@ writing while it walks, so the program is still an execution of the machine
 Walking one side of each joined wire to its end was tried before, and is
 quadratic on `0 + (0 + (… + 5))`: memory keeps every segment ever written,
 so the walks grow.  Walking both sides in turn stops at the shorter side
-when that ends at an auxiliary port. -/
+when that ends at an auxiliary port.  That the threads never all rest
+before the normal form is in `JoinLive.lean`. -/
 
 section JMachine
 
@@ -89,19 +90,17 @@ def XRhs.joinPairs (R : XRhs S) (ar : S → Nat) (a b : Id) (α β : S) : List (
 variable [DecidableEq S]
 
 /-- One segment along one side of a walk.  `other` is the start of the
-other side: coming to it, the wire is a loop. -/
+other side: a segment that leads to it closes a loop. -/
 def JCur.next (X : XNet S) (other : Port) : JCur S → JCur S
   | .go prev cur =>
-    if cur = other then .stop
-    else
-      match nextSeg X.wires cur prev with
-      | some n => .go cur n
-      | none =>
-        if cur.2 = 0 then
-          match assoc cur.1 X.agents with
-          | some γ => .prin cur.1 γ
-          | none => .stop
-        else .stop
+    match nextSeg X.wires cur prev with
+    | some n => if n = other then .stop else .go cur n
+    | none =>
+      if cur.2 = 0 then
+        match assoc cur.1 X.agents with
+        | some γ => .prin cur.1 γ
+        | none => .stop
+      else .stop
   | c => c
 
 /-- The side is still going. -/

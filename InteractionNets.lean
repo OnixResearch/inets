@@ -82,6 +82,7 @@ import InteractionNets.JoinWalk
 import InteractionNets.Peano.JoinWalk
 import InteractionNets.WorkRun
 import InteractionNets.Arith.WorkRun
+import InteractionNets.JoinLive
 
 /-!
 # Interaction nets
@@ -3363,8 +3364,22 @@ holds up to equality rather than up to renaming.
   `((5 + 0) + 0) + …` with 40 additions one thread takes 5,754 actions
   where `WMach` takes 8,294, and the gap grows with the size, while on
   `0 + (0 + (… + 5))` the walks cost about twice the rescans (1,090
-  against 578).  That `JMach` never rests before the normal form, and a
-  bound on its actions, are not proved.
+  against 578).  Its threads never all rest before the normal form
+  (`JMach.exec_rest`, `JoinLive.lean`): a walker answers only for the
+  pairs whose wire runs through a segment it has joined (`JEnds`), and
+  those are the only new pairs without a new agent that a claim makes
+  (`Redex.of_fire_join`, from `walk_split`: a wire after a firing that
+  is not an old one runs along old segments to a fired agent and on by a
+  joined segment, or ends at a new agent).  A side that stops leaves the
+  pair to someone else (`JMach.Live.cur_stop`): it has met an agent of
+  the pair that another thread holds or still has to write, or a
+  segment not yet written, whose writer either has the agent at its end
+  in its list or has joined it and will walk it; or it has come back to
+  the joined segment, and a wire that closes on itself has no end
+  (`Walk.cycle_false`).  When both sides reach principal ports, the
+  agent at the first is the agent of every pair through the wire
+  (`prin_end`, `JMach.Live.advance_found`).  A bound on its actions is
+  not proved.
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers
