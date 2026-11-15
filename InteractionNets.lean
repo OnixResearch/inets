@@ -1,3 +1,4 @@
+import InteractionNets.Rewriting
 import InteractionNets.Wires
 import InteractionNets.Nets
 import InteractionNets.Confluence
@@ -81,6 +82,10 @@ The development is in the modules under `InteractionNets/`, imported here
 in an order in which each imports only earlier ones, so they read as one
 text.
 This file holds the overview.
+The first module, `InteractionNets.Rewriting`, imports nothing: it holds
+the results about an arbitrary relation (`StrongConfluent.confluence`,
+`StrongConfluent.normal_unique`, `StrongConfluent.bounded`), so a
+development with its own step relation can import it alone.
 
 Main results, for an arbitrary interaction system `sys`:
 
