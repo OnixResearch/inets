@@ -49,7 +49,16 @@ threads that are not at rest, is linear (`jStats`):
 With one thread no turn is at rest, and the walks take 2,072 of the
 23,034 actions on the sums with 160 additions (about two for each claim),
 1,280 of 5,123 on `inertThenJoins 320` (four for each join) and 3,832 of
-8,650 on `0 + (0 + (… + 5))` with 320 additions (twelve for each join). -/
+8,650 on `0 + (0 + (… + 5))` with 320 additions (twelve for each join).
+
+`JMach` is not linear on every net.  On a chain of `n` adders, each facing
+a zero, with the result of each wired to the second argument of the next
+(`joinChain`), every claim joins two wires.  Listed in order, each walk
+takes five actions.  Listed in the order of the reversed bits of their
+positions, the walks join wires of equal length, both sides go to the end,
+and the walks take 133, 773, 4,101, 20,485, 45,061 and 98,309 actions for
+`n` = 16, 64, 256, 1,024, 2,048 and 4,096: almost exactly `2 * n * lg n`.
+So the best bound to hope for on walks is of the order `n * lg n`. -/
 
 namespace INet
 
@@ -133,5 +142,39 @@ def joinTable : IO Unit := do
   for k in [80, 160, 320] do
     joinRow Arith.xsys s!"lnest {k}" (Arith.lnest k).net 1 (k ≤ 160)
     joinRow Arith.xsys s!"rnest {k}" (Arith.rnest k).net 1 (k ≤ 160)
+
+/-- The reversal of the `b` lowest bits of `i`. -/
+def bitRev (b i : Nat) : Nat := Id.run do
+  let mut r := 0
+  let mut x := i
+  for _ in [0:b] do
+    r := 2 * r + x % 2
+    x := x / 2
+  return r
+
+/-- A chain of `2 ^ b` adders of `Arith`, each facing a zero: a free port,
+the second argument of the first adder, its result wired to the second
+argument of the next, and so on, the result of the last free.  The adders
+are listed in the order `order`. -/
+def joinChain (b : Nat) (order : Nat → Nat) : XNet Arith :=
+  let n := 2 ^ b
+  ⟨((List.range n).map order).flatMap fun i =>
+      [([2 * i + 1], Arith.add), ([2 * i + 2], Arith.zero)],
+    [([0], 0), ([0], 1)],
+    ((List.range n).flatMap fun i =>
+      [(([2 * i + 1], 0), ([2 * i + 2], 0)), (([2 * i + 2], 0), ([2 * i + 1], 0))]) ++
+    ((List.range (n - 1)).flatMap fun i =>
+      [(([2 * i + 1], 2), ([2 * (i + 1) + 1], 1)), (([2 * (i + 1) + 1], 1), ([2 * i + 1], 2))]) ++
+    [(([0], 0), ([1], 1)), (([1], 1), ([0], 0)),
+      (([2 * (n - 1) + 1], 2), ([0], 1)), (([0], 1), ([2 * (n - 1) + 1], 2))]⟩
+
+/-- The runs of `joinChain`, in order and with the bits of the positions
+reversed: claims, actions and actions of walks of one thread. -/
+def chainTable : IO Unit := do
+  for b in [4, 6, 8, 10, 11, 12] do
+    for (nm, ord) in [("in order", fun i => i), ("bit-reversed", bitRev b)] do
+      let (a, c, _, w) := jStats Arith.xsys 1 (JMach.init (joinChain b ord) 1) 1000000000
+      IO.println s!"{nm} n={2 ^ b} claims={c} actions={a} walk={w}"
+      (← IO.getStdout).flush
 
 end INet

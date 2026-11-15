@@ -87,6 +87,7 @@ import InteractionNets.JoinRun
 import InteractionNets.JoinBound
 import InteractionNets.Arith.JoinRun
 import InteractionNets.MeasureJoin
+import InteractionNets.Arith.JoinChain
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
 
@@ -3424,6 +3425,11 @@ holds up to equality rather than up to renaming.
   of which the turns of a thread already at rest are 34,820 for 320: the
   work of the threads, 48,050, is linear, and the walks are about two
   actions for each claim.
+  `JMach` is not linear on every net: on a chain of `n` adders each facing
+  a zero, listed so that every join merges two wires of equal length
+  (`joinChain` with the bits of the positions reversed), the walks take
+  98,309 actions for `n = 4,096`, almost exactly `2 * n * lg n`, where
+  in order they take five for each join.
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
