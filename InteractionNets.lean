@@ -3436,11 +3436,12 @@ holds up to equality rather than up to renaming.
   trail from one of its points can reach, so the longest trail from its
   `j`-th point has at most `max (j + 1) (t - j + 1)` points
   (`IsPath.trail_le`, `IsPath.lfar_le`, `IsPath.of_ends`), and adding
-  segments only lengthens the longest trail (`lfar_mono`).  When a walk
-  stops on the shorter of two joined wires, the far half of that wire at
-  least doubles the longest trail from each of its points; summing the
-  logarithms of the longest trails is the measure such a bound would
-  charge the walks to.  The charge itself is not yet proved.
+  segments only lengthens the longest trail (`lfar_mono`).  The plan is to
+  charge a walk to the growth of the logarithms of the longest trails: the
+  side whose walk stops first should see the longest trail from the far
+  half of its points at least double.  That charge is not yet proved; it
+  has only been measured to hold on the nets of `MeasureJoin`, on rings of
+  adders and on Peano expressions.
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
