@@ -91,6 +91,8 @@ class Core {S : Type} (system : System S) (zero succ dup era : outParam S) : Pro
   numerals : ∀ α β, (α = zero ∨ α = succ) → (β = zero ∨ β = succ) → system.rule α β = none
   ar_zero : system.ar zero = 0
   ar_succ : system.ar succ = 1
+  zero_ne_succ : zero ≠ succ
+  sided : system.Sided
 
 namespace Core
 
@@ -231,7 +233,11 @@ instance core : Core system zero succ dup era :=
   { copyRules with
     numerals := by rintro α β (rfl | rfl) (rfl | rfl) <;> rfl
     ar_zero := rfl
-    ar_succ := rfl }
+    ar_succ := rfl
+    zero_ne_succ := by decide
+    sided := by
+      intro α β R hR j
+      cases α <;> cases β <;> cases hR <;> rfl }
 
 /-- **An agent of `Peano` that computes a function of two numerals.** -/
 abbrev Computes2 (op : Peano) (f c : Nat → Nat → Nat) : Prop := Core.Computes2 system op f c

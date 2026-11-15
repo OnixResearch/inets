@@ -2037,7 +2037,7 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              for the adder: a run at rest has made
                              exactly the counted interactions and holds
                              the value; a fair run comes to rest
-* `INet.Peano.GExpr.rest`, `INet.Peano.GExpr.fair`, `INet.Peano.GExpr.good`,
+* `INet.Core.GExpr.rest`, `INet.Core.GExpr.fair`, `INet.Core.GExpr.good`,
   `INet.Peano.Op1`, `INet.Peano.Op2`, `INet.Peano.system_sided`
                              expressions over any operators that
                              compute come out right on the machine: with
@@ -3433,18 +3433,18 @@ holds up to equality rather than up to renaming.
   operator is data (`Peano.Op1`, `Peano.Op2`): a symbol, its function,
   its cost and the proof that alone with numerals it reduces in that
   cost to the numeral of the value.  Every agent that computes gives one
-  (`Peano.Op1.ofComputes`, `Peano.Op2.ofComputes`), and so does the adder
+  (`Core.Op1.ofComputes`, `Core.Op2.ofComputes`), and so does the adder
   (`Peano.addOp`).  Expressions (`Peano.GExpr`) are numerals and
   operators of one or two arguments applied to expressions; an operator
   of one argument waits on its argument as one of two does
-  (`Peano.op_setup1`).  Every expression has a net that is well formed
+  (`Core.op_setup1`).  Every expression has a net that is well formed
   and computes its value in exactly `GExpr.cost` interactions
   (`GExpr.good`), on the machine under any schedule (`GExpr.rest`) and
   under fair ones (`GExpr.fair`), and it can be run and read
   (`GExpr.run_sound`, `GExpr.run_complete`).  The expressions of `+`, `*`
   and `^` are a case, with the same nets, values and costs
   (`PExpr.toG`), and their theorems are those of these expressions.  A single operator on the
-  machine (`Peano.Op2.rest`, `Peano.Op1.rest`, and the fair versions)
+  machine (`Core.Op2.rest`, `Core.Op1.rest`, and the fair versions)
   brings in the adder (`Peano.sum_rest`, `Peano.sum_fair`).
 * The development holds in any system with the core (`Core`): numerals,
   a copier and an eraser with their rules, no rule for two numerals, and
@@ -3499,7 +3499,7 @@ holds up to equality rather than up to renaming.
   agent a side (`Peano.system_sided`), so the argument nets reduce
   inside the whole as they do alone (`Net.Made.steps`); the operator
   then has two numerals as arguments in a net of successors and zeros
-  (`Peano.op_setup`).  Each such expression is an expression over
+  (`Core.op_setup`).  Each such expression is an expression over
   operators with the same net (`PExpr.toG_net`), so its net is well
   formed and computes the value in exactly `PExpr.cost` interactions
   (`PExpr.good`), and on the machine, with any number of threads and any

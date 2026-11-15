@@ -76,6 +76,10 @@ instance core : Core system zero succ dup era where
   numerals := by rintro α β (rfl | rfl) (rfl | rfl) <;> rfl
   ar_zero := rfl
   ar_succ := rfl
+  zero_ne_succ := by decide
+  sided := by
+    intro α β R hR j
+    cases α <;> cases β <;> cases hR <;> rfl
 
 /-- **The system has the adder.** -/
 theorem rules : Addition.Rules system zero succ add :=

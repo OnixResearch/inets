@@ -102,7 +102,7 @@ theorem xsys_bounded : xsys.Bounded 4 12 := by
 
 theorem lit_nodup : ∀ n, ((Peano.lit n).agents.map Prod.fst).Nodup
   | 0 => by decide
-  | n + 1 => XNet.pushOn_nodup (good_lit n).below succ _ (lit_nodup n)
+  | n + 1 => XNet.pushOn_nodup (good_lit (xsys := xsys) n).below succ _ (lit_nodup n)
 
 theorem openOp_nodup (γ : Peano) : ((openOp γ).agents.map Prod.fst).Nodup :=
   List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩
