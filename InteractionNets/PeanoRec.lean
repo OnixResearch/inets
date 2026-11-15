@@ -34,7 +34,10 @@ does that, and is a combiner (`Peano.add_combines`); every agent that
 computes is one (`Peano.Computes2.combines`).
 
 The three theorems of the agents follow (`Peano.mul_computes'`,
-`Peano.pow_computes'`, `Peano.fac_computes'`), with the same costs.
+`Peano.pow_computes'`, `Peano.fac_computes'`), with the same costs.  They
+are stacked: the multiplier is derived with the adder as combiner, and
+the power and the factorial with that derived multiplier, so none of the
+three uses the proofs written for them one by one.
 -/
 
 namespace INet
@@ -955,7 +958,7 @@ recurses on its parameter, the base, with the multiplier. -/
 theorem pow_computes' : Computes2 pow (fun e b => b ^ e) powCost :=
   (iter_computes rule_pow_succ ⟨by decide, by decide, by decide, by decide, by decide,
     by decide, by decide⟩ (zero2_powZero rule_pow_zero (by decide) (by decide))
-    mul_computes.combines).congr iter_pow iterCost_pow
+    mul_computes'.combines).congr iter_pow iterCost_pow
 
 theorem prim_fac (n : Nat) : prim 1 (fun v n => v * n) n = fact n := by
   induction n with
@@ -977,7 +980,7 @@ recursion: it recurses on the predecessor with the multiplier. -/
 theorem fac_computes' : Computes1 fac fact facCost :=
   (prim_computes rule_fac_succ ⟨by decide, by decide, by decide, by decide, by decide,
     by decide, by decide⟩ (zero1_facZero rule_fac_zero (by decide))
-    mul_computes.combines).congr prim_fac primCost_fac
+    mul_computes'.combines).congr prim_fac primCost_fac
 
 end Peano
 
