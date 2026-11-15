@@ -3475,7 +3475,8 @@ holds up to equality rather than up to renaming.
   adder is not of this form: its result contains the agents of its
   second argument, so it is not made of new agents only
   (`Addition.Adding.run` says what it is made of).  The expressions of
-  the next item do not have factorials.
+  the next item do not have factorials; the expressions over operators
+  (`PeanoGExpr`, below) do.
 * The three proofs follow one course, and it is proved once, in two
   shapes (`PeanoRec`).  On a parameter, `f (S x) y = g y (f x y)`: the
   agent copies its second argument for a new agent of its own symbol and
@@ -3547,7 +3548,11 @@ holds up to equality rather than up to renaming.
   well-formed net that lists no name twice, with a normal form `n` steps
   away and rules that write at most `C` agents and `D` segments, is at
   rest after `nt * ((nt + n) * X.passBound n C D + n * (C + D + 1) + 1)`
-  actions (`XMach.roundRobin_rest`).  The measure of `XMach.time_bound`
+  actions (`XMach.roundRobin_rest`); if every thread acts in every
+  window of `W` actions, after `W` times the same count plus one
+  (`XMach.window_rest`, `Peano.GExpr.rest_within`).  Without a window
+  there is no bound: a fair schedule can starve a thread for as long as
+  it likes.  The measure of `XMach.time_bound`
   goes down at every action that is not free, and a round of free
   actions leaves every thread at rest (`XThread.rest_of_cost`).  For the
   expressions over operators (`PeanoBound`), the rules of `Peano` write at

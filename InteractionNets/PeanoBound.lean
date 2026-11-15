@@ -135,6 +135,21 @@ theorem GExpr.rest_by (e : GExpr) {nt : Nat} (hnt : 0 < nt) :
     (normal_of_numerals hag) i hi
   exact ⟨hr, e.rest hnt _ hr⟩
 
+/-- **The same for any schedule in which every thread acts in every
+window of `W` actions**: after `W` times the count, the threads are at
+rest with the value in memory. -/
+theorem GExpr.rest_within (e : GExpr) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {W : Nat}
+    (hwin : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ j < i + W ∧ σ j = u) :
+    ∀ i, W * ((nt + e.cost) * e.net.passBound e.cost 4 12 + e.cost * (4 + 12 + 1) + 1) ≤ i →
+      ((XMach.init e.net nt).trace xsys σ i).1.resting = true ∧
+      ((XMach.init e.net nt).trace xsys σ i).2 = e.cost ∧
+      IsNum ((XMach.init e.net nt).trace xsys σ i).1.mem.toNet e.res e.eval := by
+  intro i hi
+  obtain ⟨hX, -, N', hs, hA, hag⟩ := GExpr.good e
+  have hr := XMach.window_rest hX (GExpr.net_nodup e) hnt xsys_bounded hs
+    (normal_of_numerals hag) σ hwin i hi
+  exact ⟨hr, e.rest hnt _ hr⟩
+
 /-- **How many actions are enough to run an expression and read its
 value.**  Run for at least the bound of `Peano.GExpr.rest_by`, the
 segments of the net and of `e.cost` right-hand sides, and the length of

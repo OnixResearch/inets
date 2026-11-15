@@ -11,7 +11,11 @@ most `C` agents and `D` segments, is at rest after
 
     nt * ((nt + n) * X.passBound n C D + n * (C + D + 1) + 1)
 
-actions (`XMach.roundRobin_rest`).
+actions (`XMach.roundRobin_rest`).  More generally, if every thread acts
+in every window of `W` actions, the run is at rest after `W` times the
+same count plus one (`XMach.window_rest`); threads that take turns are
+the case `W = nt`.  Without such a window no bound holds: a fair schedule
+can starve a thread for as long as it likes.
 
 The count is that of `XMach.time_bound`, read differently.  There, a
 measure goes down at every action that is not free, and a free action
@@ -96,75 +100,76 @@ theorem free_round {Φ : Nat → Nat} {free : Nat → Prop} {nt P : Nat}
   have := hdrop (P + 1) (Nat.le_refl _)
   omega
 
-/-- **Threads that take turns are at rest after a bounded number of
-actions.** -/
-theorem XMach.roundRobin_rest {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
+/-- **Threads that each act in every window of `W` actions are at rest
+after a bounded number of actions.** -/
+theorem XMach.window_rest {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
     (hnd : (X.agents.map Prod.fst).Nodup) {nt : Nat} (hnt : 0 < nt) {C D : Nat}
     (hb : xs.Bounded C D) {n : Nat} {N' : Net S} (hs : Steps (Step xs.sys) n X.toNet N')
-    (hn : Normal (Step xs.sys) N') :
-    ∀ i, nt * ((nt + n) * X.passBound n C D + n * (C + D + 1) + 1) ≤ i →
-      ((XMach.init X nt).trace xs (fun j => j % nt) i).1.resting = true := by
+    (hn : Normal (Step xs.sys) N') (σ : Nat → Nat) {W : Nat}
+    (hwin : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ j < i + W ∧ σ j = u) :
+    ∀ i, W * ((nt + n) * X.passBound n C D + n * (C + D + 1) + 1) ≤ i →
+      ((XMach.init X nt).trace xs σ i).1.resting = true := by
   -- what `XMach.time_bound` knows about the run
-  have live := XMach.trace_live (xs := xs) (fun j => j % nt) (XMach.init_live hX hnt)
-  have run : ∀ i, MRun xs.sys ((XMach.init X nt).trace xs (fun j => j % nt) i).2
-      (Mach.init X.toNet) ((XMach.init X nt).trace xs (fun j => j % nt) i).1.toMach := by
+  have live := XMach.trace_live (xs := xs) σ (XMach.init_live hX hnt)
+  have run : ∀ i, MRun xs.sys ((XMach.init X nt).trace xs σ i).2
+      (Mach.init X.toNet) ((XMach.init X nt).trace xs σ i).1.toMach := by
     intro i
-    have h := XMach.trace_run xs (fun j => j % nt) (XMach.init X nt) i
+    have h := XMach.trace_run xs σ (XMach.init X nt) i
     rw [XMach.init_toMach] at h
     exact h
-  have bound : ∀ i, ((XMach.init X nt).trace xs (fun j => j % nt) i).2 ≤ n :=
+  have bound : ∀ i, ((XMach.init X nt).trace xs σ i).2 ≤ n :=
     fun i => (run i).claims_le hX hs hn
   let K := X.wires.length + D * n
   let A := X.agents.length + C * n
   obtain ⟨is, ih⟩ := XMach.init_sizes X nt
-  have sizes := XMach.seq_sizes (xs := xs) ((XMach.init X nt).trace xs (fun j => j % nt))
-    (fun j => j % nt) (fun _ => rfl) live hb (W := X.wires.length) (A₀ := X.agents.length)
+  have sizes := XMach.seq_sizes (xs := xs) ((XMach.init X nt).trace xs σ)
+    σ (fun _ => rfl) live hb (W := X.wires.length) (A₀ := X.agents.length)
     ⟨Nat.le_trans (Nat.le_of_eq is) (Nat.le_add_right _ _),
       Nat.le_trans (Nat.le_of_eq ih) (Nat.le_add_right _ _)⟩
-  have hA : ∀ i, ((XMach.init X nt).trace xs (fun j => j % nt) i).1.heads ≤ A :=
+  have hA : ∀ i, ((XMach.init X nt).trace xs σ i).1.heads ≤ A :=
     fun i => Nat.le_trans (sizes i).2
       (Nat.add_le_add_left (Nat.mul_le_mul_left C (bound i)) _)
-  have nd : ∀ i, (((XMach.init X nt).trace xs (fun j => j % nt) i).1.mem.agents.map
+  have nd : ∀ i, (((XMach.init X nt).trace xs σ i).1.mem.agents.map
       Prod.fst).Nodup := by
     intro i
     induction i with
     | zero => exact hnd
-    | succ i ih => exact XMach.step_nodup (live i) ih (i % nt)
+    | succ i ih => exact XMach.step_nodup (live i) ih (σ i)
   have hH : N'.Sized K := XNet.normal_sized hX hb hs hn
-  have ahead : ∀ i, ((XMach.init X nt).trace xs (fun j => j % nt) i).1.Ahead N' :=
+  have ahead : ∀ i, ((XMach.init X nt).trace xs σ i).1.Ahead N' :=
     fun i => XMach.ahead_of_run (live i).inv hX (run i) hs hn
   -- the measure
   let Kc := C + D + 7 * A + K + 1
   let Φ : Nat → Nat := fun i =>
-    ((XMach.init X nt).trace xs (fun j => j % nt) i).1.energyIn N' K A +
-      (n - ((XMach.init X nt).trace xs (fun j => j % nt) i).2) * Kc
+    ((XMach.init X nt).trace xs σ i).1.energyIn N' K A +
+      (n - ((XMach.init X nt).trace xs σ i).2) * Kc
   let free : Nat → Prop := fun i =>
-    (XMach.init X nt).trace xs (fun j => j % nt) (i + 1) =
-        (XMach.init X nt).trace xs (fun j => j % nt) i ∧
-      ((XMach.init X nt).trace xs (fun j => j % nt) i).1.stepCost xs (i % nt) = 0
+    (XMach.init X nt).trace xs σ (i + 1) =
+        (XMach.init X nt).trace xs σ i ∧
+      ((XMach.init X nt).trace xs σ i).1.stepCost xs (σ i) = 0
   have dich : ∀ i, free i ∨ Φ (i + 1) < Φ i := by
     intro i
-    have hb1 : ((XMach.init X nt).trace xs (fun j => j % nt) i).2 +
-        (((XMach.init X nt).trace xs (fun j => j % nt) i).1.step xs (i % nt)).2 ≤ n :=
+    have hb1 : ((XMach.init X nt).trace xs σ i).2 +
+        (((XMach.init X nt).trace xs σ i).1.step xs (σ i)).2 ≤ n :=
       bound (i + 1)
-    have htr : (XMach.init X nt).trace xs (fun j => j % nt) (i + 1) =
-        ((((XMach.init X nt).trace xs (fun j => j % nt) i).1.step xs (i % nt)).1,
-          ((XMach.init X nt).trace xs (fun j => j % nt) i).2 +
-            (((XMach.init X nt).trace xs (fun j => j % nt) i).1.step xs (i % nt)).2) := rfl
-    rcases XMach.step_work (live i) (nd i) hb hH (ahead i) (hA i) (i % nt) with
+    have htr : (XMach.init X nt).trace xs σ (i + 1) =
+        ((((XMach.init X nt).trace xs σ i).1.step xs (σ i)).1,
+          ((XMach.init X nt).trace xs σ i).2 +
+            (((XMach.init X nt).trace xs σ i).1.step xs (σ i)).2) := rfl
+    rcases XMach.step_work (live i) (nd i) hb hH (ahead i) (hA i) (σ i) with
       ⟨e, hz⟩ | ⟨h1, hce⟩ | ⟨h0, hlt⟩
     · refine .inl ⟨?_, hz⟩
       rw [htr, e, Nat.add_zero]
     · refine .inr ?_
-      show (((XMach.init X nt).trace xs (fun j => j % nt) (i + 1)).1.energyIn N' K A +
-          (n - ((XMach.init X nt).trace xs (fun j => j % nt) (i + 1)).2) * Kc) <
-        ((XMach.init X nt).trace xs (fun j => j % nt) i).1.energyIn N' K A +
-          (n - ((XMach.init X nt).trace xs (fun j => j % nt) i).2) * Kc
+      show (((XMach.init X nt).trace xs σ (i + 1)).1.energyIn N' K A +
+          (n - ((XMach.init X nt).trace xs σ (i + 1)).2) * Kc) <
+        ((XMach.init X nt).trace xs σ i).1.energyIn N' K A +
+          (n - ((XMach.init X nt).trace xs σ i).2) * Kc
       rw [htr]
       dsimp only
-      have e1 : n - ((XMach.init X nt).trace xs (fun j => j % nt) i).2 =
-          (n - (((XMach.init X nt).trace xs (fun j => j % nt) i).2 +
-            (((XMach.init X nt).trace xs (fun j => j % nt) i).1.step xs (i % nt)).2)) + 1 := by
+      have e1 : n - ((XMach.init X nt).trace xs σ i).2 =
+          (n - (((XMach.init X nt).trace xs σ i).2 +
+            (((XMach.init X nt).trace xs σ i).1.step xs (σ i)).2)) + 1 := by
         omega
       rw [e1, Nat.add_mul, Nat.one_mul]
       have : C + D + 7 * A + K < Kc := by
@@ -172,10 +177,10 @@ theorem XMach.roundRobin_rest {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
         omega
       omega
     · refine .inr ?_
-      show (((XMach.init X nt).trace xs (fun j => j % nt) (i + 1)).1.energyIn N' K A +
-          (n - ((XMach.init X nt).trace xs (fun j => j % nt) (i + 1)).2) * Kc) <
-        ((XMach.init X nt).trace xs (fun j => j % nt) i).1.energyIn N' K A +
-          (n - ((XMach.init X nt).trace xs (fun j => j % nt) i).2) * Kc
+      show (((XMach.init X nt).trace xs σ (i + 1)).1.energyIn N' K A +
+          (n - ((XMach.init X nt).trace xs σ (i + 1)).2) * Kc) <
+        ((XMach.init X nt).trace xs σ i).1.energyIn N' K A +
+          (n - ((XMach.init X nt).trace xs σ i).2) * Kc
       rw [htr]
       dsimp only
       rw [h0, Nat.add_zero]
@@ -183,8 +188,8 @@ theorem XMach.roundRobin_rest {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
   have mono : ∀ i, Φ (i + 1) ≤ Φ i := by
     intro i
     rcases dich i with ⟨e, -⟩ | hlt
-    · show (((XMach.init X nt).trace xs (fun j => j % nt) (i + 1)).1.energyIn N' K A +
-          (n - ((XMach.init X nt).trace xs (fun j => j % nt) (i + 1)).2) * Kc) ≤ _
+    · show (((XMach.init X nt).trace xs σ (i + 1)).1.energyIn N' K A +
+          (n - ((XMach.init X nt).trace xs σ (i + 1)).2) * Kc) ≤ _
       rw [e]
       exact Nat.le_refl _
     · exact Nat.le_of_lt hlt
@@ -210,44 +215,70 @@ theorem XMach.roundRobin_rest {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
     rw [Nat.sub_zero, e1, Nat.mul_add n (X.passBound n C D) (C + D + 1),
       Nat.add_mul nt n (X.passBound n C D)]
     omega
-  -- a free round, and rest from then on
-  obtain ⟨k, hk, hfree⟩ := free_round dich mono h0
-  have same : ∀ u, u ≤ nt → (XMach.init X nt).trace xs (fun j => j % nt) (k * nt + u) =
-      (XMach.init X nt).trace xs (fun j => j % nt) (k * nt) := by
+  -- a free window, and rest from then on
+  obtain ⟨k, hk, hfree⟩ := free_round (nt := W) dich mono h0
+  have same : ∀ u, u ≤ W → (XMach.init X nt).trace xs σ (k * W + u) =
+      (XMach.init X nt).trace xs σ (k * W) := by
     intro u
     induction u with
     | zero => intro _; rfl
     | succ u ih =>
       intro hu
       rw [← Nat.add_assoc, (hfree u (by omega)).1, ih (by omega)]
-  have hlen : ((XMach.init X nt).trace xs (fun j => j % nt) (k * nt)).1.ths.length = nt := by
+  have hlen : ((XMach.init X nt).trace xs σ (k * W)).1.ths.length = nt := by
     rw [XMach.trace_length]
     show ((List.range nt).map _).length = nt
     rw [List.length_map, List.length_range]
-  have rest : ((XMach.init X nt).trace xs (fun j => j % nt) (k * nt)).1.resting = true := by
+  have rest : ((XMach.init X nt).trace xs σ (k * W)).1.resting = true := by
     apply List.all_eq_true.2
     intro T hT
     obtain ⟨u, hu, hTu⟩ := List.getElem_of_mem hT
     rw [hlen] at hu
-    have hc := (hfree u hu).2
-    rw [same u (Nat.le_of_lt hu)] at hc
-    have em : (k * nt + u) % nt = u := by
-      rw [Nat.mul_comm, Nat.mul_add_mod]
-      exact Nat.mod_eq_of_lt hu
-    rw [em] at hc
+    obtain ⟨j, hj1, hj2, hσ⟩ := hwin u hu (k * W)
+    obtain ⟨d, rfl⟩ : ∃ d, j = k * W + d := ⟨j - k * W, by omega⟩
+    have hc := (hfree d (by omega)).2
+    rw [same d (by omega), hσ] at hc
     unfold XMach.stepCost at hc
     rw [List.getElem?_eq_getElem (by rw [hlen]; exact hu), hTu] at hc
     exact XThread.rest_of_cost hc
   intro i hi
-  have hki : k * nt ≤ i := by
-    have := Nat.mul_le_mul_right nt hk
-    rw [Nat.mul_comm nt] at hi
-    have h2 : ((nt + n) * X.passBound n C D + n * (C + D + 1)) * nt + nt ≤ i := by
+  have hki : k * W ≤ i := by
+    have := Nat.mul_le_mul_right W hk
+    rw [Nat.mul_comm W] at hi
+    have h2 : ((nt + n) * X.passBound n C D + n * (C + D + 1)) * W + W ≤ i := by
       rw [Nat.add_mul, Nat.one_mul] at hi
       exact hi
     omega
-  obtain ⟨d, rfl⟩ : ∃ d, i = k * nt + d := ⟨i - k * nt, by omega⟩
+  obtain ⟨d, rfl⟩ : ∃ d, i = k * W + d := ⟨i - k * W, by omega⟩
   exact XMach.resting_trace _ rest d
+
+/-- Threads that take turns act in every window of `nt` actions. -/
+theorem roundRobin_window {nt : Nat} (hnt : 0 < nt) :
+    ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ j < i + nt ∧ j % nt = u := by
+  intro u hu i
+  have hd := Nat.div_add_mod i nt
+  have hr := Nat.mod_lt i hnt
+  by_cases h : i % nt ≤ u
+  · refine ⟨nt * (i / nt) + u, by omega, by omega, ?_⟩
+    rw [Nat.mul_add_mod]
+    exact Nat.mod_eq_of_lt hu
+  · refine ⟨nt * (i / nt + 1) + u, ?_, ?_, ?_⟩
+    · rw [Nat.mul_succ]
+      omega
+    · rw [Nat.mul_succ]
+      omega
+    · rw [Nat.mul_add_mod]
+      exact Nat.mod_eq_of_lt hu
+
+/-- **Threads that take turns are at rest after a bounded number of
+actions.** -/
+theorem XMach.roundRobin_rest {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
+    (hnd : (X.agents.map Prod.fst).Nodup) {nt : Nat} (hnt : 0 < nt) {C D : Nat}
+    (hb : xs.Bounded C D) {n : Nat} {N' : Net S} (hs : Steps (Step xs.sys) n X.toNet N')
+    (hn : Normal (Step xs.sys) N') :
+    ∀ i, nt * ((nt + n) * X.passBound n C D + n * (C + D + 1) + 1) ≤ i →
+      ((XMach.init X nt).trace xs (fun j => j % nt) i).1.resting = true :=
+  XMach.window_rest hX hnd hnt hb hs hn _ (roundRobin_window hnt)
 
 /-! ### Enough fuel to read -/
 
