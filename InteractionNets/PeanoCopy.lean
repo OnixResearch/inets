@@ -3,57 +3,74 @@ import InteractionNets.Keeps
 
 /-! # Erasing and copying a numeral
 
-The two helpers that multiplication needs, in the system `Peano`, with
-any other agents in the net.
+The two helpers that multiplication needs, with any other agents in the
+net, in any system that has a zero, a successor, a copier and an eraser
+with their rules (`Copies.Rules`).
 
 An eraser on a numeral `n` runs for `n + 1` steps; the eraser and the
 agents of the numeral are then gone, nothing new is there, and what was
-away from them is as it was (`Peano.erase`).
+away from them is as it was (`Copies.erase`).
 
 A copier on a numeral `n`, with its two copies wired to the ports `p₁`
 and `p₂`, runs for `n + 1` steps, after which both ports carry the
 numeral `n`, and what was away from the copier and the numeral is as it
-was (`Peano.copy`).  The ports may be free ports or ports of other
+was (`Copies.copy`).  The ports may be free ports or ports of other
 agents.  The two copies are made of agents whose names were not in use
-(`Peano.copy_fresh`).
+(`Copies.copy_fresh`).
+
+The system `Peano` has them (`Peano.copyRules`), and the theorems are
+stated for it under the names `Peano.erase`, `Peano.copy_fresh` and
+`Peano.copy`.
 -/
 
 namespace INet
 
-namespace Peano
+namespace Copies
 
 open Addition (gone)
 
-/-- The port `p` is wired to the numeral `k`. -/
-abbrev IsNum (N : Net Peano) (p : Port) (k : Nat) : Prop := Addition.IsNum ar zero succ N p k
+variable {S : Type}
 
-/-- The agents of a numeral, from its head down. -/
-abbrev NumList (N : Net Peano) (i : Id) (l : List Id) : Prop :=
-  Addition.NumList ar zero succ N i l
+/-- A copy of `0` is two zeros. -/
+def dupZeroData (zero : S) : RuleData S :=
+  RuleData.ofWires [((some false, 0), zero), ((some true, 0), zero)]
+    [(.ifc false 0, .new (some false) 0 0),
+      (.ifc false 1, .new (some true) 0 0)]
 
-/-- Above the port `x` there are `j` successors, the last of which has its
-principal port wired to `r`. -/
-abbrev Tower (N : Net Peano) (x : Port) (j : Nat) (r : Port) : Prop :=
-  Addition.Tower ar succ N x j r
+/-- A copy of `S x` is two successors on the two copies of `x`. -/
+def dupSuccData (succ dup : S) : RuleData S :=
+  RuleData.ofWires [((some false, 0), succ), ((some false, 1), succ), ((some true, 0), dup)]
+    [(.ifc false 0, .new (some false) 0 0),
+      (.ifc false 1, .new (some false) 1 0),
+      (.new (some false) 0 1, .new (some true) 0 1),
+      (.new (some false) 1 1, .new (some true) 0 2),
+      (.new (some true) 0 0, .ifc true 0)]
 
-/-- The port `p` is wired to the numeral `k`, all of whose agents satisfy
-`Q`. -/
-abbrev IsNumQ (N : Net Peano) (Q : Id → Prop) (p : Port) (k : Nat) : Prop :=
-  Addition.IsNumQ ar zero succ N Q p k
+/-- Erasing `0` leaves nothing. -/
+def eraZeroData : RuleData S := RuleData.ofWires [] []
 
-/-- A tower all of whose agents satisfy `Q`. -/
-abbrev TowerQ (N : Net Peano) (Q : Id → Prop) (x : Port) (j : Nat) (r : Port) : Prop :=
-  Addition.TowerQ ar succ N Q x j r
+/-- Erasing `S x` erases `x`. -/
+def eraSuccData (era : S) : RuleData S :=
+  RuleData.ofWires [((some true, 0), era)] [(.ifc true 0, .new (some true) 0 0)]
 
-theorem rule_era_zero : system.rule era zero = some eraZero.toX.toRhs := rfl
-theorem rule_era_succ : system.rule era succ = some eraSucc.toX.toRhs := rfl
-theorem rule_dup_zero : system.rule dup zero = some dupZero.toX.toRhs := rfl
-theorem rule_dup_succ : system.rule dup succ = some dupSucc.toX.toRhs := rfl
+/-- **A system with a copier and an eraser**: the symbols are apart, and
+the system has their rules. -/
+structure Rules (sys : System S) (zero succ dup era : S) : Prop where
+  zero_ne_dup : zero ≠ dup
+  succ_ne_dup : succ ≠ dup
+  zero_ne_era : zero ≠ era
+  succ_ne_era : succ ≠ era
+  rule_dup_zero : sys.rule dup zero = some (dupZeroData zero).toX.toRhs
+  rule_dup_succ : sys.rule dup succ = some (dupSuccData succ dup).toX.toRhs
+  rule_era_zero : sys.rule era zero = some (eraZeroData (S := S)).toX.toRhs
+  rule_era_succ : sys.rule era succ = some (eraSuccData era).toX.toRhs
+
+variable {sys : System S} {zero succ dup era : S}
 
 /-- The rule for erasing a successor makes one agent, the new eraser. -/
-theorem eraSucc_lab {o : Option Bool} {j : Nat} {γ : Peano}
-    (h : eraSucc.toX.toRhs.lab o j = some γ) : o = some true ∧ j = 0 := by
-  have h' : assoc (o, j) eraSucc.agents = some γ := h
+theorem eraSucc_lab {era : S} {o : Option Bool} {j : Nat} {γ : S}
+    (h : (eraSuccData era).toX.toRhs.lab o j = some γ) : o = some true ∧ j = 0 := by
+  have h' : assoc (o, j) (eraSuccData era).agents = some γ := h
   have hm : ((o, j), γ) ∈ [(((some true : Option Bool), 0), era)] := assoc_mem h'
   rcases List.mem_cons.1 hm with e | hm'
   · injection e with e1 _
@@ -62,9 +79,9 @@ theorem eraSucc_lab {o : Option Bool} {j : Nat} {γ : Peano}
   · exact absurd hm' List.not_mem_nil
 
 /-- The rule for copying a zero makes two zeros. -/
-theorem dupZero_lab {o : Option Bool} {j : Nat} {γ : Peano}
-    (h : dupZero.toX.toRhs.lab o j = some γ) : γ = zero := by
-  have h' : assoc (o, j) dupZero.agents = some γ := h
+theorem dupZero_lab {zero : S} {o : Option Bool} {j : Nat} {γ : S}
+    (h : (dupZeroData zero).toX.toRhs.lab o j = some γ) : γ = zero := by
+  have h' : assoc (o, j) (dupZeroData zero).agents = some γ := h
   have hm : ((o, j), γ) ∈ [(((some false : Option Bool), 0), zero), ((some true, 0), zero)] :=
     assoc_mem h'
   rcases List.mem_cons.1 hm with e | hm'
@@ -75,9 +92,9 @@ theorem dupZero_lab {o : Option Bool} {j : Nat} {γ : Peano}
 
 /-- The rule for copying a successor makes two successors and the new
 copier. -/
-theorem dupSucc_lab {o : Option Bool} {j : Nat} {γ : Peano}
-    (h : dupSucc.toX.toRhs.lab o j = some γ) : γ = succ ∨ (o = some true ∧ j = 0) := by
-  have h' : assoc (o, j) dupSucc.agents = some γ := h
+theorem dupSucc_lab {succ dup : S} {o : Option Bool} {j : Nat} {γ : S}
+    (h : (dupSuccData succ dup).toX.toRhs.lab o j = some γ) : γ = succ ∨ (o = some true ∧ j = 0) := by
+  have h' : assoc (o, j) (dupSuccData succ dup).agents = some γ := h
   have hm : ((o, j), γ) ∈ [(((some false : Option Bool), 0), succ), ((some false, 1), succ),
       ((some true, 0), dup)] := assoc_mem h'
   rcases List.mem_cons.1 hm with e | hm'
@@ -92,6 +109,28 @@ theorem dupSucc_lab {o : Option Bool} {j : Nat} {γ : Peano}
         exact .inr ⟨e3, e4⟩
       · exact absurd hm''' List.not_mem_nil
 
+/-- The situation of a copy under way: the copier `d` faces the head `h`
+of what is left of the numeral, with the agents `l`; above each of its
+two copies there are already `j` successors, up to the ports `p₁` and
+`p₂`, which are on names in use that are neither the copier nor agents of
+the numeral.  Those successors satisfy `Q`, and so does every name not in
+use. -/
+structure Copying (sys : System S) (zero succ dup : S) (N : Net S) (Q : Id → Prop) (d : Id)
+    (j : Nat) (h : Id) (l : List Id)
+    (p₁ p₂ : Port) : Prop where
+  wf : N.WF sys.ar
+  hd : N.agent d dup
+  fst : N.Paired sys.ar (d, 0) (h, 0)
+  num : Addition.NumList sys.ar zero succ N h l
+  out₁ : ∃ x, N.Paired sys.ar (d, 1) x ∧ Addition.TowerQ sys.ar succ N Q x j p₁
+  out₂ : ∃ x, N.Paired sys.ar (d, 2) x ∧ Addition.TowerQ sys.ar succ N Q x j p₂
+  hp₁ : N.Used p₁.1 ∧ p₁.1 ≠ d ∧ ¬ p₁.1 ∈ l
+  hp₂ : N.Used p₂.1 ∧ p₂.1 ≠ d ∧ ¬ p₂.1 ∈ l
+  hQ : ∀ i, ¬ N.Used i → Q i
+
+variable (H : Rules sys zero succ dup era)
+include H
+
 /-! ### Erasing -/
 
 /-- **Erasing a numeral.**  Let the eraser `e` face the head `h` of a
@@ -99,18 +138,18 @@ numeral with the agents `l`.  The net reduces, in as many steps as the
 numeral has agents, to a net that has kept everything away from the
 eraser and the numeral, and whose agents are those of the start without
 the eraser and the numeral. -/
-theorem erase : ∀ (l : List Id) {N : Net Peano} {e h : Id}, N.WF ar → N.agent e era →
-    N.Paired ar (e, 0) (h, 0) → NumList N h l →
-    ∃ N', Steps (Step system) l.length N N' ∧ N.Keeps ar (gone N e l) N' ∧
+theorem erase : ∀ (l : List Id) {N : Net S} {e h : Id}, N.WF sys.ar → N.agent e era →
+    N.Paired sys.ar (e, 0) (h, 0) → Addition.NumList sys.ar zero succ N h l →
+    ∃ N', Steps (Step sys) l.length N N' ∧ N.Keeps sys.ar (gone N e l) N' ∧
       ∀ i γ, N'.agent i γ → N.agent i γ ∧ i ≠ e ∧ ¬ i ∈ l
   | [], _, _, _, _, _, _, hl => by cases hl
   | h :: l', N, e, _, hN, he, hp, hl => by
     cases hl with
     | last hz =>
-      have hA : Addition.Adder ar era N e h zero := ⟨hN, he, hz, by decide, hp⟩
-      have red : Redex system N e h era zero eraZero.toX.toRhs :=
-        ⟨he, hz, hA.site.ne, hp.2.2, rule_era_zero⟩
-      have st : Step system N (N.fire e h eraZero.toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
+      have hA : Addition.Adder sys.ar era N e h zero := ⟨hN, he, hz, H.zero_ne_era, hp⟩
+      have red : Redex sys N e h era zero (eraZeroData (S := S)).toX.toRhs :=
+        ⟨he, hz, hA.site.ne, hp.2.2, H.rule_era_zero⟩
+      have st : Step sys N (N.fire e h (eraZeroData (S := S)).toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
       refine ⟨_, .single st, (hA.site.keeps _).mono ?_, ?_⟩
       · rintro i (e1 | e1)
         · exact .inl e1
@@ -121,34 +160,34 @@ theorem erase : ∀ (l : List Id) {N : Net Peano} {e h : Id}, N.WF ar → N.agen
         · exact ⟨hi, h1, fun hm => h2 (List.mem_singleton.1 hm)⟩
         · cases hlab
     | @next _ h' _ hs hpi hl' =>
-      have hA : Addition.Adder ar era N e h succ := ⟨hN, he, hs, by decide, hp⟩
-      have hR : eraSucc.toX.toRhs.WF ar era succ := system.rule_wf rule_era_succ
-      have red : Redex system N e h era succ eraSucc.toX.toRhs :=
-        ⟨he, hs, hA.site.ne, hp.2.2, rule_era_succ⟩
-      have st : Step system N (N.fire e h eraSucc.toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
+      have hA : Addition.Adder sys.ar era N e h succ := ⟨hN, he, hs, H.succ_ne_era, hp⟩
+      have hR : (eraSuccData era).toX.toRhs.WF sys.ar era succ := sys.rule_wf H.rule_era_succ
+      have red : Redex sys N e h era succ (eraSuccData era).toX.toRhs :=
+        ⟨he, hs, hA.site.ne, hp.2.2, H.rule_era_succ⟩
+      have st : Step sys N (N.fire e h (eraSuccData era).toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
       have hN₁ := Step.wf hN st
       have hh'e : h' ≠ e := by
         rcases hl'.label h' hl'.head_mem with hx | hx
-        · exact hA.ne_add hx (by decide)
-        · exact hA.ne_add hx (by decide)
+        · exact hA.ne_add hx H.zero_ne_era
+        · exact hA.ne_add hx H.succ_ne_era
       have hh'h : h' ≠ h := hA.not_s hpi (port_ne_snd (by decide))
       -- the new eraser faces the rest of the numeral
-      have pe : (N.fire e h eraSucc.toX.toRhs).Paired ar (h', 0) (child e h (some true) 0, 0) :=
+      have pe : (N.fire e h (eraSuccData era).toX.toRhs).Paired sys.ar (h', 0) (child e h (some true) 0, 0) :=
         hA.site.paired_fire_ifc_new hR
-          (show eraSucc.toX.toRhs.link (.ifc true 0) (.new (some true) 0 0) from rfl)
+          (show (eraSuccData era).toX.toRhs.link (.ifc true 0) (.new (some true) 0 0) from rfl)
           (hpi.symm hN) hh'e hh'h
       have hav : ∀ j, j ∈ l' → ¬ (j = e ∨ j = h) := by
         intro j hj hc
         rcases hc with e1 | e1
         · rw [e1] at hj
           rcases hl'.label e hj with hx | hx
-          · exact absurd (hN.agent_fun hx he) (by decide)
-          · exact absurd (hN.agent_fun hx he) (by decide)
+          · exact absurd (hN.agent_fun hx he) H.zero_ne_era
+          · exact absurd (hN.agent_fun hx he) H.succ_ne_era
         · rw [e1] at hj
           exact Addition.NumList.not_mem hN hp hl' hpi (port_ne_snd (by decide)) hj
-      have hl₁ : NumList (N.fire e h eraSucc.toX.toRhs) h' l' :=
+      have hl₁ : Addition.NumList sys.ar zero succ (N.fire e h (eraSuccData era).toX.toRhs) h' l' :=
         hl'.keeps (hA.site.keeps _) hav
-      have he' : (N.fire e h eraSucc.toX.toRhs).agent (child e h (some true) 0) era :=
+      have he' : (N.fire e h (eraSuccData era).toX.toRhs).agent (child e h (some true) 0) era :=
         .inr ⟨some true, 0, rfl, rfl⟩
       obtain ⟨N', sts, kp, hag⟩ := erase l' hN₁ he' (pe.symm hN₁) hl₁
       refine ⟨N', .head st sts, ((hA.site.keeps _).trans kp).mono ?_, ?_⟩
@@ -170,46 +209,29 @@ theorem erase : ∀ (l : List Id) {N : Net Peano} {e h : Id}, N.WF ar → N.agen
           exact absurd e1 hne'
 
 /-- **Erasing the numeral `n`** takes `n + 1` steps. -/
-theorem erase_num {N : Net Peano} {e : Id} {n : Nat} (hN : N.WF ar) (he : N.agent e era)
-    (hn : IsNum N (e, 0) n) :
-    ∃ N' l, l.length = n + 1 ∧ Steps (Step system) (n + 1) N N' ∧ N.Keeps ar (gone N e l) N' ∧
+theorem erase_num {N : Net S} {e : Id} {n : Nat} (hN : N.WF sys.ar) (he : N.agent e era)
+    (hn : Addition.IsNum sys.ar zero succ N (e, 0) n) :
+    ∃ N' l, l.length = n + 1 ∧ Steps (Step sys) (n + 1) N N' ∧ N.Keeps sys.ar (gone N e l) N' ∧
       ∀ i γ, N'.agent i γ → N.agent i γ ∧ i ≠ e ∧ ¬ i ∈ l := by
   obtain ⟨h, hp, hk⟩ := hn
   obtain ⟨l, hl, el⟩ := Addition.Num.list hk
-  obtain ⟨N', sts, kp, hag⟩ := erase l hN he hp hl
+  obtain ⟨N', sts, kp, hag⟩ := erase H l hN he hp hl
   rw [el] at sts
   exact ⟨N', l, el, sts, kp, hag⟩
 
 /-! ### Copying -/
-
-/-- The situation of a copy under way: the copier `d` faces the head `h`
-of what is left of the numeral, with the agents `l`; above each of its
-two copies there are already `j` successors, up to the ports `p₁` and
-`p₂`, which are on names in use that are neither the copier nor agents of
-the numeral.  Those successors satisfy `Q`, and so does every name not in
-use. -/
-structure Copying (N : Net Peano) (Q : Id → Prop) (d : Id) (j : Nat) (h : Id) (l : List Id)
-    (p₁ p₂ : Port) : Prop where
-  wf : N.WF ar
-  hd : N.agent d dup
-  fst : N.Paired ar (d, 0) (h, 0)
-  num : NumList N h l
-  out₁ : ∃ x, N.Paired ar (d, 1) x ∧ TowerQ N Q x j p₁
-  out₂ : ∃ x, N.Paired ar (d, 2) x ∧ TowerQ N Q x j p₂
-  hp₁ : N.Used p₁.1 ∧ p₁.1 ≠ d ∧ ¬ p₁.1 ∈ l
-  hp₂ : N.Used p₂.1 ∧ p₂.1 ≠ d ∧ ¬ p₂.1 ∈ l
-  hQ : ∀ i, ¬ N.Used i → Q i
 
 /-- The copier runs for as many steps as the numeral has agents left,
 after which both ports carry the numeral, made of the successors already
 there and of new agents; everything away from the copier and the numeral
 is kept, and the agents of the net are zeros, successors, or agents of
 the start other than the copier. -/
-theorem Copying.run {Q : Id → Prop} : ∀ (l : List Id) {N : Net Peano} {d : Id} {j : Nat}
-    {h : Id} {p₁ p₂ : Port} {n : Nat}, Copying N Q d j h l p₁ p₂ → l.length = n + 1 →
-    ∃ N', Steps (Step system) l.length N N' ∧ IsNumQ N' Q p₁ (j + n) ∧
-      IsNumQ N' Q p₂ (j + n) ∧
-      N.Keeps ar (gone N d l) N' ∧
+theorem Copying.run {Q : Id → Prop} : ∀ (l : List Id) {N : Net S} {d : Id} {j : Nat}
+    {h : Id} {p₁ p₂ : Port} {n : Nat}, Copying sys zero succ dup N Q d j h l p₁ p₂ →
+    l.length = n + 1 →
+    ∃ N', Steps (Step sys) l.length N N' ∧ Addition.IsNumQ sys.ar zero succ N' Q p₁ (j + n) ∧
+      Addition.IsNumQ sys.ar zero succ N' Q p₂ (j + n) ∧
+      N.Keeps sys.ar (gone N d l) N' ∧
       ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d)
   | [], _, _, _, _, _, _, _, c, _ => by cases c.num
   | h :: l', N, d, j, _, p₁, p₂, n, c, hlen => by
@@ -224,33 +246,33 @@ theorem Copying.run {Q : Id → Prop} : ∀ (l : List Id) {N : Net Peano} {d : I
     cases hnum with
     | last hz =>
       have hn : n = 0 := Nat.succ.inj hlen.symm
-      have hA : Addition.Adder ar dup N d h zero := ⟨hN, hd, hz, by decide, hfst⟩
-      have hR : dupZero.toX.toRhs.WF ar dup zero := system.rule_wf rule_dup_zero
-      have red : Redex system N d h dup zero dupZero.toX.toRhs :=
-        ⟨hd, hz, hA.site.ne, hfst.2.2, rule_dup_zero⟩
-      have st : Step system N (N.fire d h dupZero.toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
-      obtain ⟨hx₁d, hx₁h, ht₁'⟩ := hA.towerQ_fire' (by decide) dupZero.toX.toRhs hp₁.2.1
+      have hA : Addition.Adder sys.ar dup N d h zero := ⟨hN, hd, hz, H.zero_ne_dup, hfst⟩
+      have hR : (dupZeroData zero).toX.toRhs.WF sys.ar dup zero := sys.rule_wf H.rule_dup_zero
+      have red : Redex sys N d h dup zero (dupZeroData zero).toX.toRhs :=
+        ⟨hd, hz, hA.site.ne, hfst.2.2, H.rule_dup_zero⟩
+      have st : Step sys N (N.fire d h (dupZeroData zero).toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
+      obtain ⟨hx₁d, hx₁h, ht₁'⟩ := hA.towerQ_fire' H.succ_ne_dup (dupZeroData zero).toX.toRhs hp₁.2.1
         (fun e => hp₁.2.2 (by
           rw [e]
           exact List.mem_cons_self)) ht₁
-      obtain ⟨hx₂d, hx₂h, ht₂'⟩ := hA.towerQ_fire' (by decide) dupZero.toX.toRhs hp₂.2.1
+      obtain ⟨hx₂d, hx₂h, ht₂'⟩ := hA.towerQ_fire' H.succ_ne_dup (dupZeroData zero).toX.toRhs hp₂.2.1
         (fun e => hp₂.2.2 (by
           rw [e]
           exact List.mem_cons_self)) ht₂
       -- a new zero on each copy
-      have q₁ : (N.fire d h dupZero.toX.toRhs).Paired ar x₁ (child d h (some false) 0, 0) :=
+      have q₁ : (N.fire d h (dupZeroData zero).toX.toRhs).Paired sys.ar x₁ (child d h (some false) 0, 0) :=
         hA.site.paired_fire_ifc_new hR
-          (show dupZero.toX.toRhs.link (.ifc false 0) (.new (some false) 0 0) from rfl)
+          (show (dupZeroData zero).toX.toRhs.link (.ifc false 0) (.new (some false) 0 0) from rfl)
           (hpx₁.symm hN) hx₁d hx₁h
-      have q₂ : (N.fire d h dupZero.toX.toRhs).Paired ar x₂ (child d h (some true) 0, 0) :=
+      have q₂ : (N.fire d h (dupZeroData zero).toX.toRhs).Paired sys.ar x₂ (child d h (some true) 0, 0) :=
         hA.site.paired_fire_ifc_new hR
-          (show dupZero.toX.toRhs.link (.ifc false 1) (.new (some true) 0 0) from rfl)
+          (show (dupZeroData zero).toX.toRhs.link (.ifc false 1) (.new (some true) 0 0) from rfl)
           (hpx₂.symm hN) hx₂d hx₂h
-      have n₁ : IsNumQ (N.fire d h dupZero.toX.toRhs) Q x₁ 0 :=
+      have n₁ : Addition.IsNumQ sys.ar zero succ (N.fire d h (dupZeroData zero).toX.toRhs) Q x₁ 0 :=
         ⟨_, [_], q₁, .last (.inr ⟨some false, 0, rfl, rfl⟩), rfl, fun i hi => by
           rw [List.mem_singleton.1 hi]
           exact c.hQ _ (hA.site.not_used_child (some false) 0)⟩
-      have n₂ : IsNumQ (N.fire d h dupZero.toX.toRhs) Q x₂ 0 :=
+      have n₂ : Addition.IsNumQ sys.ar zero succ (N.fire d h (dupZeroData zero).toX.toRhs) Q x₂ 0 :=
         ⟨_, [_], q₂, .last (.inr ⟨some true, 0, rfl, rfl⟩), rfl, fun i hi => by
           rw [List.mem_singleton.1 hi]
           exact c.hQ _ (hA.site.not_used_child (some true) 0)⟩
@@ -272,56 +294,57 @@ theorem Copying.run {Q : Id → Prop} : ∀ (l : List Id) {N : Net Peano} {d : I
       have hn : n = k + 1 := by
         have e : l'.length + 1 = n + 1 := hlen
         omega
-      have hA : Addition.Adder ar dup N d h succ := ⟨hN, hd, hs, by decide, hfst⟩
-      have hR : dupSucc.toX.toRhs.WF ar dup succ := system.rule_wf rule_dup_succ
-      have red : Redex system N d h dup succ dupSucc.toX.toRhs :=
-        ⟨hd, hs, hA.site.ne, hfst.2.2, rule_dup_succ⟩
-      have st : Step system N (N.fire d h dupSucc.toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
+      have hA : Addition.Adder sys.ar dup N d h succ := ⟨hN, hd, hs, H.succ_ne_dup, hfst⟩
+      have hR : (dupSuccData succ dup).toX.toRhs.WF sys.ar dup succ := sys.rule_wf H.rule_dup_succ
+      have red : Redex sys N d h dup succ (dupSuccData succ dup).toX.toRhs :=
+        ⟨hd, hs, hA.site.ne, hfst.2.2, H.rule_dup_succ⟩
+      have st : Step sys N (N.fire d h (dupSuccData succ dup).toX.toRhs) := ⟨_, _, _, _, _, red, rfl⟩
       have hN₁ := Step.wf hN st
       have hh'd : h' ≠ d := by
         rcases hl'.label h' hl'.head_mem with hx | hx
-        · exact hA.ne_add hx (by decide)
-        · exact hA.ne_add hx (by decide)
+        · exact hA.ne_add hx H.zero_ne_dup
+        · exact hA.ne_add hx H.succ_ne_dup
       have hh'h : h' ≠ h := hA.not_s hpi (port_ne_snd (by decide))
-      obtain ⟨hx₁d, hx₁h, ht₁'⟩ := hA.towerQ_fire' (by decide) dupSucc.toX.toRhs hp₁.2.1
+      obtain ⟨hx₁d, hx₁h, ht₁'⟩ := hA.towerQ_fire' H.succ_ne_dup (dupSuccData succ dup).toX.toRhs hp₁.2.1
         (fun e => hp₁.2.2 (by
           rw [e]
           exact List.mem_cons_self)) ht₁
-      obtain ⟨hx₂d, hx₂h, ht₂'⟩ := hA.towerQ_fire' (by decide) dupSucc.toX.toRhs hp₂.2.1
+      obtain ⟨hx₂d, hx₂h, ht₂'⟩ := hA.towerQ_fire' H.succ_ne_dup (dupSuccData succ dup).toX.toRhs hp₂.2.1
         (fun e => hp₂.2.2 (by
           rw [e]
           exact List.mem_cons_self)) ht₂
       -- the five wires of the right-hand side
-      have q₁ : (N.fire d h dupSucc.toX.toRhs).Paired ar x₁ (child d h (some false) 0, 0) :=
+      have q₁ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar x₁ (child d h (some false) 0, 0) :=
         hA.site.paired_fire_ifc_new hR
-          (show dupSucc.toX.toRhs.link (.ifc false 0) (.new (some false) 0 0) from rfl)
+          (show (dupSuccData succ dup).toX.toRhs.link (.ifc false 0) (.new (some false) 0 0) from rfl)
           (hpx₁.symm hN) hx₁d hx₁h
-      have q₂ : (N.fire d h dupSucc.toX.toRhs).Paired ar x₂ (child d h (some false) 1, 0) :=
+      have q₂ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar x₂ (child d h (some false) 1, 0) :=
         hA.site.paired_fire_ifc_new hR
-          (show dupSucc.toX.toRhs.link (.ifc false 1) (.new (some false) 1 0) from rfl)
+          (show (dupSuccData succ dup).toX.toRhs.link (.ifc false 1) (.new (some false) 1 0) from rfl)
           (hpx₂.symm hN) hx₂d hx₂h
-      have q₃ : (N.fire d h dupSucc.toX.toRhs).Paired ar (child d h (some false) 0, 1)
+      have q₃ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar (child d h (some false) 0, 1)
           (child d h (some true) 0, 1) :=
         Site.paired_fire_new_new hR
-          (show dupSucc.toX.toRhs.link (.new (some false) 0 1) (.new (some true) 0 1) from rfl)
-      have q₄ : (N.fire d h dupSucc.toX.toRhs).Paired ar (child d h (some false) 1, 1)
+          (show (dupSuccData succ dup).toX.toRhs.link (.new (some false) 0 1) (.new (some true) 0 1) from rfl)
+      have q₄ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar (child d h (some false) 1, 1)
           (child d h (some true) 0, 2) :=
         Site.paired_fire_new_new hR
-          (show dupSucc.toX.toRhs.link (.new (some false) 1 1) (.new (some true) 0 2) from rfl)
-      have q₅ : (N.fire d h dupSucc.toX.toRhs).Paired ar (h', 0) (child d h (some true) 0, 0) :=
+          (show (dupSuccData succ dup).toX.toRhs.link (.new (some false) 1 1) (.new (some true) 0 2) from rfl)
+      have q₅ : (N.fire d h (dupSuccData succ dup).toX.toRhs).Paired sys.ar (h', 0) (child d h (some true) 0, 0) :=
         hA.site.paired_fire_ifc_new hR
-          (show dupSucc.toX.toRhs.link (.ifc true 0) (.new (some true) 0 0) from rfl)
+          (show (dupSuccData succ dup).toX.toRhs.link (.ifc true 0) (.new (some true) 0 0) from rfl)
           (hpi.symm hN) hh'd hh'h
       have hav : ∀ i, i ∈ l' → ¬ (i = d ∨ i = h) := by
         intro i hi hc
         rcases hc with e1 | e1
         · rw [e1] at hi
           rcases hl'.label d hi with hx | hx
-          · exact absurd (hN.agent_fun hx hd) (by decide)
-          · exact absurd (hN.agent_fun hx hd) (by decide)
+          · exact absurd (hN.agent_fun hx hd) H.zero_ne_dup
+          · exact absurd (hN.agent_fun hx hd) H.succ_ne_dup
         · rw [e1] at hi
           exact Addition.NumList.not_mem hN hfst hl' hpi (port_ne_snd (by decide)) hi
-      have c' : Copying (N.fire d h dupSucc.toX.toRhs) Q (child d h (some true) 0) (j + 1) h'
+      have c' : Copying sys zero succ dup (N.fire d h (dupSuccData succ dup).toX.toRhs) Q
+          (child d h (some true) 0) (j + 1) h'
           l' p₁ p₂ :=
         { wf := hN₁
           hd := .inr ⟨some true, 0, rfl, rfl⟩
@@ -374,20 +397,84 @@ The net reduces, in `n + 1` steps, to a net in which both ports carry the
 numeral `n`, made of agents whose names were not in use, and which has
 kept everything away from the copier and the numeral; its agents are
 zeros, successors, or agents of the start other than the copier. -/
+theorem copy_fresh {N : Net S} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : Nat}
+    (hN : N.WF sys.ar) (hd : N.agent d dup) (hp : N.Paired sys.ar (d, 0) (h, 0)) (hl : Addition.NumList sys.ar zero succ N h l)
+    (hlen : l.length = n + 1) (h₁ : N.Paired sys.ar (d, 1) p₁) (h₂ : N.Paired sys.ar (d, 2) p₂)
+    (hp₁ : p₁.1 ≠ d ∧ ¬ p₁.1 ∈ l) (hp₂ : p₂.1 ≠ d ∧ ¬ p₂.1 ∈ l) :
+    ∃ N', Steps (Step sys) (n + 1) N N' ∧ Addition.IsNumQ sys.ar zero succ N' (fun i => ¬ N.Used i) p₁ n ∧
+      Addition.IsNumQ sys.ar zero succ N' (fun i => ¬ N.Used i) p₂ n ∧ N.Keeps sys.ar (gone N d l) N' ∧
+      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d) := by
+  have c : Copying sys zero succ dup N (fun i => ¬ N.Used i) d 0 h l p₁ p₂ :=
+    ⟨hN, hd, hp, hl, ⟨p₁, h₁, rfl⟩, ⟨p₂, h₂, rfl⟩, ⟨Net.End.used h₁.2.1, hp₁⟩,
+      ⟨Net.End.used h₂.2.1, hp₂⟩, fun _ hu => hu⟩
+  obtain ⟨N', sts, i₁, i₂, kp, hag⟩ := Copying.run H l c hlen
+  rw [hlen] at sts
+  rw [Nat.zero_add] at i₁ i₂
+  exact ⟨N', sts, i₁, i₂, kp, hag⟩
+
+/-- The same, without the statement about the agents of the copies. -/
+theorem copy {N : Net S} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : Nat}
+    (hN : N.WF sys.ar) (hd : N.agent d dup) (hp : N.Paired sys.ar (d, 0) (h, 0)) (hl : Addition.NumList sys.ar zero succ N h l)
+    (hlen : l.length = n + 1) (h₁ : N.Paired sys.ar (d, 1) p₁) (h₂ : N.Paired sys.ar (d, 2) p₂)
+    (hp₁ : p₁.1 ≠ d ∧ ¬ p₁.1 ∈ l) (hp₂ : p₂.1 ≠ d ∧ ¬ p₂.1 ∈ l) :
+    ∃ N', Steps (Step sys) (n + 1) N N' ∧ Addition.IsNum sys.ar zero succ N' p₁ n ∧ Addition.IsNum sys.ar zero succ N' p₂ n ∧
+      N.Keeps sys.ar (gone N d l) N' ∧
+      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d) := by
+  obtain ⟨N', sts, i₁, i₂, kp, hag⟩ := copy_fresh H hN hd hp hl hlen h₁ h₂ hp₁ hp₂
+  exact ⟨N', sts, i₁.isNum, i₂.isNum, kp, hag⟩
+
+end Copies
+
+namespace Peano
+
+open Addition (gone)
+
+/-- The port `p` is wired to the numeral `k`. -/
+abbrev IsNum (N : Net Peano) (p : Port) (k : Nat) : Prop := Addition.IsNum ar zero succ N p k
+
+/-- The agents of a numeral, from its head down. -/
+abbrev NumList (N : Net Peano) (i : Id) (l : List Id) : Prop :=
+  Addition.NumList ar zero succ N i l
+
+/-- Above the port `x` there are `j` successors, the last of which has its
+principal port wired to `r`. -/
+abbrev Tower (N : Net Peano) (x : Port) (j : Nat) (r : Port) : Prop :=
+  Addition.Tower ar succ N x j r
+
+/-- The port `p` is wired to the numeral `k`, all of whose agents satisfy
+`Q`. -/
+abbrev IsNumQ (N : Net Peano) (Q : Id → Prop) (p : Port) (k : Nat) : Prop :=
+  Addition.IsNumQ ar zero succ N Q p k
+
+/-- A tower all of whose agents satisfy `Q`. -/
+abbrev TowerQ (N : Net Peano) (Q : Id → Prop) (x : Port) (j : Nat) (r : Port) : Prop :=
+  Addition.TowerQ ar succ N Q x j r
+
+theorem rule_era_zero : system.rule era zero = some eraZero.toX.toRhs := rfl
+theorem rule_era_succ : system.rule era succ = some eraSucc.toX.toRhs := rfl
+theorem rule_dup_zero : system.rule dup zero = some dupZero.toX.toRhs := rfl
+theorem rule_dup_succ : system.rule dup succ = some dupSucc.toX.toRhs := rfl
+
+/-- **`Peano` has a copier and an eraser.** -/
+theorem copyRules : Copies.Rules system zero succ dup era :=
+  ⟨by decide, by decide, by decide, by decide, rfl, rfl, rfl, rfl⟩
+
+/-- **Erasing a numeral**, in `Peano`. -/
+theorem erase : ∀ (l : List Id) {N : Net Peano} {e h : Id}, N.WF ar → N.agent e era →
+    N.Paired ar (e, 0) (h, 0) → NumList N h l →
+    ∃ N', Steps (Step system) l.length N N' ∧ N.Keeps ar (gone N e l) N' ∧
+      ∀ i γ, N'.agent i γ → N.agent i γ ∧ i ≠ e ∧ ¬ i ∈ l :=
+  Copies.erase copyRules
+
+/-- **Copying a numeral**, in `Peano`. -/
 theorem copy_fresh {N : Net Peano} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : Nat}
     (hN : N.WF ar) (hd : N.agent d dup) (hp : N.Paired ar (d, 0) (h, 0)) (hl : NumList N h l)
     (hlen : l.length = n + 1) (h₁ : N.Paired ar (d, 1) p₁) (h₂ : N.Paired ar (d, 2) p₂)
     (hp₁ : p₁.1 ≠ d ∧ ¬ p₁.1 ∈ l) (hp₂ : p₂.1 ≠ d ∧ ¬ p₂.1 ∈ l) :
     ∃ N', Steps (Step system) (n + 1) N N' ∧ IsNumQ N' (fun i => ¬ N.Used i) p₁ n ∧
       IsNumQ N' (fun i => ¬ N.Used i) p₂ n ∧ N.Keeps ar (gone N d l) N' ∧
-      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d) := by
-  have c : Copying N (fun i => ¬ N.Used i) d 0 h l p₁ p₂ :=
-    ⟨hN, hd, hp, hl, ⟨p₁, h₁, rfl⟩, ⟨p₂, h₂, rfl⟩, ⟨Net.End.used h₁.2.1, hp₁⟩,
-      ⟨Net.End.used h₂.2.1, hp₂⟩, fun _ hu => hu⟩
-  obtain ⟨N', sts, i₁, i₂, kp, hag⟩ := Copying.run l c hlen
-  rw [hlen] at sts
-  rw [Nat.zero_add] at i₁ i₂
-  exact ⟨N', sts, i₁, i₂, kp, hag⟩
+      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d) :=
+  Copies.copy_fresh copyRules hN hd hp hl hlen h₁ h₂ hp₁ hp₂
 
 /-- The same, without the statement about the agents of the copies. -/
 theorem copy {N : Net Peano} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : Nat}
@@ -396,9 +483,9 @@ theorem copy {N : Net Peano} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : Na
     (hp₁ : p₁.1 ≠ d ∧ ¬ p₁.1 ∈ l) (hp₂ : p₂.1 ≠ d ∧ ¬ p₂.1 ∈ l) :
     ∃ N', Steps (Step system) (n + 1) N N' ∧ IsNum N' p₁ n ∧ IsNum N' p₂ n ∧
       N.Keeps ar (gone N d l) N' ∧
-      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d) := by
-  obtain ⟨N', sts, i₁, i₂, kp, hag⟩ := copy_fresh hN hd hp hl hlen h₁ h₂ hp₁ hp₂
-  exact ⟨N', sts, i₁.isNum, i₂.isNum, kp, hag⟩
+      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d) :=
+  Copies.copy copyRules hN hd hp hl hlen h₁ h₂ hp₁ hp₂
+
 
 /-! ### Two small runs -/
 
