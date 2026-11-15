@@ -329,4 +329,41 @@ theorem XMach.relabel_fair (xs₂ : XSys S₂) (h : sys₁.Embeds ι xs₂.sys) 
 
 end Machine
 
+/-! ### Validity, relabelled -/
+
+/-- **Relabelling that keeps the arities of the agents keeps a matching.** -/
+theorem Net.Matching.relabel {ar₁ : S₁ → Nat} {ar₂ : S₂ → Nat} {N : Net S₁} (ι : S₁ → S₂)
+    (har : ∀ i γ, N.agent i γ → ar₂ (ι γ) = ar₁ γ) (h : N.Matching ar₁) :
+    (N.relabel ι).Matching ar₂ := by
+  have endIff : ∀ p, (N.relabel ι).End ar₂ p ↔ N.End ar₁ p := by
+    intro p
+    constructor
+    · rintro (hf | ⟨γ₂, ⟨γ, rfl, hγ⟩, hk⟩)
+      · exact .inl hf
+      · exact .inr ⟨γ, hγ, by rw [har _ _ hγ] at hk; exact hk⟩
+    · rintro (hf | ⟨γ, hγ, hk⟩)
+      · exact .inl hf
+      · exact .inr ⟨ι γ, ⟨γ, rfl, hγ⟩, by rw [har _ _ hγ]; exact hk⟩
+  have usedIff : ∀ i, (N.relabel ι).Used i → N.Used i := by
+    rintro i (⟨γ₂, γ, -, hγ⟩ | hl | hf)
+    · exact .inl ⟨γ, hγ⟩
+    · exact .inr (.inl hl)
+    · exact .inr (.inr hf)
+  refine ⟨?_, h.symm, h.irrefl, h.functional, fun hl => (endIff _).2 (h.ends hl),
+    fun he => h.wired ((endIff _).1 he), ?_, ?_⟩
+  · rintro i α β ⟨γ, rfl, hγ⟩ ⟨γ', rfl, hγ'⟩
+    rw [h.agent_fun hγ hγ']
+  · rintro i k α hf ⟨γ, -, hγ⟩
+    exact h.free_agent hf hγ
+  · rintro a α l ⟨γ, -, hγ⟩ hu
+    exact h.fresh l hγ (usedIff _ hu)
+
+/-- **Relabelling that keeps the arities of the agents keeps a valid
+memory valid.**  A small net is then checked once, over a fixed set of
+symbols, and holds for any symbols of the same arities. -/
+theorem XNet.Ok.relabel {ar₁ : S₁ → Nat} {ar₂ : S₂ → Nat} {X : XNet S₁} (ι : S₁ → S₂)
+    (har : ∀ i γ, X.toNet.agent i γ → ar₂ (ι γ) = ar₁ γ) (h : X.Ok ar₁) : (X.relabel ι).Ok ar₂ := by
+  rw [XNet.ok_iff_matching, XNet.relabel_toNet]
+  exact (XNet.ok_iff_matching.1 h).relabel ι har
+
 end INet

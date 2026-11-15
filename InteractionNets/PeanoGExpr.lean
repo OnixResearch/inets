@@ -683,11 +683,20 @@ def openOp1 (γ : Peano) : XNet Peano :=
   XNet.ofWires [([1], γ)] [([0], 0), ([2], 0)]
     [(([1], 0), ([2], 0)), (([1], 1), ([0], 0))]
 
+/-- An operator of one argument that waits, over the symbols of
+`Arith`. -/
+def openOp1T : XNet Arith :=
+  XNet.ofWires [([1], .succ)] [([0], 0), ([2], 0)]
+    [(([1], 0), ([2], 0)), (([1], 1), ([0], 0))]
+
 theorem openOp1_ok {γ : Peano} (h : ar γ = 1) : (openOp1 γ).Ok ar := by
-  cases γ
-  all_goals first
-    | exact absurd h (by decide)
-    | decide
+  have hT : openOp1T.Ok Arith.ar := by decide
+  have e : openOp1 γ = openOp1T.relabel (ofArithAt γ) := rfl
+  rw [e]
+  refine hT.relabel (ofArithAt γ) fun i γ' hi => ?_
+  have hi' : (i, γ') ∈ [(([1] : Id), Arith.succ)] := hi
+  rw [(Prod.mk.inj (List.mem_singleton.1 hi')).2]
+  exact h
 
 theorem openOp1_spec {γ : Peano} (h : ar γ = 1) :
     OpenOp1 (openOp1 γ).toNet γ [1] ([2], 0) ([0], 0) := by
@@ -721,13 +730,20 @@ theorem opNet1_toNet (γ : Peano) (X : XNet Peano) (p : Port) :
   rw [XNet.plug2_toNet]
   rfl
 
-/-- An operator of two arguments that waits is valid for every symbol of
-two arguments. -/
+/-- An operator of two arguments that waits, over the symbols of
+`Arith`. -/
+def openOpT : XNet Arith :=
+  XNet.ofWires [([1], .add)] [([0], 0), ([2], 0), ([3], 0)]
+    [(([1], 0), ([2], 0)), (([1], 1), ([3], 0)), (([1], 2), ([0], 0))]
+
 theorem openOp_ok {γ : Peano} (h : ar γ = 2) : (openOp γ).Ok ar := by
-  cases γ
-  all_goals first
-    | exact absurd h (by decide)
-    | decide
+  have hT : openOpT.Ok Arith.ar := by decide
+  have e : openOp γ = openOpT.relabel (ofArithAt γ) := rfl
+  rw [e]
+  refine hT.relabel (ofArithAt γ) fun i γ' hi => ?_
+  have hi' : (i, γ') ∈ [(([1] : Id), Arith.add)] := hi
+  rw [(Prod.mk.inj (List.mem_singleton.1 hi')).2]
+  exact h
 
 theorem openOp_spec {γ : Peano} (h : ar γ = 2) :
     OpenOp (openOp γ).toNet γ [1] ([2], 0) ([3], 0) ([0], 0) := by

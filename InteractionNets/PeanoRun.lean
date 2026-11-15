@@ -104,14 +104,34 @@ theorem GoodUnary.push {op : Peano} {X : XNet Peano} {n c : Nat} (g : GoodUnary 
       · exact cf.only i γ hi
       · exact .inr (.inl e')
 
-/-- The net for `op 0` is valid for every agent of one argument; the
-check is evaluated for each symbol. -/
-theorem unaryBase_ok {op : Peano} (h : ar op = 1) (h1 : succ ≠ op) : (unaryBase op).Ok ar := by
-  cases op
-  all_goals first
-    | exact absurd h (by decide)
-    | exact absurd rfl h1
-    | decide
+/-- The symbols of `Arith` as symbols of `Peano`: `succ` and `add` stand
+for an agent `op` of one or two arguments. -/
+def ofArithAt (op : Peano) : Arith → Peano
+  | .zero => zero
+  | .succ => op
+  | .add => op
+
+/-- The net for `op 0`, over the symbols of `Arith`. -/
+def unaryT : XNet Arith :=
+  XNet.ofWires [([1], .succ), ([2], .zero)] [([0], 0)]
+    [(([1], 0), ([2], 0)), (([1], 1), ([0], 0))]
+
+theorem unaryT_ok : unaryT.Ok Arith.ar := by decide
+
+/-- The net for `op 0` is valid for every agent of one argument: it is the
+net over `Arith`, checked once, relabelled. -/
+theorem unaryBase_ok {op : Peano} (h : ar op = 1) (_h1 : succ ≠ op) : (unaryBase op).Ok ar := by
+  have e : unaryBase op = unaryT.relabel (ofArithAt op) := rfl
+  rw [e]
+  refine unaryT_ok.relabel (ofArithAt op) fun i γ hi => ?_
+  have hi' : (i, γ) ∈ [(([1] : Id), Arith.succ), ([2], Arith.zero)] := hi
+  rcases List.mem_cons.1 hi' with e | hi''
+  · rw [(Prod.mk.inj e).2]
+    exact h
+  · rcases List.mem_cons.1 hi'' with e | h3
+    · rw [(Prod.mk.inj e).2]
+      rfl
+    · exact absurd h3 List.not_mem_nil
 
 theorem good_unaryBase {op : Peano} (h : ar op = 1) (h1 : succ ≠ op) :
     GoodUnary op (unaryBase op) 0 3 := by
@@ -337,13 +357,29 @@ theorem GoodBinary.push_snd {op : Peano} (h0 : zero ≠ op) (h1 : succ ≠ op) {
       · exact cf.only i γ hi
       · exact .inr (.inl e')
 
-/-- The net for `op 0 0` is valid for every agent of two arguments; the
-check is evaluated for each symbol. -/
+/-- The net for `op 0 0`, over the symbols of `Arith`. -/
+def binaryT : XNet Arith :=
+  XNet.ofWires [([1], .add), ([2], .zero), ([3], .zero)] [([0], 0)]
+    [(([1], 0), ([2], 0)), (([1], 1), ([3], 0)), (([1], 2), ([0], 0))]
+
+theorem binaryT_ok : binaryT.Ok Arith.ar := by decide
+
+/-- The net for `op 0 0` is valid for every agent of two arguments. -/
 theorem binaryBase_ok {op : Peano} (h : ar op = 2) : (binaryBase op).Ok ar := by
-  cases op
-  all_goals first
-    | exact absurd h (by decide)
-    | decide
+  have e : binaryBase op = binaryT.relabel (ofArithAt op) := rfl
+  rw [e]
+  refine binaryT_ok.relabel (ofArithAt op) fun i γ hi => ?_
+  have hi' : (i, γ) ∈ [(([1] : Id), Arith.add), ([2], Arith.zero), ([3], Arith.zero)] := hi
+  rcases List.mem_cons.1 hi' with e | hi''
+  · rw [(Prod.mk.inj e).2]
+    exact h
+  · rcases List.mem_cons.1 hi'' with e | hi'''
+    · rw [(Prod.mk.inj e).2]
+      rfl
+    · rcases List.mem_cons.1 hi''' with e | h3
+      · rw [(Prod.mk.inj e).2]
+        rfl
+      · exact absurd h3 List.not_mem_nil
 
 theorem good_binaryBase {op : Peano} (h : ar op = 2) : GoodBinary op (binaryBase op) 0 0 4 := by
   have hX := binaryBase_ok h
