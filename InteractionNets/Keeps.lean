@@ -16,6 +16,11 @@ a name in `C` being wired to a name in `C`, every numeral held at a port
 outside `C` is outside `C` (`Addition.NumList.avoid`,
 `Addition.IsNum.keeps`).  The names that a run on a numeral uses up
 (`Addition.gone`) are closed in this sense.
+
+The adder is proved here in this setting (`Addition.Adding.run`): the net
+may have any other agents, other adders among them, and the result of the
+adder may be wired to any port.  The theorem says what the run leaves
+alone, and what agents the net has afterwards.
 -/
 
 namespace INet
@@ -221,7 +226,201 @@ theorem tower_fire' (h : Adder ar add N a s σ) (hsa : succ ≠ add) (R : Rhs S)
     exact ⟨hua, hus, u, x', rfl, .inl ⟨hu, hua, hus⟩,
       h.site.paired_fire hp hx'a hx's hua hus, ht'⟩
 
+/-- The two agents of an active pair are a closed set. -/
+theorem closed (h : Adder ar add N a s σ) : Closed ar (fun i => i = a ∨ i = s) N := by
+  intro i q hi hq
+  rcases hi with e | e
+  · rw [e] at hq
+    exact .inr (congrArg Prod.fst (hq.det_left h.wf (h.pair.symm h.wf)))
+  · rw [e] at hq
+    exact .inl (congrArg Prod.fst (hq.det_left h.wf h.pair))
+
 end Adder
+
+/-! ### The adder, with anything else around -/
+
+/-- The new agents of the rule for `succ` are a successor and the adder
+of the second side. -/
+theorem succ_lab {o : Option Bool} {j : Nat} {γ : S}
+    (h : (succData succ add).toX.toRhs.lab o j = some γ) :
+    γ = succ ∨ (o = some true ∧ j = 0) := by
+  have h' : assoc (o, j) (succData succ add).agents = some γ := h
+  have hm : ((o, j), γ) ∈ [(((some false : Option Bool), 0), succ), ((some true, 0), add)] :=
+    assoc_mem h'
+  rcases List.mem_cons.1 hm with e | hm'
+  · injection e with _ e2
+    exact .inl e2
+  · rcases List.mem_cons.1 hm' with e | hm''
+    · injection e with e1 _
+      injection e1 with e3 e4
+      exact .inr ⟨e3, e4⟩
+    · exact absurd hm'' List.not_mem_nil
+
+/-- The situation of an addition under way, with anything else in the
+net: the adder `a` faces the head `h` of what is left of its first
+argument, with the agents `l`; its second argument is the numeral `n`;
+above its result there are already `j` successors, up to the port `x`,
+which is on a name in use that is neither the adder nor an agent of the
+first argument.  The port `x` need not be free, and the net may have
+other adders. -/
+structure Adding (ar : S → Nat) (zero succ add : S) (N : Net S) (a : Id) (j : Nat) (h : Id)
+    (l : List Id) (n : Nat) (x : Port) : Prop where
+  wf : N.WF ar
+  ha : N.agent a add
+  fst : N.Paired ar (a, 0) (h, 0)
+  num : NumList ar zero succ N h l
+  snd : IsNum ar zero succ N (a, 1) n
+  out : ∃ y, N.Paired ar (a, 2) y ∧ Tower ar succ N y j x
+  hx : N.Used x.1 ∧ x.1 ≠ a ∧ ¬ x.1 ∈ l
+
+/-- **The adder adds, with anything else around.**  The adder runs for as
+many steps as its first argument has agents left, after which the port
+`x` carries the numeral; everything away from the adder and its first
+argument is kept, and the agents of the net are successors or agents of
+the start other than the adder. -/
+theorem Adding.run {sys : System S} (H : Rules sys zero succ add) :
+    ∀ (l : List Id) {N : Net S} {a : Id} {j : Nat} {h : Id} {n : Nat} {x : Port} {m : Nat},
+      Adding sys.ar zero succ add N a j h l n x → l.length = m + 1 →
+      ∃ N', Steps (Step sys) l.length N N' ∧ IsNum sys.ar zero succ N' x (j + m + n) ∧
+        N.Keeps sys.ar (gone N a l) N' ∧
+        ∀ i γ, N'.agent i γ → γ = succ ∨ (N.agent i γ ∧ i ≠ a)
+  | [], _, _, _, _, _, _, _, c, _ => by cases c.num
+  | h :: l', N, a, j, _, n, x, m, c, hlen => by
+    have hN := c.wf
+    have ha := c.ha
+    have hfst := c.fst
+    have hx := c.hx
+    obtain ⟨t, hpt, hnt⟩ := c.snd
+    obtain ⟨y, hpy, hty⟩ := c.out
+    have hnum := c.num
+    cases hnum with
+    | last hz =>
+      have hm : m = 0 := Nat.succ.inj hlen.symm
+      have hA : Adder sys.ar add N a h zero := ⟨hN, ha, hz, H.zero_ne_add, hfst⟩
+      have red : Redex sys N a h add zero (zeroData (S := S)).toX.toRhs :=
+        ⟨ha, hz, hA.site.ne, hfst.2.2, H.rule_zero⟩
+      have st : Step sys N (N.fire a h (zeroData (S := S)).toX.toRhs) :=
+        ⟨_, _, _, _, _, red, rfl⟩
+      have hN₁ := Step.wf hN st
+      have hta : t ≠ a := by
+        rcases hnt.label with hx' | hx'
+        · exact hA.ne_add hx' H.zero_ne_add
+        · exact hA.ne_add hx' H.succ_ne_add
+      have hts : t ≠ h := hA.not_s hpt (port_ne_snd (by decide))
+      obtain ⟨hya, hyh, hty'⟩ :=
+        hA.tower_fire' H.succ_ne_add (zeroData (S := S)).toX.toRhs hx.2.1
+          (fun e => hx.2.2 (by
+            rw [e]
+            exact List.mem_cons_self)) hty
+      have hlk : (zeroData (S := S)).toX.toRhs.link (.ifc false 0) (.ifc false 1) := rfl
+      have hp : (N.fire a h (zeroData (S := S)).toX.toRhs).Paired sys.ar (t, 0) y :=
+        hA.site.paired_fire_ifc_ifc hlk (hpt.symm hN) (hpy.symm hN) hta hts hya hyh
+      refine ⟨_, .single st, ?_, (hA.site.keeps _).mono ?_, ?_⟩
+      · rw [hm, Nat.add_zero]
+        exact hty'.num ⟨t, hp.symm hN₁, hA.num_fire H.zero_ne_add H.succ_ne_add _ hnt hts⟩
+      · rintro i (e1 | e1)
+        · exact .inl e1
+        · exact .inr (.inl (by
+            rw [e1]
+            exact List.mem_cons_self))
+      · rintro i γ (⟨hi, h1, -⟩ | ⟨o, j', -, hlab⟩)
+        · exact .inr ⟨hi, h1⟩
+        · cases hlab
+    | @next _ h' _ hs hpi hl' =>
+      obtain ⟨k, ek, -⟩ := hl'.num
+      have hm : m = k + 1 := by
+        have e : l'.length + 1 = m + 1 := hlen
+        omega
+      have hA : Adder sys.ar add N a h succ := ⟨hN, ha, hs, H.succ_ne_add, hfst⟩
+      have hR : (succData succ add).toX.toRhs.WF sys.ar add succ := sys.rule_wf H.rule_succ
+      have red : Redex sys N a h add succ (succData succ add).toX.toRhs :=
+        ⟨ha, hs, hA.site.ne, hfst.2.2, H.rule_succ⟩
+      have st : Step sys N (N.fire a h (succData succ add).toX.toRhs) :=
+        ⟨_, _, _, _, _, red, rfl⟩
+      have hN₁ := Step.wf hN st
+      have hta : t ≠ a := by
+        rcases hnt.label with hx' | hx'
+        · exact hA.ne_add hx' H.zero_ne_add
+        · exact hA.ne_add hx' H.succ_ne_add
+      have hts : t ≠ h := hA.not_s hpt (port_ne_snd (by decide))
+      have hh'a : h' ≠ a := by
+        rcases hl'.label h' hl'.head_mem with hx' | hx'
+        · exact hA.ne_add hx' H.zero_ne_add
+        · exact hA.ne_add hx' H.succ_ne_add
+      have hh'h : h' ≠ h := hA.not_s hpi (port_ne_snd (by decide))
+      obtain ⟨hya, hyh, hty'⟩ :=
+        hA.tower_fire' H.succ_ne_add (succData succ add).toX.toRhs hx.2.1
+          (fun e => hx.2.2 (by
+            rw [e]
+            exact List.mem_cons_self)) hty
+      -- the four wires of the right-hand side
+      have p₁ : (N.fire a h (succData succ add).toX.toRhs).Paired sys.ar y
+          (child a h (some false) 0, 0) :=
+        hA.site.paired_fire_ifc_new hR
+          (show (succData succ add).toX.toRhs.link (.ifc false 1) (.new (some false) 0 0)
+            from rfl)
+          (hpy.symm hN) hya hyh
+      have p₂ : (N.fire a h (succData succ add).toX.toRhs).Paired sys.ar
+          (child a h (some false) 0, 1) (child a h (some true) 0, 2) :=
+        Site.paired_fire_new_new hR
+          (show (succData succ add).toX.toRhs.link (.new (some false) 0 1)
+            (.new (some true) 0 2) from rfl)
+      have p₃ : (N.fire a h (succData succ add).toX.toRhs).Paired sys.ar (h', 0)
+          (child a h (some true) 0, 0) :=
+        hA.site.paired_fire_ifc_new hR
+          (show (succData succ add).toX.toRhs.link (.ifc true 0) (.new (some true) 0 0)
+            from rfl)
+          (hpi.symm hN) hh'a hh'h
+      have p₄ : (N.fire a h (succData succ add).toX.toRhs).Paired sys.ar (t, 0)
+          (child a h (some true) 0, 1) :=
+        hA.site.paired_fire_ifc_new hR
+          (show (succData succ add).toX.toRhs.link (.ifc false 0) (.new (some true) 0 1)
+            from rfl)
+          (hpt.symm hN) hta hts
+      have hav : ∀ i, i ∈ l' → ¬ (i = a ∨ i = h) := by
+        intro i hi hc
+        rcases hc with e1 | e1
+        · rw [e1] at hi
+          rcases hl'.label a hi with hx' | hx'
+          · exact H.zero_ne_add (hN.agent_fun hx' ha)
+          · exact H.succ_ne_add (hN.agent_fun hx' ha)
+        · rw [e1] at hi
+          exact NumList.not_mem hN hfst hl' hpi (port_ne_snd (by decide)) hi
+      have c' : Adding sys.ar zero succ add (N.fire a h (succData succ add).toX.toRhs)
+          (child a h (some true) 0) (j + 1) h' l' n x :=
+        { wf := hN₁
+          ha := .inr ⟨some true, 0, rfl, rfl⟩
+          fst := p₃.symm hN₁
+          num := hl'.keeps (hA.site.keeps _) hav
+          snd := ⟨t, p₄.symm hN₁, hA.num_fire H.zero_ne_add H.succ_ne_add _ hnt hts⟩
+          out := ⟨_, p₂.symm hN₁, child a h (some false) 0, y, rfl,
+            .inr ⟨some false, 0, rfl, rfl⟩, p₁, hty'⟩
+          hx := ⟨Net.used_fire hN hx.1 _ _ _, fun e => hA.site.not_used_child (some true) 0 (by
+            rw [← e]
+            exact hx.1), fun hmem => hx.2.2 (List.mem_cons_of_mem _ hmem)⟩ }
+      obtain ⟨N', sts, inum, kp, hag⟩ := Adding.run H l' c' ek
+      have e : j + m + n = j + 1 + k + n := by omega
+      refine ⟨N', .head st sts, ?_, ((hA.site.keeps _).trans kp).mono ?_, ?_⟩
+      · rw [e]
+        exact inum
+      · rintro i ((e1 | e1) | e1 | hmem | hu)
+        · exact .inl e1
+        · exact .inr (.inl (by
+            rw [e1]
+            exact List.mem_cons_self))
+        · exact .inr (.inr (by
+            rw [e1]
+            exact hA.site.not_used_child (some true) 0))
+        · exact .inr (.inl (List.mem_cons_of_mem _ hmem))
+        · exact .inr (.inr fun hu' => hu (Net.used_fire hN hu' _ _ _))
+      · intro i γ hi
+        rcases hag i γ hi with hsucc | ⟨hi₁, hne'⟩
+        · exact .inl hsucc
+        · rcases hi₁ with ⟨hi₀, h1, -⟩ | ⟨o, j', e1, hlab⟩
+          · exact .inr ⟨hi₀, h1⟩
+          · rcases succ_lab hlab with hsucc | ⟨rfl, rfl⟩
+            · exact .inl hsucc
+            · exact absurd e1 hne'
 
 end Addition
 

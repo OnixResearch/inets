@@ -13,7 +13,8 @@ multipliers and copiers around (`Addition.Config.steps`); and the system
 of `Arith` is inside it (`Peano.embeds`), so what is proved for the nets
 of `Arith` holds for them here (`Peano.expr_rest`).
 
-That the multiplier multiplies is not proved.  One product is evaluated.
+One product is evaluated here.  That the multiplier multiplies, for all
+inputs, is `Peano.mul_correct`, in `PeanoMul`.
 -/
 
 namespace INet
@@ -165,7 +166,7 @@ def twoTimesThree : XNet Peano :=
 
 /-- The reducer validates the net for `2 * 3` and stops after 23 steps on
 a net whose agents are six successors and a zero.  This is one product,
-evaluated; that the multiplier multiplies is not proved. -/
+evaluated; the proof for all products is `Peano.mul_correct`. -/
 example : (twoTimesThree.normalize xsys 100).map (fun r => (r.2, r.1.agents.map (·.2))) =
     some (23, [zero, succ, succ, succ, succ, succ, succ]) := by
   decide +kernel

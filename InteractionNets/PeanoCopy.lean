@@ -51,6 +51,37 @@ theorem eraSucc_lab {o : Option Bool} {j : Nat} {γ : Peano}
     exact ⟨e3, e4⟩
   · exact absurd hm' List.not_mem_nil
 
+/-- The rule for copying a zero makes two zeros. -/
+theorem dupZero_lab {o : Option Bool} {j : Nat} {γ : Peano}
+    (h : dupZero.toX.toRhs.lab o j = some γ) : γ = zero := by
+  have h' : assoc (o, j) dupZero.agents = some γ := h
+  have hm : ((o, j), γ) ∈ [(((some false : Option Bool), 0), zero), ((some true, 0), zero)] :=
+    assoc_mem h'
+  rcases List.mem_cons.1 hm with e | hm'
+  · injection e with _ e2
+  · rcases List.mem_cons.1 hm' with e | hm''
+    · injection e with _ e2
+    · exact absurd hm'' List.not_mem_nil
+
+/-- The rule for copying a successor makes two successors and the new
+copier. -/
+theorem dupSucc_lab {o : Option Bool} {j : Nat} {γ : Peano}
+    (h : dupSucc.toX.toRhs.lab o j = some γ) : γ = succ ∨ (o = some true ∧ j = 0) := by
+  have h' : assoc (o, j) dupSucc.agents = some γ := h
+  have hm : ((o, j), γ) ∈ [(((some false : Option Bool), 0), succ), ((some false, 1), succ),
+      ((some true, 0), dup)] := assoc_mem h'
+  rcases List.mem_cons.1 hm with e | hm'
+  · injection e with _ e2
+    exact .inl e2
+  · rcases List.mem_cons.1 hm' with e | hm''
+    · injection e with _ e2
+      exact .inl e2
+    · rcases List.mem_cons.1 hm'' with e | hm'''
+      · injection e with e1 _
+        injection e1 with e3 e4
+        exact .inr ⟨e3, e4⟩
+      · exact absurd hm''' List.not_mem_nil
+
 /-! ### Erasing -/
 
 /-- **Erasing a numeral.**  Let the eraser `e` face the head `h` of a
@@ -159,11 +190,14 @@ structure Copying (N : Net Peano) (d : Id) (j : Nat) (h : Id) (l : List Id) (p�
 
 /-- The copier runs for as many steps as the numeral has agents left,
 after which both ports carry the numeral, with the successors already
-made, and everything away from the copier and the numeral is kept. -/
+made; everything away from the copier and the numeral is kept, and the
+agents of the net are zeros, successors, or agents of the start other
+than the copier. -/
 theorem Copying.run : ∀ (l : List Id) {N : Net Peano} {d : Id} {j : Nat} {h : Id}
     {p₁ p₂ : Port} {n : Nat}, Copying N d j h l p₁ p₂ → l.length = n + 1 →
     ∃ N', Steps (Step system) l.length N N' ∧ IsNum N' p₁ (j + n) ∧ IsNum N' p₂ (j + n) ∧
-      N.Keeps ar (gone N d l) N'
+      N.Keeps ar (gone N d l) N' ∧
+      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d)
   | [], _, _, _, _, _, _, _, c, _ => by cases c.num
   | h :: l', N, d, j, _, p₁, p₂, n, c, hlen => by
     have hN := c.wf
@@ -203,7 +237,7 @@ theorem Copying.run : ∀ (l : List Id) {N : Net Peano} {d : Id} {j : Nat} {h : 
         ⟨_, q₁, .inr ⟨some false, 0, rfl, rfl⟩⟩
       have n₂ : IsNum (N.fire d h dupZero.toX.toRhs) x₂ 0 :=
         ⟨_, q₂, .inr ⟨some true, 0, rfl, rfl⟩⟩
-      refine ⟨_, .single st, ?_, ?_, (hA.site.keeps _).mono ?_⟩
+      refine ⟨_, .single st, ?_, ?_, (hA.site.keeps _).mono ?_, ?_⟩
       · rw [hn]
         exact ht₁'.num n₁
       · rw [hn]
@@ -213,6 +247,9 @@ theorem Copying.run : ∀ (l : List Id) {N : Net Peano} {d : Id} {j : Nat} {h : 
         · exact .inr (.inl (by
             rw [e1]
             exact List.mem_cons_self))
+      · rintro i γ (⟨hi, h1, -⟩ | ⟨o, j', -, hlab⟩)
+        · exact .inr (.inr ⟨hi, h1⟩)
+        · exact .inl (dupZero_lab hlab)
     | @next _ h' _ hs hpi hl' =>
       obtain ⟨k, ek, -⟩ := hl'.num
       have hn : n = k + 1 := by
@@ -283,9 +320,9 @@ theorem Copying.run : ∀ (l : List Id) {N : Net Peano} {d : Id} {j : Nat} {h : 
           hp₂ := ⟨Net.used_fire hN hp₂.1 _ _ _, fun e => hA.site.not_used_child (some true) 0 (by
             rw [← e]
             exact hp₂.1), fun hm => hp₂.2.2 (List.mem_cons_of_mem _ hm)⟩ }
-      obtain ⟨N', sts, i₁, i₂, kp⟩ := Copying.run l' c' ek
+      obtain ⟨N', sts, i₁, i₂, kp, hag⟩ := Copying.run l' c' ek
       have e : j + n = j + 1 + k := by omega
-      refine ⟨N', .head st sts, ?_, ?_, ((hA.site.keeps _).trans kp).mono ?_⟩
+      refine ⟨N', .head st sts, ?_, ?_, ((hA.site.keeps _).trans kp).mono ?_, ?_⟩
       · rw [e]
         exact i₁
       · rw [e]
@@ -300,26 +337,37 @@ theorem Copying.run : ∀ (l : List Id) {N : Net Peano} {d : Id} {j : Nat} {h : 
             exact hA.site.not_used_child (some true) 0))
         · exact .inr (.inl (List.mem_cons_of_mem _ hm))
         · exact .inr (.inr fun hu' => hu (Net.used_fire hN hu' _ _ _))
+      · intro i γ hi
+        rcases hag i γ hi with hz | hsu | ⟨hi₁, hne'⟩
+        · exact .inl hz
+        · exact .inr (.inl hsu)
+        · rcases hi₁ with ⟨hi₀, h1, -⟩ | ⟨o, j', e1, hlab⟩
+          · exact .inr (.inr ⟨hi₀, h1⟩)
+          · rcases dupSucc_lab hlab with hsu | ⟨rfl, rfl⟩
+            · exact .inr (.inl hsu)
+            · exact absurd e1 hne'
 
 /-- **Copying a numeral.**  Let the copier `d` face the head `h` of the
 numeral `n`, with the agents `l`, and let its two copies be wired to the
 ports `p₁` and `p₂`, neither on the copier or on an agent of the numeral.
 The net reduces, in `n + 1` steps, to a net in which both ports carry the
 numeral `n`, and which has kept everything away from the copier and the
-numeral. -/
+numeral; its agents are zeros, successors, or agents of the start other
+than the copier. -/
 theorem copy {N : Net Peano} {d h : Id} {l : List Id} {p₁ p₂ : Port} {n : Nat}
     (hN : N.WF ar) (hd : N.agent d dup) (hp : N.Paired ar (d, 0) (h, 0)) (hl : NumList N h l)
     (hlen : l.length = n + 1) (h₁ : N.Paired ar (d, 1) p₁) (h₂ : N.Paired ar (d, 2) p₂)
     (hp₁ : p₁.1 ≠ d ∧ ¬ p₁.1 ∈ l) (hp₂ : p₂.1 ≠ d ∧ ¬ p₂.1 ∈ l) :
     ∃ N', Steps (Step system) (n + 1) N N' ∧ IsNum N' p₁ n ∧ IsNum N' p₂ n ∧
-      N.Keeps ar (gone N d l) N' := by
+      N.Keeps ar (gone N d l) N' ∧
+      ∀ i γ, N'.agent i γ → γ = zero ∨ γ = succ ∨ (N.agent i γ ∧ i ≠ d) := by
   have c : Copying N d 0 h l p₁ p₂ :=
     ⟨hN, hd, hp, hl, ⟨p₁, h₁, rfl⟩, ⟨p₂, h₂, rfl⟩, ⟨Net.End.used h₁.2.1, hp₁⟩,
       ⟨Net.End.used h₂.2.1, hp₂⟩⟩
-  obtain ⟨N', sts, i₁, i₂, kp⟩ := Copying.run l c hlen
+  obtain ⟨N', sts, i₁, i₂, kp, hag⟩ := Copying.run l c hlen
   rw [hlen] at sts
   rw [Nat.zero_add] at i₁ i₂
-  exact ⟨N', sts, i₁, i₂, kp⟩
+  exact ⟨N', sts, i₁, i₂, kp, hag⟩
 
 /-! ### Two small runs -/
 

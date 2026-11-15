@@ -50,6 +50,8 @@ import InteractionNets.Arith.Carry
 import InteractionNets.Peano
 import InteractionNets.Keeps
 import InteractionNets.PeanoCopy
+import InteractionNets.PeanoMul
+import InteractionNets.PeanoProd
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.LongRun
@@ -1983,8 +1985,7 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              a system with addition, multiplication,
                              copying and erasing: the adder adds in it,
                              and every expression of additions comes out
-                             right in it; that its multiplier multiplies
-                             is not proved (`2 * 3` is evaluated)
+                             right in it
 * `INet.Peano.erase`, `INet.Peano.copy`, `INet.Net.Keeps`,
   `INet.Addition.IsNum.keeps`, `INet.Addition.gone_closed`
                              erasing and copying a numeral, with any other
@@ -1993,6 +1994,25 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              copier leaves the numeral `n` on both of its
                              ports after `n + 1` steps, and what was away
                              from them is as it was
+* `INet.Addition.Adding.run`
+                             the adder adds with any other agents in the
+                             net and its result wired to any port
+* `INet.Peano.mul_correct`, `INet.Peano.Product`, `INet.Peano.Stack`,
+  `INet.Peano.MState.run`, `INet.Peano.SState.run`
+                             the multiplier multiplies: a net whose
+                             multiplier has the numerals `m` and `n` as
+                             arguments reduces, in
+                             `(m + 1) * (n + 2) + m * (n + 1)` steps, to a
+                             normal form with the numeral `m * n` on the
+                             result port
+* `INet.Peano.prod_ok`, `INet.Peano.good_prod`, `INet.Peano.prod_rest`,
+  `INet.Peano.prod_fair`
+                             the nets `Peano.prod m n` are valid for all
+                             `m` and `n`; with any number of threads and
+                             any schedule, a run of the machine on one
+                             that is at rest has made exactly that many
+                             interactions and holds the numeral `m * n`,
+                             and under a fair schedule it comes to rest
 * `INet.Arith.sum_ok`, `INet.Arith.sum_correct`
                              the nets `Arith.sum m n` are valid for all `m`
                              and `n`, and on each of them the reducer takes
@@ -3277,10 +3297,8 @@ holds up to equality rather than up to renaming.
   the rules for them.  It contains addition (`Peano.rules`,
   `Peano.add_steps`) and has `Arith` inside it (`Peano.embeds`), so
   every expression of additions comes out right in it
-  (`Peano.expr_rest`).  That its multiplier multiplies is not proved:
-  the reducer is run on `2 * 3`, and leaves six successors and a zero
-  after 23 steps.  The two helpers of multiplication are proved, in a
-  net that may have any other agents.  An eraser facing a numeral `n`
+  (`Peano.expr_rest`).  The two helpers of multiplication are proved, in
+  a net that may have any other agents.  An eraser facing a numeral `n`
   runs for `n + 1` steps, after which it and the agents of the numeral
   are gone and nothing new is there (`Peano.erase`); a copier facing a
   numeral `n` runs for `n + 1` steps, after which the two ports its
@@ -3293,9 +3311,34 @@ holds up to equality rather than up to renaming.
   (`Addition.gone`).  That set is closed, the principal port of each of
   its names being wired to one of its names (`Addition.gone_closed`),
   and a numeral held at a port outside a closed set lies outside it, so
-  it is kept (`Addition.IsNum.keeps`).  This is what a proof of
-  multiplication will use to carry the waiting adders and their
-  arguments through the copies; that proof is not done.
+  it is kept (`Addition.IsNum.keeps`).  The adder is proved in the same
+  setting: with any other agents in the net, other adders among them,
+  and its result wired to any port, it runs for as many steps as its
+  first argument has agents and leaves the sum on that port
+  (`Addition.Adding.run`).
+* The multiplier multiplies (`Peano.mul_correct`): a net whose multiplier
+  has the numerals `m` and `n` as arguments and a free port as result
+  (`Peano.Product`) reduces to a normal form with the numeral `m * n` on
+  that port, in exactly `(m + 1) * (n + 2) + m * (n + 1)` steps.  The
+  run has two parts.  In the first the multiplier walks down its first
+  argument; on each successor it leaves an adder behind and copies its
+  second argument, one copy for the adder and one for itself, and on
+  the zero it puts a zero on its result and erases its second argument
+  (`Peano.MState.run`).  The adders left behind wait in a stack, each
+  with a copy of `n` and with the result of the next as its second
+  argument (`Peano.Stack`); the frame lemmas carry the stack through
+  each copy.  In the second part the adders run, the last one made
+  first, each adding `n` (`Peano.SState.run`).  The nets
+  `Peano.prod m n`, built by putting successors on the arguments of the
+  multiplier of `0 * 0`, are valid and are such multiplications for all
+  `m` and `n` (`Peano.good_prod`), so the theorems about the machine
+  apply: a run on `prod m n` that is at rest, with any number of
+  threads and any schedule, has made exactly that many interactions and
+  holds the numeral `m * n` on the free port (`Peano.prod_rest`), and a
+  fair run comes to rest (`Peano.prod_fair`).  Scope: the net of
+  `mul_correct` has only the multiplier and its two arguments; products
+  inside larger expressions, and a multiplier whose arguments are still
+  being computed, are not covered.
 * An executable system (`XSys`) carries proofs: that its rules are the rules
   of a `System`, and that the slots of each right-hand side are listed.  For
   a system given as data (`SysData`) these follow from the evaluation of
