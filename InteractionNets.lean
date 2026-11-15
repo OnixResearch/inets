@@ -71,6 +71,7 @@ import InteractionNets.WorkLive
 import InteractionNets.WorkBound
 import InteractionNets.Weighted
 import InteractionNets.WorkCount
+import InteractionNets.Arith.WorkBound
 import InteractionNets.Peano.WorkList
 import InteractionNets.Union
 import InteractionNets.UnionExamples
@@ -3320,7 +3321,12 @@ holds up to equality rather than up to renaming.
   is `F * 992` actions, checked in the kernel (`Peano.inertThenPairs_fair`).
   The pass charged for each joining claim is not slack: with `k` pairs
   `0 + y` behind a numeral both programs take 443, 1483 and 5363 actions
-  for `k` = 10, 20, 40 (`Peano.inertThenJoins`).
+  for `k` = 10, 20, 40 (`Peano.inertThenJoins`).  In unary addition no
+  run is needed: every rule takes out as many adders as it writes, but
+  for `0 + y`, so the joining claims are at most the adders at the start
+  (`WMach.joined_le_census`), one per `+`, and every fair run on an
+  expression of additions is at rest with its value after a bound in its
+  size, its steps and its additions (`Arith.Expr.wfair`).
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers
