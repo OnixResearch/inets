@@ -5,13 +5,15 @@ import InteractionNets.PeanoBound
 A small system, apart from `Peano`, with numerals, an adder, a copier,
 an eraser, and two agents of its own: the lazy caterer `cater`,
 `c 0 = 1` and `c (S x) = c x + S x`, and the triangular numbers `tri`,
-`t 0 = 0` and `t (S x) = t x + S x`.  It has the core (`Extra.core`) and
+`t 0 = 0` and `t (S x) = t x + S x`, and a multiplier `mul` of its own.
+It has the core (`Extra.core`) and
 the rules of the adder (`Extra.rules`), so the theorems on recursion and
 on the machine hold in it.  The two agents are proved with them and
 nothing else: their rules on a successor are the template on the
 predecessor with the adder, and their rules on a zero put down a
 constant (`Extra.cater_computes`, `Extra.tri_computes`, and on the
-machine `Extra.cater_rest`, `Extra.tri_rest`).
+machine `Extra.cater_rest`, `Extra.tri_rest`).  The multiplier is the
+case of recursion on a parameter (`Extra.mul_computes`, `Extra.mul_rest`).
 -/
 
 namespace INet
@@ -19,7 +21,7 @@ namespace INet
 /-- The symbols: numbers, addition, copying, erasing, the lazy caterer and
 the triangular numbers. -/
 inductive Extra
-  | zero | succ | add | dup | era | cater | tri
+  | zero | succ | add | dup | era | cater | tri | mul
   deriving DecidableEq, Repr
 
 namespace Extra
@@ -33,11 +35,18 @@ def ar : Extra → Nat
   | era => 0
   | cater => 1
   | tri => 1
+  | mul => 2
 
 /-- `1` on the result: a new successor on a new zero. -/
 def oneData : RuleData Extra :=
   RuleData.ofWires [((some false, 0), succ), ((some false, 1), zero)]
     [(.ifc false 0, .new (some false) 0 0), (.new (some false) 0 1, .new (some false) 1 0)]
+
+/-- `0` on the result and the second argument erased: a new zero and a
+new eraser. -/
+def zeroEraData : RuleData Extra :=
+  RuleData.ofWires [((some false, 0), zero), ((some true, 0), era)]
+    [(.ifc false 1, .new (some false) 0 0), (.ifc false 0, .new (some true) 0 0)]
 
 /-- `0` on the result: a new zero. -/
 def zeroData : RuleData Extra :=
@@ -55,7 +64,10 @@ def data : SysData Extra :=
     ((succ, cater), (Core.primSucc succ dup cater add).swap),
     ((tri, zero), zeroData), ((zero, tri), zeroData.swap),
     ((tri, succ), Core.primSucc succ dup tri add),
-    ((succ, tri), (Core.primSucc succ dup tri add).swap)]⟩
+    ((succ, tri), (Core.primSucc succ dup tri add).swap),
+    ((mul, zero), zeroEraData), ((zero, mul), zeroEraData.swap),
+    ((mul, succ), Core.iterSucc dup mul add),
+    ((succ, mul), (Core.iterSucc dup mul add).swap)]⟩
 
 /-- The system, by evaluation of the check. -/
 def xsys : XSys Extra := data.toXSys (by decide)
@@ -244,6 +256,40 @@ theorem tri_fair (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
         (triN n) :=
   Core.unary_fair (xsys := xsys) tri_computes rfl (by decide) n hnt σ hfair
 
+/-! ### Multiplication, by recursion on a parameter -/
+
+/-- **The multiplier computes the product**, in any net: the theorem on
+recursion on a parameter, with the theorem on constants for the zero and
+the adder as combiner.  Its rule on a successor, `S x * y = y + x * y`,
+is the template on a parameter. -/
+theorem mul_computes : Core.Computes2 system mul (fun m n => m * n) Peano.prodCost :=
+  (Core.iter_computes
+    (show system.rule mul succ = some (Core.iterSucc dup mul add).toX.toRhs from rfl)
+    ⟨by decide, by decide, by decide, by decide, by decide, by decide, by decide⟩
+    (Core.zero2_const (show system.rule mul zero = some zeroEraData.toX.toRhs from rfl)
+      (by decide) (by decide) ⟨by decide, by decide, by decide, by decide⟩
+      ⟨by decide, by decide⟩ (by decide))
+    (Core.add_combines rules)).congr Peano.iter_mul Peano.iterCost_mul
+
+/-- **Multiplication on the machine**: with any number of threads and any
+schedule, a run on the net for `m * n` that is at rest has made exactly
+`prodCost m n` interactions and holds the numeral `m * n`. -/
+theorem mul_rest (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+    (hr : ((XMach.init (Core.binaryNet zero succ mul m n) nt).trace xsys σ i).1.resting = true) :
+    ((XMach.init (Core.binaryNet zero succ mul m n) nt).trace xsys σ i).2 = Peano.prodCost m n ∧
+      Addition.IsNum ar zero succ
+        ((XMach.init (Core.binaryNet zero succ mul m n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
+        (m * n) :=
+  Core.binary_rest (xsys := xsys) mul_computes rfl (by decide) (by decide) m n hnt σ hr
+
+/-- The reducer on the net for `2 * 3` stops after `prodCost 2 3 = 23`
+steps on six successors and a zero. -/
+example : ((Core.binaryNet zero succ mul 2 3).normalize xsys 100).map
+    (fun r => (r.2, (r.1.agents.filter (·.2 = succ)).length,
+      (r.1.agents.filter (·.2 = zero)).length, r.1.agents.length)) =
+    some (Peano.prodCost 2 3, 6, 1, 7) := by
+  decide +kernel
+
 /-! ### Expressions -/
 
 /-- **The rules are bounded**: at most four new agents and twelve ports. -/
@@ -259,6 +305,9 @@ def addOp : Core.Op2 xsys :=
 /-- The lazy caterer as an operator. -/
 def caterOp : Core.Op1 xsys := Core.Op1.ofComputes cater_computes rfl (by decide) (by decide)
 
+/-- The multiplier as an operator. -/
+def mulOp : Core.Op2 xsys := Core.Op2.ofComputes mul_computes rfl (by decide) (by decide)
+
 /-- The triangular numbers as an operator. -/
 def triOp : Core.Op1 xsys := Core.Op1.ofComputes tri_computes rfl (by decide) (by decide)
 
@@ -268,6 +317,12 @@ example : (Core.GExpr.app2 addOp (.app1 caterOp (.lit 2)) (.app1 triOp (.lit 2))
       Core.GExpr xsys).eval = 7 ∧
     (Core.GExpr.app2 addOp (.app1 caterOp (.lit 2)) (.app1 triOp (.lit 2)) :
       Core.GExpr xsys).cost = 25 := by
+  decide
+
+/-- `c 2 * t 3`, with the multiplier, an operator of two arguments by
+recursion on a parameter: `4 * 6 = 24`. -/
+example : (Core.GExpr.app2 mulOp (.app1 caterOp (.lit 2)) (.app1 triOp (.lit 3)) :
+    Core.GExpr xsys).eval = 24 := by
   decide
 
 set_option maxRecDepth 100000 in

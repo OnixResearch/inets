@@ -3467,7 +3467,9 @@ holds up to equality rather than up to renaming.
   on a zero puts down a constant, and their theorems are the general
   ones applied to their rules (`Extra.cater_computes`,
   `Extra.tri_computes`, and on the machine `Extra.cater_rest`,
-  `Extra.tri_rest` and the fair versions).  With its own operators,
+  `Extra.tri_rest` and the fair versions).  It has a multiplier of its
+  own, the case of recursion on a parameter (`Extra.mul_computes`,
+  `Extra.mul_rest`), and `c 2 * t 3` is an expression.  With its own operators,
   `c 2 + t 2` is run by two threads in the kernel and gives `7`; the
   reducer runs `c 3` and `t 4` in the kernel.
 * How many actions are enough, threads taking turns (`RoundRobin`).
