@@ -1,0 +1,59 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Restore build cache
+        uses: actions/cache@v4
+        with:
+          path: .lake
+          key: lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ github.sha }}
+          restore-keys: |
+            lake-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
+
+      # Warnings are errors (lakefile.toml), so a `sorry` fails the build.
+      - name: Build
+        run: lake build
+
+      # Re-check every declaration with the kernel from the .olean files.
+      - name: Kernel check
+        run: lake env leanchecker --fresh InteractionNets
+
+      # Only Lean's three standard axioms are allowed.
+      - name: Axioms
+        run: |
+          cat > /tmp/Axioms.lean <<'EOF'
+          import InteractionNets
+          import Lean
+          open Lean in
+          #eval show CoreM Unit from do
+            let env ← getEnv
+            let allowed := [``propext, ``Quot.sound, ``Classical.choice]
+            let mut used : NameSet := {}
+            for (n, _) in env.constants.toList do
+              let some idx := env.getModuleIdxFor? n | continue
+              unless (`InteractionNets).isPrefixOf env.header.moduleNames[idx.toNat]! do continue
+              for a in ← collectAxioms n do
+                used := used.insert a
+            IO.println s!"axioms used: {used.toList}"
+            let bad := used.toList.filter (!allowed.contains ·)
+            unless bad.isEmpty do
+              throwError m!"unexpected axioms: {bad}"
+          EOF
+          lake env lean /tmp/Axioms.lean
