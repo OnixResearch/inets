@@ -905,7 +905,7 @@ theorem Op2.rest (o : Op2) (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → N
     ((XMach.init (binaryNet o.sym m n) nt).trace xsys σ i).2 = o.c m n ∧
       IsNum ((XMach.init (binaryNet o.sym m n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
         (o.f m n) := by
-  have g := good_binaryNet o.ar_eq o.ne0 o.ne1 m n
+  have g := good_binaryNet (xsys := xsys) o.ar_eq o.ne0 o.ne1 m n
   obtain ⟨N', hs, hnum, hag⟩ := o.steps g.config
   have hn' := normal_of_numerals (system := system) hag
   have L := XMach.trace_live σ (XMach.init_live (xs := xsys) g.ok.1 hnt) i
@@ -927,7 +927,7 @@ theorem Op2.fair (o : Op2) (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → N
       ((XMach.init (binaryNet o.sym m n) nt).trace xsys σ i).2 = o.c m n ∧
       IsNum ((XMach.init (binaryNet o.sym m n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
         (o.f m n) := by
-  have g := good_binaryNet o.ar_eq o.ne0 o.ne1 m n
+  have g := good_binaryNet (xsys := xsys) o.ar_eq o.ne0 o.ne1 m n
   obtain ⟨N', hs, hnum, hag⟩ := o.steps g.config
   obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) g.ok.1 hnt hs (normal_of_numerals (system := system) hag)
     σ hfair
@@ -943,7 +943,7 @@ theorem Op1.rest (o : Op1) (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat
     ((XMach.init (unaryNet o.sym n) nt).trace xsys σ i).2 = o.c n ∧
       IsNum ((XMach.init (unaryNet o.sym n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
         (o.f n) := by
-  have g := good_unaryNet o.ar_eq o.ne1 n
+  have g := good_unaryNet (xsys := xsys) o.ar_eq o.ne1 n
   obtain ⟨N', hs, hnum, hag⟩ := o.steps g.config
   have hn' := normal_of_numerals (system := system) hag
   have L := XMach.trace_live σ (XMach.init_live (xs := xsys) g.ok.1 hnt) i
@@ -965,7 +965,7 @@ theorem Op1.fair (o : Op1) (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat
       ((XMach.init (unaryNet o.sym n) nt).trace xsys σ i).2 = o.c n ∧
       IsNum ((XMach.init (unaryNet o.sym n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
         (o.f n) := by
-  have g := good_unaryNet o.ar_eq o.ne1 n
+  have g := good_unaryNet (xsys := xsys) o.ar_eq o.ne1 n
   obtain ⟨N', hs, hnum, hag⟩ := o.steps g.config
   obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) g.ok.1 hnt hs (normal_of_numerals (system := system) hag)
     σ hfair

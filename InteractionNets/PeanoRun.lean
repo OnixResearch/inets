@@ -7,9 +7,9 @@ and its result on the free port `([0], 0)`.  If `op` computes `f` in `c`
 steps (`Peano.Computes1`), then on the machine, with any number of
 threads and any schedule, a run on that net that is at rest has made
 exactly `c n` interactions and holds the numeral `f n`
-(`Peano.unary_rest`), and a fair run comes to rest (`Peano.unary_fair`).
+(`Core.unary_rest`), and a fair run comes to rest (`Core.unary_fair`).
 The same for two arguments (`Peano.Computes2`, `Peano.binaryNet`,
-`Peano.binary_rest`, `Peano.binary_fair`).
+`Core.binary_rest`, `Core.binary_fair`).
 
 The factorial, the multiplier and the power are cases (`Peano.fac_rest`,
 `Peano.prod_rest`, `Peano.power_rest`, and the fair versions), on the
@@ -18,30 +18,37 @@ nets `Peano.facNet n`, `Peano.prod m n` and `Peano.power e b`.
 
 namespace INet
 
-namespace Peano
-
-open Core
+namespace Core
 
 open Addition (gone gone2)
 
-variable {N : Net Peano} {r : Port}
+variable {S : Type} [DecidableEq S] {xsys : XSys S} {zero succ dup era : S}
+  [K : Core xsys.sys zero succ dup era]
+
+set_option linter.unusedSectionVars false
+
+local notation "system" => xsys.sys
+local notation "ar" => xsys.sys.ar
+local notation "NumList" => Addition.NumList xsys.sys.ar zero succ
+local notation "IsNum" => Addition.IsNum xsys.sys.ar zero succ
 
 /-- **The situation of an agent of one argument.**  The agent `a` has the
 symbol `op`, the numeral `n` as argument and the free port `r` as result,
 and the net has no other agents than it and the successors and zeros. -/
-structure Unary (op : Peano) (N : Net Peano) (a : Id) (n : Nat) (r : Port) : Prop where
-  wf : N.WF ar
+structure Unary (sys : System S) {zero succ dup era : S} [Core sys zero succ dup era]
+    (op : S) (N : Net S) (a : Id) (n : Nat) (r : Port) : Prop where
+  wf : N.WF sys.ar
   ha : N.agent a op
-  fst : IsNum N (a, 0) n
-  out : N.Paired ar (a, 1) r
+  fst : Addition.IsNum sys.ar zero succ N (a, 0) n
+  out : N.Paired sys.ar (a, 1) r
   free : N.free r
   only : ∀ i γ, N.agent i γ → γ = zero ∨ γ = succ ∨ i = a
 
 /-- **An agent that computes is correct alone.**  A net in the situation
 `Peano.Unary` reduces in `c n` steps to a normal form in which `r`
 carries the numeral `f n`. -/
-theorem unary_correct {op : Peano} {f c : Nat → Nat} (H : Computes1 op f c) {a : Id} {n : Nat}
-    (u : Unary op N a n r) :
+theorem unary_correct {op : S} {f c : Nat → Nat} (H : Computes1 system op f c) {a : Id} {n : Nat}
+    (u : Unary system op N a n r) :
     ∃ N', Steps (Step system) (c n) N N' ∧ Normal (Step system) N' ∧ IsNum N' r (f n) := by
   have hN := u.wf
   obtain ⟨h, hp, hn⟩ := u.fst
@@ -63,32 +70,33 @@ theorem unary_correct {op : Peano} {f c : Nat → Nat} (H : Computes1 op f c) {a
 /-! ### The nets, and the machine on them -/
 
 /-- The net for `op 0`, with the result on the free port `([0], 0)`. -/
-def unaryBase (op : Peano) : XNet Peano :=
+def unaryBase (zero op : S) : XNet S :=
   XNet.ofWires [([1], op), ([2], zero)] [([0], 0)]
     [(([1], 0), ([2], 0)), (([1], 1), ([0], 0))]
 
 /-- The net for `op n`: `n` successors are put on the argument of the
 agent of `op 0`. -/
-def unaryNet (op : Peano) : Nat → XNet Peano
-  | 0 => unaryBase op
-  | n + 1 => (unaryNet op n).pushOn succ ([1], 0) [n + 3]
+def unaryNet (zero succ op : S) : Nat → XNet S
+  | 0 => unaryBase zero op
+  | n + 1 => (unaryNet zero succ op n).pushOn succ ([1], 0) [n + 3]
 
 /-- The situation of an agent of one argument, on a valid input whose
 identifiers are numbered below `c`. -/
-structure GoodUnary (op : Peano) (X : XNet Peano) (n c : Nat) : Prop where
-  ok : X.Ok ar
-  config : Unary op X.toNet [1] n ([0], 0)
+structure GoodUnary (sys : System S) {zero succ dup era : S} [Core sys zero succ dup era]
+    (op : S) (X : XNet S) (n c : Nat) : Prop where
+  ok : X.Ok sys.ar
+  config : Unary sys op X.toNet [1] n ([0], 0)
   below : X.Below c
 
 /-- One more successor on the argument. -/
-theorem GoodUnary.push {op : Peano} {X : XNet Peano} {n c : Nat} (g : GoodUnary op X n c) :
-    GoodUnary op (X.pushOn succ ([1], 0) [c]) (n + 1) (c + 1) := by
+theorem GoodUnary.push {op : S} {X : XNet S} {n c : Nat} (g : GoodUnary system op X n c) :
+    GoodUnary system op (X.pushOn succ ([1], 0) [c]) (n + 1) (c + 1) := by
   have cf := g.config
   have hX := g.ok
   have hm := XNet.ok_iff_matching.1 hX
   obtain ⟨h, hph, hnh⟩ := cf.fst
   have hm' : (X.toNet.insert1 [c] succ ([1], 0) (h, 0)).Matching ar :=
-    hm.insert1 rfl (hm.paired_iff.1 hph) g.below.fresh g.below.fresh'
+    hm.insert1 K.ar_succ (hm.paired_iff.1 hph) g.below.fresh g.below.fresh'
   have hnum : ∀ {k : Nat} {i : Id}, Addition.Num ar zero succ X.toNet i k →
       Addition.Num ar zero succ (X.toNet.insert1 [c] succ ([1], 0) (h, 0)) i k :=
     Addition.Num.insert1 hm' hm (fun _ _ => port_ne_snd (by decide))
@@ -108,7 +116,7 @@ theorem GoodUnary.push {op : Peano} {X : XNet Peano} {n c : Nat} (g : GoodUnary 
 
 /-- The symbols of `Arith` as symbols of `Peano`: `succ` and `add` stand
 for an agent `op` of one or two arguments. -/
-def ofArithAt (op : Peano) : Arith → Peano
+def ofArithAt (zero op : S) : Arith → S
   | .zero => zero
   | .succ => op
   | .add => op
@@ -120,34 +128,35 @@ def unaryT : XNet Arith :=
 
 theorem unaryT_ok : unaryT.Ok Arith.ar := by decide
 
+include K in
 /-- The net for `op 0` is valid for every agent of one argument: it is the
 net over `Arith`, checked once, relabelled. -/
-theorem unaryBase_ok {op : Peano} (h : ar op = 1) (_h1 : succ ≠ op) : (unaryBase op).Ok ar := by
-  have e : unaryBase op = unaryT.relabel (ofArithAt op) := rfl
+theorem unaryBase_ok {op : S} (h : ar op = 1) (_h1 : succ ≠ op) : (unaryBase zero op).Ok ar := by
+  have e : unaryBase zero op = unaryT.relabel (ofArithAt zero op) := rfl
   rw [e]
-  refine unaryT_ok.relabel (ofArithAt op) fun i γ hi => ?_
+  refine unaryT_ok.relabel (ofArithAt zero op) fun i γ hi => ?_
   have hi' : (i, γ) ∈ [(([1] : Id), Arith.succ), ([2], Arith.zero)] := hi
   rcases List.mem_cons.1 hi' with e | hi''
   · rw [(Prod.mk.inj e).2]
     exact h
   · rcases List.mem_cons.1 hi'' with e | h3
     · rw [(Prod.mk.inj e).2]
-      rfl
+      exact K.ar_zero
     · exact absurd h3 List.not_mem_nil
 
-theorem good_unaryBase {op : Peano} (h : ar op = 1) (h1 : succ ≠ op) :
-    GoodUnary op (unaryBase op) 0 3 := by
+theorem good_unaryBase {op : S} (h : ar op = 1) (h1 : succ ≠ op) :
+    GoodUnary system op (unaryBase zero op) 0 3 := by
   have hX := unaryBase_ok h h1
   -- the wires, the free port and the names do not depend on the symbol
-  have ew : (unaryBase op).wires = (unaryBase fac).wires := rfl
-  have ef : (unaryBase op).free = (unaryBase fac).free := rfl
-  have eu : (unaryBase op).usedIds = (unaryBase fac).usedIds := rfl
+  have ew : (unaryBase zero op).wires = unaryT.wires := rfl
+  have ef : (unaryBase zero op).free = unaryT.free := rfl
+  have eu : (unaryBase zero op).usedIds = unaryT.usedIds := rfl
   refine ⟨hX, ⟨hX.1, ?_, ?_, ?_, ?_, ?_⟩, ?_⟩
   · exact List.mem_cons_self
   · exact ⟨[2], hX.link_iff.1 (by rw [ew]; decide),
       List.mem_cons_of_mem _ List.mem_cons_self⟩
   · exact hX.link_iff.1 (by rw [ew]; decide)
-  · show ([0], 0) ∈ (unaryBase op).free
+  · show ([0], 0) ∈ (unaryBase zero op).free
     rw [ef]
     decide
   · intro i γ hi
@@ -158,14 +167,14 @@ theorem good_unaryBase {op : Peano} (h : ar op = 1) (h1 : succ ≠ op) :
       · exact .inl (Prod.mk.inj e).2
       · exact absurd h3 List.not_mem_nil
   · intro i hi
-    have hall : ∀ i ∈ (unaryBase op).usedIds, ∃ j, j < 3 ∧ i = [j] := by
+    have hall : ∀ i ∈ (unaryBase zero op).usedIds, ∃ j, j < 3 ∧ i = [j] := by
       rw [eu]
       decide
     exact hall i (XNet.mem_usedIds hi)
 
 /-- **The nets for `op n` are in the situation**, for all `n`. -/
-theorem good_unaryNet {op : Peano} (h : ar op = 1) (h1 : succ ≠ op) :
-    ∀ n, GoodUnary op (unaryNet op n) n (n + 3)
+theorem good_unaryNet {op : S} (h : ar op = 1) (h1 : succ ≠ op) :
+    ∀ n, GoodUnary system op (unaryNet zero succ op n) n (n + 3)
   | 0 => good_unaryBase h h1
   | n + 1 => (good_unaryNet h h1 n).push
 
@@ -173,20 +182,20 @@ theorem good_unaryNet {op : Peano} (h : ar op = 1) (h1 : succ ≠ op) :
 with any number of threads and any schedule, a run of the machine on the
 net for `op n` that is at rest has made exactly `c n` interactions, and
 its memory has the numeral `f n` on the free port. -/
-theorem unary_rest {op : Peano} {f c : Nat → Nat} (H : Computes1 op f c) (har : ar op = 1)
+theorem unary_rest {op : S} {f c : Nat → Nat} (H : Computes1 system op f c) (har : ar op = 1)
     (h1 : succ ≠ op) (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
-    (hr : ((XMach.init (unaryNet op n) nt).trace xsys σ i).1.resting = true) :
-    ((XMach.init (unaryNet op n) nt).trace xsys σ i).2 = c n ∧
-      IsNum ((XMach.init (unaryNet op n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (f n) := by
+    (hr : ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).1.resting = true) :
+    ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).2 = c n ∧
+      IsNum ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (f n) := by
   have g := good_unaryNet har h1 n
   obtain ⟨N', hs, hn', hnum⟩ := unary_correct H g.config
   have L := XMach.trace_live σ (XMach.init_live (xs := xsys) g.ok.1 hnt) i
   obtain ⟨q, hn⟩ := L.rest hr
-  have rn := XMach.trace_run xsys σ (XMach.init (unaryNet op n) nt) i
+  have rn := XMach.trace_run xsys σ (XMach.init (unaryNet zero succ op n) nt) i
   rw [XMach.init_toMach] at rn
   obtain ⟨-, hu⟩ := MRun.final g.ok.1 rn q hn
   obtain ⟨e₁, ek⟩ := (hu hs).2 hn'
-  have e' : N' = ((XMach.init (unaryNet op n) nt).trace xsys σ i).1.mem.toNet := e₁
+  have e' : N' = ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).1.mem.toNet := e₁
   refine ⟨ek.symm, ?_⟩
   rw [← e']
   exact hnum
@@ -194,12 +203,12 @@ theorem unary_rest {op : Peano} {f c : Nat → Nat} (H : Computes1 op f c) (har 
 /-- **An agent that computes, under any fair schedule**: with any number
 of threads, as long as every thread keeps being scheduled, the run comes
 to rest after `c n` interactions with the numeral `f n` in memory. -/
-theorem unary_fair {op : Peano} {f c : Nat → Nat} (H : Computes1 op f c) (har : ar op = 1)
+theorem unary_fair {op : S} {f c : Nat → Nat} (H : Computes1 system op f c) (har : ar op = 1)
     (h1 : succ ≠ op) (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
     (hfair : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ σ j = u) :
-    ∃ i₀, ∀ i, i₀ ≤ i → ((XMach.init (unaryNet op n) nt).trace xsys σ i).1.resting = true ∧
-      ((XMach.init (unaryNet op n) nt).trace xsys σ i).2 = c n ∧
-      IsNum ((XMach.init (unaryNet op n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (f n) := by
+    ∃ i₀, ∀ i, i₀ ≤ i → ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).1.resting = true ∧
+      ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).2 = c n ∧
+      IsNum ((XMach.init (unaryNet zero succ op n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (f n) := by
   have g := good_unaryNet har h1 n
   obtain ⟨N', hs, hn', hnum⟩ := unary_correct H g.config
   obtain ⟨i₀, h⟩ := XMach.fair_complete (xs := xsys) g.ok.1 hnt hs hn' σ hfair
@@ -209,44 +218,25 @@ theorem unary_fair {op : Peano} {f c : Nat → Nat} (H : Computes1 op f c) (har 
   rw [h₃]
   exact hnum
 
-/-! ### The factorial -/
-
-/-- The net for `n!`. -/
-def facNet (n : Nat) : XNet Peano := unaryNet fac n
-
-/-- **Factorials on the machine**, as a case. -/
-theorem fac_rest (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
-    (hr : ((XMach.init (facNet n) nt).trace xsys σ i).1.resting = true) :
-    ((XMach.init (facNet n) nt).trace xsys σ i).2 = facCost n ∧
-      IsNum ((XMach.init (facNet n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (fact n) := by
-  exact unary_rest fac_computes rfl (by decide) n hnt σ hr
-
-/-- **Factorials under any fair schedule**, as a case. -/
-theorem fac_fair (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
-    (hfair : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ σ j = u) :
-    ∃ i₀, ∀ i, i₀ ≤ i → ((XMach.init (facNet n) nt).trace xsys σ i).1.resting = true ∧
-      ((XMach.init (facNet n) nt).trace xsys σ i).2 = facCost n ∧
-      IsNum ((XMach.init (facNet n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (fact n) := by
-  exact unary_fair fac_computes rfl (by decide) n hnt σ hfair
-
 /-! ### Agents of two arguments -/
 
 /-- **The situation of an agent of two arguments.**  The agent `a` has
 the symbol `op`, the numerals `m` and `n` as arguments and the free port
 `r` as result, and the net has no other agents than it and the
 successors and zeros. -/
-structure Binary (op : Peano) (N : Net Peano) (a : Id) (m n : Nat) (r : Port) : Prop where
-  wf : N.WF ar
+structure Binary (sys : System S) {zero succ dup era : S} [Core sys zero succ dup era]
+    (op : S) (N : Net S) (a : Id) (m n : Nat) (r : Port) : Prop where
+  wf : N.WF sys.ar
   ha : N.agent a op
-  fst : IsNum N (a, 0) m
-  snd : IsNum N (a, 1) n
-  out : N.Paired ar (a, 2) r
+  fst : Addition.IsNum sys.ar zero succ N (a, 0) m
+  snd : Addition.IsNum sys.ar zero succ N (a, 1) n
+  out : N.Paired sys.ar (a, 2) r
   free : N.free r
   only : ∀ i γ, N.agent i γ → γ = zero ∨ γ = succ ∨ i = a
 
 /-- **An agent of two arguments that computes is correct alone.** -/
-theorem binary_correct {op : Peano} {f c : Nat → Nat → Nat} (H : Computes2 op f c) {a : Id}
-    {m n : Nat} (u : Binary op N a m n r) :
+theorem binary_correct {op : S} {f c : Nat → Nat → Nat} (H : Computes2 system op f c) {a : Id}
+    {m n : Nat} (u : Binary system op N a m n r) :
     ∃ N', Steps (Step system) (c m n) N N' ∧ Normal (Step system) N' ∧ IsNum N' r (f m n) := by
   have hN := u.wf
   obtain ⟨h₁, hp₁, hn₁⟩ := u.fst
@@ -269,39 +259,40 @@ theorem binary_correct {op : Peano} {f c : Nat → Nat → Nat} (H : Computes2 o
     · exact absurd e' hne
 
 /-- The net for `op 0 0`, with the result on the free port `([0], 0)`. -/
-def binaryBase (op : Peano) : XNet Peano :=
+def binaryBase (zero op : S) : XNet S :=
   XNet.ofWires [([1], op), ([2], zero), ([3], zero)] [([0], 0)]
     [(([1], 0), ([2], 0)), (([1], 1), ([3], 0)), (([1], 2), ([0], 0))]
 
 /-- The net for `op 0 n`. -/
-def binarySnd (op : Peano) : Nat → XNet Peano
-  | 0 => binaryBase op
-  | n + 1 => (binarySnd op n).pushOn succ ([1], 1) [n + 4]
+def binarySnd (zero succ op : S) : Nat → XNet S
+  | 0 => binaryBase zero op
+  | n + 1 => (binarySnd zero succ op n).pushOn succ ([1], 1) [n + 4]
 
 /-- The net for `op m n`: `m` successors on the first argument of the
 agent of `op 0 0`, and `n` on the second. -/
-def binaryNet (op : Peano) : Nat → Nat → XNet Peano
-  | 0, n => binarySnd op n
-  | m + 1, n => (binaryNet op m n).pushOn succ ([1], 0) [m + n + 4]
+def binaryNet (zero succ op : S) : Nat → Nat → XNet S
+  | 0, n => binarySnd zero succ op n
+  | m + 1, n => (binaryNet zero succ op m n).pushOn succ ([1], 0) [m + n + 4]
 
 /-- The situation of an agent of two arguments, on a valid input whose
 identifiers are numbered below `c`. -/
-structure GoodBinary (op : Peano) (X : XNet Peano) (m n c : Nat) : Prop where
-  ok : X.Ok ar
-  config : Binary op X.toNet [1] m n ([0], 0)
+structure GoodBinary (sys : System S) {zero succ dup era : S} [Core sys zero succ dup era]
+    (op : S) (X : XNet S) (m n c : Nat) : Prop where
+  ok : X.Ok sys.ar
+  config : Binary sys op X.toNet [1] m n ([0], 0)
   below : X.Below c
 
 /-- One more successor on the first argument. -/
-theorem GoodBinary.push_fst {op : Peano} {X : XNet Peano} {m n c : Nat}
-    (g : GoodBinary op X m n c) :
-    GoodBinary op (X.pushOn succ ([1], 0) [c]) (m + 1) n (c + 1) := by
+theorem GoodBinary.push_fst {op : S} {X : XNet S} {m n c : Nat}
+    (g : GoodBinary system op X m n c) :
+    GoodBinary system op (X.pushOn succ ([1], 0) [c]) (m + 1) n (c + 1) := by
   have cf := g.config
   have hX := g.ok
   have hm := XNet.ok_iff_matching.1 hX
   obtain ⟨h, hph, hnh⟩ := cf.fst
   obtain ⟨t, hpt, hnt⟩ := cf.snd
   have hm' : (X.toNet.insert1 [c] succ ([1], 0) (h, 0)).Matching ar :=
-    hm.insert1 rfl (hm.paired_iff.1 hph) g.below.fresh g.below.fresh'
+    hm.insert1 K.ar_succ (hm.paired_iff.1 hph) g.below.fresh g.below.fresh'
   have hnum : ∀ {k : Nat} {i : Id}, Addition.Num ar zero succ X.toNet i k →
       Addition.Num ar zero succ (X.toNet.insert1 [c] succ ([1], 0) (h, 0)) i k :=
     Addition.Num.insert1 hm' hm (fun _ _ => port_ne_snd (by decide))
@@ -322,9 +313,9 @@ theorem GoodBinary.push_fst {op : Peano} {X : XNet Peano} {m n c : Nat}
       · exact .inr (.inl e')
 
 /-- One more successor on the second argument. -/
-theorem GoodBinary.push_snd {op : Peano} (h0 : zero ≠ op) (h1 : succ ≠ op) {X : XNet Peano}
-    {m n c : Nat} (g : GoodBinary op X m n c) :
-    GoodBinary op (X.pushOn succ ([1], 1) [c]) m (n + 1) (c + 1) := by
+theorem GoodBinary.push_snd {op : S} (h0 : zero ≠ op) (h1 : succ ≠ op) {X : XNet S}
+    {m n c : Nat} (g : GoodBinary system op X m n c) :
+    GoodBinary system op (X.pushOn succ ([1], 1) [c]) m (n + 1) (c + 1) := by
   have cf := g.config
   have hX := g.ok
   have hm := XNet.ok_iff_matching.1 hX
@@ -339,7 +330,7 @@ theorem GoodBinary.push_snd {op : Peano} (h0 : zero ≠ op) (h1 : succ ≠ op) {
     · exact h0 (cf.wf.agent_fun hl cf.ha)
     · exact h1 (cf.wf.agent_fun hl cf.ha)
   have hm' : (X.toNet.insert1 [c] succ ([1], 1) (t, 0)).Matching ar :=
-    hm.insert1 rfl (hm.paired_iff.1 hpt) g.below.fresh g.below.fresh'
+    hm.insert1 K.ar_succ (hm.paired_iff.1 hpt) g.below.fresh g.below.fresh'
   have hnum : ∀ {k : Nat} {i : Id}, Addition.Num ar zero succ X.toNet i k →
       Addition.Num ar zero succ (X.toNet.insert1 [c] succ ([1], 1) (t, 0)) i k :=
     Addition.Num.insert1 hm' hm (fun i hi e' => hsucc i hi (congrArg Prod.fst e'))
@@ -366,29 +357,30 @@ def binaryT : XNet Arith :=
 
 theorem binaryT_ok : binaryT.Ok Arith.ar := by decide
 
+include K in
 /-- The net for `op 0 0` is valid for every agent of two arguments. -/
-theorem binaryBase_ok {op : Peano} (h : ar op = 2) : (binaryBase op).Ok ar := by
-  have e : binaryBase op = binaryT.relabel (ofArithAt op) := rfl
+theorem binaryBase_ok {op : S} (h : ar op = 2) : (binaryBase zero op).Ok ar := by
+  have e : binaryBase zero op = binaryT.relabel (ofArithAt zero op) := rfl
   rw [e]
-  refine binaryT_ok.relabel (ofArithAt op) fun i γ hi => ?_
+  refine binaryT_ok.relabel (ofArithAt zero op) fun i γ hi => ?_
   have hi' : (i, γ) ∈ [(([1] : Id), Arith.add), ([2], Arith.zero), ([3], Arith.zero)] := hi
   rcases List.mem_cons.1 hi' with e | hi''
   · rw [(Prod.mk.inj e).2]
     exact h
   · rcases List.mem_cons.1 hi'' with e | hi'''
     · rw [(Prod.mk.inj e).2]
-      rfl
+      exact K.ar_zero
     · rcases List.mem_cons.1 hi''' with e | h3
       · rw [(Prod.mk.inj e).2]
-        rfl
+        exact K.ar_zero
       · exact absurd h3 List.not_mem_nil
 
-theorem good_binaryBase {op : Peano} (h : ar op = 2) : GoodBinary op (binaryBase op) 0 0 4 := by
+theorem good_binaryBase {op : S} (h : ar op = 2) : GoodBinary system op (binaryBase zero op) 0 0 4 := by
   have hX := binaryBase_ok h
   -- the wires, the free port and the names do not depend on the symbol
-  have ew : (binaryBase op).wires = (binaryBase mul).wires := rfl
-  have ef : (binaryBase op).free = (binaryBase mul).free := rfl
-  have eu : (binaryBase op).usedIds = (binaryBase mul).usedIds := rfl
+  have ew : (binaryBase zero op).wires = binaryT.wires := rfl
+  have ef : (binaryBase zero op).free = binaryT.free := rfl
+  have eu : (binaryBase zero op).usedIds = binaryT.usedIds := rfl
   refine ⟨hX, ⟨hX.1, ?_, ?_, ?_, ?_, ?_, ?_⟩, ?_⟩
   · exact List.mem_cons_self
   · exact ⟨[2], hX.link_iff.1 (by rw [ew]; decide),
@@ -396,7 +388,7 @@ theorem good_binaryBase {op : Peano} (h : ar op = 2) : GoodBinary op (binaryBase
   · exact ⟨[3], hX.link_iff.1 (by rw [ew]; decide),
       List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self)⟩
   · exact hX.link_iff.1 (by rw [ew]; decide)
-  · show ([0], 0) ∈ (binaryBase op).free
+  · show ([0], 0) ∈ (binaryBase zero op).free
     rw [ef]
     decide
   · intro i γ hi
@@ -409,19 +401,19 @@ theorem good_binaryBase {op : Peano} (h : ar op = 2) : GoodBinary op (binaryBase
         · exact .inl (Prod.mk.inj e).2
         · exact absurd h4 List.not_mem_nil
   · intro i hi
-    have hall : ∀ i ∈ (binaryBase op).usedIds, ∃ j, j < 4 ∧ i = [j] := by
+    have hall : ∀ i ∈ (binaryBase zero op).usedIds, ∃ j, j < 4 ∧ i = [j] := by
       rw [eu]
       decide
     exact hall i (XNet.mem_usedIds hi)
 
-theorem good_binarySnd {op : Peano} (h : ar op = 2) (h0 : zero ≠ op) (h1 : succ ≠ op) :
-    ∀ n, GoodBinary op (binarySnd op n) 0 n (n + 4)
+theorem good_binarySnd {op : S} (h : ar op = 2) (h0 : zero ≠ op) (h1 : succ ≠ op) :
+    ∀ n, GoodBinary system op (binarySnd zero succ op n) 0 n (n + 4)
   | 0 => good_binaryBase h
   | n + 1 => (good_binarySnd h h0 h1 n).push_snd h0 h1
 
 /-- **The nets for `op m n` are in the situation**, for all `m` and `n`. -/
-theorem good_binaryNet {op : Peano} (h : ar op = 2) (h0 : zero ≠ op) (h1 : succ ≠ op) :
-    ∀ m n, GoodBinary op (binaryNet op m n) m n (m + n + 4)
+theorem good_binaryNet {op : S} (h : ar op = 2) (h0 : zero ≠ op) (h1 : succ ≠ op) :
+    ∀ m n, GoodBinary system op (binaryNet zero succ op m n) m n (m + n + 4)
   | 0, n => by
     rw [Nat.zero_add]
     exact good_binarySnd h h0 h1 n
@@ -432,35 +424,35 @@ theorem good_binaryNet {op : Peano} (h : ar op = 2) (h0 : zero ≠ op) (h1 : suc
 
 /-- **An agent of two arguments that computes comes out right, whatever
 the threads do.** -/
-theorem binary_rest {op : Peano} {f c : Nat → Nat → Nat} (H : Computes2 op f c)
+theorem binary_rest {op : S} {f c : Nat → Nat → Nat} (H : Computes2 system op f c)
     (har : ar op = 2) (h0 : zero ≠ op) (h1 : succ ≠ op) (m n : Nat) {nt : Nat} (hnt : 0 < nt)
     (σ : Nat → Nat) {i : Nat}
-    (hr : ((XMach.init (binaryNet op m n) nt).trace xsys σ i).1.resting = true) :
-    ((XMach.init (binaryNet op m n) nt).trace xsys σ i).2 = c m n ∧
-      IsNum ((XMach.init (binaryNet op m n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
+    (hr : ((XMach.init (binaryNet zero succ op m n) nt).trace xsys σ i).1.resting = true) :
+    ((XMach.init (binaryNet zero succ op m n) nt).trace xsys σ i).2 = c m n ∧
+      IsNum ((XMach.init (binaryNet zero succ op m n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
         (f m n) := by
   have g := good_binaryNet har h0 h1 m n
   obtain ⟨N', hs, hn', hnum⟩ := binary_correct H g.config
   have L := XMach.trace_live σ (XMach.init_live (xs := xsys) g.ok.1 hnt) i
   obtain ⟨q, hn⟩ := L.rest hr
-  have rn := XMach.trace_run xsys σ (XMach.init (binaryNet op m n) nt) i
+  have rn := XMach.trace_run xsys σ (XMach.init (binaryNet zero succ op m n) nt) i
   rw [XMach.init_toMach] at rn
   obtain ⟨-, hu⟩ := MRun.final g.ok.1 rn q hn
   obtain ⟨e₁, ek⟩ := (hu hs).2 hn'
-  have e' : N' = ((XMach.init (binaryNet op m n) nt).trace xsys σ i).1.mem.toNet := e₁
+  have e' : N' = ((XMach.init (binaryNet zero succ op m n) nt).trace xsys σ i).1.mem.toNet := e₁
   refine ⟨ek.symm, ?_⟩
   rw [← e']
   exact hnum
 
 /-- **An agent of two arguments that computes, under any fair
 schedule.** -/
-theorem binary_fair {op : Peano} {f c : Nat → Nat → Nat} (H : Computes2 op f c)
+theorem binary_fair {op : S} {f c : Nat → Nat → Nat} (H : Computes2 system op f c)
     (har : ar op = 2) (h0 : zero ≠ op) (h1 : succ ≠ op) (m n : Nat) {nt : Nat} (hnt : 0 < nt)
     (σ : Nat → Nat) (hfair : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ σ j = u) :
     ∃ i₀, ∀ i, i₀ ≤ i →
-      ((XMach.init (binaryNet op m n) nt).trace xsys σ i).1.resting = true ∧
-      ((XMach.init (binaryNet op m n) nt).trace xsys σ i).2 = c m n ∧
-      IsNum ((XMach.init (binaryNet op m n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
+      ((XMach.init (binaryNet zero succ op m n) nt).trace xsys σ i).1.resting = true ∧
+      ((XMach.init (binaryNet zero succ op m n) nt).trace xsys σ i).2 = c m n ∧
+      IsNum ((XMach.init (binaryNet zero succ op m n) nt).trace xsys σ i).1.mem.toNet ([0], 0)
         (f m n) := by
   have g := good_binaryNet har h0 h1 m n
   obtain ⟨N', hs, hn', hnum⟩ := binary_correct H g.config
@@ -470,6 +462,49 @@ theorem binary_fair {op : Peano} {f c : Nat → Nat → Nat} (H : Computes2 op f
   refine ⟨h₁, h₂, ?_⟩
   rw [h₃]
   exact hnum
+
+end Core
+
+namespace Peano
+
+open Core
+
+/-- The situation of an agent of one argument of `Peano`. -/
+abbrev Unary (op : Peano) (N : Net Peano) (a : Id) (n : Nat) (r : Port) : Prop :=
+  Core.Unary system op N a n r
+
+/-- The situation of an agent of two arguments of `Peano`. -/
+abbrev Binary (op : Peano) (N : Net Peano) (a : Id) (m n : Nat) (r : Port) : Prop :=
+  Core.Binary system op N a m n r
+
+/-- The net for `op n`, in `Peano`. -/
+abbrev unaryNet (op : Peano) (n : Nat) : XNet Peano := Core.unaryNet zero succ op n
+
+/-- The net for `op m n`, in `Peano`. -/
+abbrev binaryNet (op : Peano) (m n : Nat) : XNet Peano := Core.binaryNet zero succ op m n
+
+/-- The symbols of `Arith` as symbols of `Peano`. -/
+abbrev ofArithAt (op : Peano) : Arith → Peano := Core.ofArithAt zero op
+
+/-! ### The factorial -/
+
+/-- The net for `n!`. -/
+def facNet (n : Nat) : XNet Peano := unaryNet fac n
+
+/-- **Factorials on the machine**, as a case. -/
+theorem fac_rest (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+    (hr : ((XMach.init (facNet n) nt).trace xsys σ i).1.resting = true) :
+    ((XMach.init (facNet n) nt).trace xsys σ i).2 = facCost n ∧
+      IsNum ((XMach.init (facNet n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (fact n) := by
+  exact unary_rest fac_computes rfl (by decide) n hnt σ hr
+
+/-- **Factorials under any fair schedule**, as a case. -/
+theorem fac_fair (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
+    (hfair : ∀ u, u < nt → ∀ i, ∃ j, i ≤ j ∧ σ j = u) :
+    ∃ i₀, ∀ i, i₀ ≤ i → ((XMach.init (facNet n) nt).trace xsys σ i).1.resting = true ∧
+      ((XMach.init (facNet n) nt).trace xsys σ i).2 = facCost n ∧
+      IsNum ((XMach.init (facNet n) nt).trace xsys σ i).1.mem.toNet ([0], 0) (fact n) := by
+  exact unary_fair fac_computes rfl (by decide) n hnt σ hfair
 
 /-- The net for `m * n`. -/
 def prod (m n : Nat) : XNet Peano := binaryNet mul m n

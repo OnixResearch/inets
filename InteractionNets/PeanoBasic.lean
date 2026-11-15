@@ -89,6 +89,8 @@ for two numerals.  The symbols are given by the system. -/
 class Core {S : Type} (system : System S) (zero succ dup era : outParam S) : Prop
     extends Copies.Rules system zero succ dup era where
   numerals : ∀ α β, (α = zero ∨ α = succ) → (β = zero ∨ β = succ) → system.rule α β = none
+  ar_zero : system.ar zero = 0
+  ar_succ : system.ar succ = 1
 
 namespace Core
 
@@ -226,7 +228,10 @@ def powCost : Nat → Nat → Nat
 
 /-- **`Peano` has numerals, a copier and an eraser.** -/
 instance core : Core system zero succ dup era :=
-  { copyRules with numerals := by rintro α β (rfl | rfl) (rfl | rfl) <;> rfl }
+  { copyRules with
+    numerals := by rintro α β (rfl | rfl) (rfl | rfl) <;> rfl
+    ar_zero := rfl
+    ar_succ := rfl }
 
 /-- **An agent of `Peano` that computes a function of two numerals.** -/
 abbrev Computes2 (op : Peano) (f c : Nat → Nat → Nat) : Prop := Core.Computes2 system op f c

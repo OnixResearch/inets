@@ -2028,8 +2028,8 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              steps: the multiplier by recursion with the
                              adder as combiner, the other two with that
                              multiplier
-* `INet.Peano.unary_rest`, `INet.Peano.unary_fair`, `INet.Peano.binary_rest`,
-  `INet.Peano.binary_fair`, `INet.Peano.prod_rest`, `INet.Peano.power_rest`,
+* `INet.Core.unary_rest`, `INet.Core.unary_fair`, `INet.Core.binary_rest`,
+  `INet.Core.binary_fair`, `INet.Peano.prod_rest`, `INet.Peano.power_rest`,
   `INet.Peano.fac_rest`, `INet.Peano.sum_rest`
                              the machine, proved once for every agent
                              that computes, of one or two arguments, and
@@ -3421,8 +3421,8 @@ holds up to equality rather than up to renaming.
   `Peano.unaryNet op n`, and of two, on `Peano.binaryNet op m n`: with
   any number of threads and any schedule, a run at rest has made exactly
   `c n` (or `c m n`) interactions and holds the numeral of the value
-  (`Peano.unary_rest`, `Peano.binary_rest`), and a fair run comes to rest
-  (`Peano.unary_fair`, `Peano.binary_fair`).  The multiplier, the power
+  (`Core.unary_rest`, `Core.binary_rest`), and a fair run comes to rest
+  (`Core.unary_fair`, `Core.binary_fair`).  The multiplier, the power
   and the factorial are cases (`Peano.prod_rest`, `Peano.power_rest`,
   `Peano.fac_rest`, and the fair versions), on the nets `Peano.prod m n`,
   `Peano.power e b` and `Peano.facNet n`, so the chain from their rules
