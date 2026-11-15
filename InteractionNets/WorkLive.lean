@@ -414,7 +414,7 @@ theorem WMach.act_half_some {X : XNet S} {T : WThread S} {a b : Id} {α β : S} 
     (h : (if assoc b X.agents = some β ∧ a ≠ b then xs.rule α β else none) = some R) :
     WMach.act xs X T = (X.takeAgent b, ⟨R.newAgents a b ++ T.todo,
       .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β),
-      T.again || R.joins xs.sys.ar α β⟩, 1) := by
+      R.joins xs.sys.ar α β⟩, 1) := by
   obtain ⟨todo, st, again⟩ := T
   dsimp only at hs
   subst hs
@@ -450,7 +450,7 @@ theorem WMach.Live.step_claim {M : WMach S} (hL : M.Live xs) {t : Nat} {T : WThr
   obtain ⟨rg, eg⟩ := hL.inv.cas₂_goal e (assoc_mem hc.1) hc.2 hsys hw
   let T₁ : WThread S := ⟨R.newAgents a₀ b₀ ++ T.todo,
     .write (R.newAgents a₀ b₀) (R.newLinks xs.sys.ar a₀ b₀ α₀ β₀),
-    T.again || R.joins xs.sys.ar α₀ β₀⟩
+    R.joins xs.sys.ar α₀ β₀⟩
   have hm1 : (M.ths.set t T₁).map WThread.toX = (M.ths.map WThread.toX).set t T₁.toX := by
     rw [List.map_set]
   have hmx : (M.ths.map WThread.toX)[t]? = some T.toX := by
@@ -504,14 +504,10 @@ theorem WMach.Live.step_claim {M : WMach S} (hL : M.Live xs) {t : Nat} {T : WThr
   · intro a b α β R' r'
     rw [eg'] at r'
     show ∃ (u : Nat) (U : WThread S), (M.ths.set t T₁)[u]? = some U ∧ U.Answers a b α β
-    cases hj : (T.again || R.joins xs.sys.ar α₀ β₀) with
+    cases hj : (R.joins xs.sys.ar α₀ β₀) with
     | true => exact ⟨t, T₁, List.getElem?_set_self hlt, .inl ⟨trivial, hj⟩⟩
     | false =>
-      have hj' : R.joins xs.sys.ar α₀ β₀ = false := by
-        cases h1 : R.joins xs.sys.ar α₀ β₀
-        · rfl
-        · rw [h1, Bool.or_true] at hj
-          cases hj
+      have hj' : R.joins xs.sys.ar α₀ β₀ = false := hj
       have hNJ := XRhs.noJoin_of_joins hRwf hj'
       rcases Redex.of_fire hG rg hNJ r' with r | hka | hkb
       · obtain ⟨u, U, hu, hA⟩ := hL.cov a b α β R' r
@@ -548,12 +544,7 @@ theorem WMach.Live.step_claim {M : WMach S} (hL : M.Live xs) {t : Nat} {T : WThr
   · intro u U hu
     rcases get hu with ⟨-, rfl⟩ | ⟨-, hu'⟩
     · intro hj p q hp
-      have hj' : R.joins xs.sys.ar α₀ β₀ = false := by
-        cases h1 : R.joins xs.sys.ar α₀ β₀
-        · rfl
-        · have hj2 : (T.again || R.joins xs.sys.ar α₀ β₀) = false := hj
-          rw [h1, Bool.or_true] at hj2
-          cases hj2
+      have hj' : R.joins xs.sys.ar α₀ β₀ = false := hj
       obtain ⟨x, y, hxy, rfl, rfl⟩ := hw.link.1 hp
       rcases XRhs.noJoin_of_joins hRwf hj' x y hxy with hx | hy
       · cases x with

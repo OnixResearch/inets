@@ -68,6 +68,7 @@ import InteractionNets.Extra
 import InteractionNets.Arith.Bound
 import InteractionNets.WorkList
 import InteractionNets.WorkLive
+import InteractionNets.WorkBound
 import InteractionNets.Peano.WorkList
 import InteractionNets.Union
 import InteractionNets.UnionExamples
@@ -3301,8 +3302,14 @@ holds up to equality rather than up to renaming.
   rescan has the agents it writes in its list, every active pair its
   claim makes has one of them in it (`Redex.of_fire`), and it writes its
   segments before its agents, so a thread that finds a segment missing
-  has found one of them.  That fair runs come to rest, and in how many
-  actions, is not yet proved for it.
+  has found one of them.  A fair run of it is at rest with the normal
+  form after `F` times one pass over the start, the writes of each claim,
+  a pass for each claim of a rule that joins interface ports, and one pass
+  over all the agents the claims write (`WMach.fair_bound`): those agents
+  have different names, so their trails share no segment.  For a system
+  whose rules join no interface ports that is linear in the steps
+  (`WMach.fair_bound_nojoin`); in general at most every claim joins
+  (`WMach.fair_bound_all`).
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers

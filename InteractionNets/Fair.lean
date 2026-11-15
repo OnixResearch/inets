@@ -1968,10 +1968,10 @@ theorem XMach.step_self {M : XMach S} {t : Nat} {T : XThread S} (ht : M.ths[t]? 
 /-- **Every action of a thread is a rest, a claim, or brings its share
 down**, measured in a net that lies ahead of the goal.  A claim raises the
 share by at most the writes of one rule and one pass over the agents. -/
-theorem XMach.act_pot {M : XMach S} (hL : M.Live xs)
+theorem XMach.act_pot_of {M : XMach S} (hG : M.toMach.goal.WF xs.sys.ar)
     (hnd : (M.mem.agents.map Prod.fst).Nodup) {C D : Nat} (hb : xs.Bounded C D)
-    {H : Net S} {K A : Nat} (hH : H.Sized K) (hM : M.Ahead H) (hA : M.heads ≤ A) {t : Nat}
-    {T : XThread S} (ht : M.ths[t]? = some T) :
+    {H : Net S} {K A : Nat} (hH : H.Sized K) (hM : M.Ahead H) (hA : M.heads ≤ A)
+    {T : XThread S} (hS : T.st.Sane M.toMach.goal) :
     (XMach.act xs M.mem T = (M.mem, T, 0) ∧ T = ⟨[], .idle⟩) ∨
       ((XMach.act xs M.mem T).2.2 = 1 ∧
         potIn H K A (XMach.act xs M.mem T).2.1 ≤ potIn H K A T + (C + D + 7 * A + K)) ∨
@@ -1982,8 +1982,6 @@ theorem XMach.act_pot {M : XMach S} (hL : M.Live xs)
     intro u vs tr
     have h := tr.length_le W hW
     omega
-  have hG := hL.inv.wf
-  have hS := hL.sane t T ht
   obtain ⟨todo, s⟩ := T
   cases s with
   | idle =>
@@ -2132,6 +2130,19 @@ theorem XMach.potAt_eq {M : XMach S} {t : Nat} {T : XThread S} (ht : M.ths[t]? =
     (H : Net S) (K A : Nat) : M.potAt H K A t = potIn H K A T := by
   unfold XMach.potAt
   rw [ht]
+
+
+/-- The same, for a thread of a machine that keeps the invariant. -/
+theorem XMach.act_pot {M : XMach S} (hL : M.Live xs)
+    (hnd : (M.mem.agents.map Prod.fst).Nodup) {C D : Nat} (hb : xs.Bounded C D)
+    {H : Net S} {K A : Nat} (hH : H.Sized K) (hM : M.Ahead H) (hA : M.heads ≤ A) {t : Nat}
+    {T : XThread S} (ht : M.ths[t]? = some T) :
+    (XMach.act xs M.mem T = (M.mem, T, 0) ∧ T = ⟨[], .idle⟩) ∨
+      ((XMach.act xs M.mem T).2.2 = 1 ∧
+        potIn H K A (XMach.act xs M.mem T).2.1 ≤ potIn H K A T + (C + D + 7 * A + K)) ∨
+      ((XMach.act xs M.mem T).2.2 = 0 ∧
+        potIn H K A (XMach.act xs M.mem T).2.1 < potIn H K A T) :=
+  XMach.act_pot_of hL.inv.wf hnd hb hH hM hA (hL.sane t T ht)
 
 /-- **One action and the share of one thread**, measured in a net that lies
 ahead of the goal.  Either another thread acted, or the thread is at rest,

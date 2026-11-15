@@ -25,7 +25,8 @@ same right-hand side, so it is still an execution of the machine `Mach`
 `XMach.exec_agrees` carries over (`WMach.exec_agrees`).  That every active
 pair a firing makes is an old one or has a new agent in it, when the rule
 joins no interface ports, is `Redex.of_fire`; with it `WorkLive.lean` shows
-that the threads never all rest before the normal form.
+that the threads never all rest before the normal form, and `WorkBound.lean`
+how many actions a fair run takes.
 
 What it buys, measured by evaluation with one thread (actions until rest):
 
@@ -78,7 +79,7 @@ def WMach.act (xs : XSys S) (X : XNet S) (T : WThread S) : XNet S × WThread S �
     | some R =>
       (X.takeAgent b, ⟨R.newAgents a b ++ T.todo,
         .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β),
-        T.again || R.joins xs.sys.ar α β⟩, 1)
+        R.joins xs.sys.ar α β⟩, 1)
     | none => (X.putAgent a α, ⟨T.todo, .idle, T.again⟩, 0)
   | .write as ((p, q) :: ls) => (X.putLink p q, ⟨T.todo, .write as ls, T.again⟩, 0)
   | .write ((i, γ) :: as) [] => (X.putAgent i γ, ⟨T.todo, .write as [], T.again⟩, 0)
@@ -100,7 +101,7 @@ theorem WMach.act_agree (xs : XSys S) (X : XNet S) (T : WThread S)
       (if assoc b X.agents = some β ∧ a ≠ b then xs.rule α β else none) = some R ∧
       WMach.act xs X T = (X.takeAgent b, ⟨R.newAgents a b ++ T.todo,
         .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β),
-        T.again || R.joins xs.sys.ar α β⟩, 1) ∧
+        R.joins xs.sys.ar α β⟩, 1) ∧
       XMach.act xs X T.toX = (X.takeAgent b,
         ⟨T.todo, .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β)⟩, 1) := by
   obtain ⟨todo, st, again⟩ := T
