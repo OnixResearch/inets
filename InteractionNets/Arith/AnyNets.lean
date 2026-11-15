@@ -664,7 +664,8 @@ theorem besides_fair {L : List (Nat × XNet Arith)} (hnd : (L.map Prod.fst).Nodu
       ((XMach.init (besides L) nt).trace xsys σ i).2 = stepsOf cl (L.map Prod.fst) ∧
       ((XMach.init (besides L) nt).trace xsys σ i).1.mem.toNet.Made (normalParts L nf) := by
   obtain ⟨Z, s, hn', hm⟩ := besides_reduce hnd cl nf hst hnf
-  obtain ⟨i₀, hh⟩ := XMach.fair_complete (xs := xsys) ((made_besides hnd).wf (partOf_wf hW)) hnt s hn' σ hfair
+  obtain ⟨i₀, hh⟩ := XMach.fair_complete (xs := xsys)
+      ((made_besides hnd).wf (partOf_wf hW)) hnt s hn' σ hfair
   refine ⟨i₀, fun i hi => ?_⟩
   obtain ⟨hr, hc, e⟩ := hh i hi
   rw [e]

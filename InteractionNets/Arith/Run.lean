@@ -47,7 +47,8 @@ def Expr.run (e : Expr) (nt steps : Nat) : Option Nat :=
 theorem Expr.run_sound (e : Expr) {nt steps v : Nat} (hnt : 0 < nt)
     (h : e.run nt steps = some v) : v = e.eval := by
   obtain ⟨hX, -, N', hs, hA, hno⟩ := Expr.good e
-  exact XNet.runRead_sound (zero := zero) (succ := succ) xsys (by decide) (Nat.le_refl 1) hX hs (normal_of_no_add hno) hA
+  exact XNet.runRead_sound (zero := zero) (succ := succ) xsys (by decide) (Nat.le_refl 1) hX hs
+      (normal_of_no_add hno) hA
     hnt h
 
 /-- **Given enough actions, the run returns the value of the
@@ -57,7 +58,8 @@ free port is read. -/
 theorem Expr.run_complete (e : Expr) {nt : Nat} (hnt : 0 < nt) :
     ∃ s₀, ∀ s, s₀ ≤ s → e.run nt s = some e.eval := by
   obtain ⟨hX, -, N', hs, hA, hno⟩ := Expr.good e
-  exact XNet.runRead_complete (zero := zero) (succ := succ) xsys (by decide) hX hs (normal_of_no_add hno) hA hnt
+  exact XNet.runRead_complete (zero := zero) (succ := succ) xsys (by decide) hX hs
+      (normal_of_no_add hno) hA hnt
 
 /-- `1 + 1` run by two threads taking turns: after 200 actions they are
 at rest and the result read is `2`. -/

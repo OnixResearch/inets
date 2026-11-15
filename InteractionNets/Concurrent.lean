@@ -169,7 +169,8 @@ theorem CState.Sound.terminal (h : st.Sound sys.ar) (ht : st.Terminal sys) :
     st.now = st.goal ∧ Normal (Step sys) st.goal := by
   have e : st.now = st.goal := by
     apply Net.ext'
-    · exact fun i γ => ⟨h.agent, fun hg => Classical.byContradiction fun hn => ht 0 _ (.agent hg hn)⟩
+    · exact fun i γ => ⟨h.agent, fun hg => Classical.byContradiction fun hn => ht 0 _
+          (.agent hg hn)⟩
     · exact fun p q => ⟨h.link, fun hg => Classical.byContradiction fun hn => ht 0 _ (.link hg hn)⟩
     · exact fun p => by rw [h.free]
   refine ⟨e, ?_⟩

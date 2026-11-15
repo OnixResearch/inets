@@ -21,11 +21,11 @@ local macro "ports_differ" : tactic =>
 
 local macro "under_wires" : tactic =>
   `(tactic| repeat (first | rw [wires_takeAgent] | rw [wires_putAgent] |
-      rw [assoc_wires_putLink (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))] | rw [nextSeg_putLink (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))]))
+      rw [assoc_wires_putLink (by ports_differ)] | rw [nextSeg_putLink (by ports_differ)]))
 
 local macro "under_agents" : tactic =>
-  `(tactic| repeat (first | rw [agents_putLink] | rw [assoc_takeAgent_ne (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))] |
-      rw [assoc_putAgent_ne (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))]))
+  `(tactic| repeat (first | rw [agents_putLink] | rw [assoc_takeAgent_ne (by ports_differ)] |
+      rw [assoc_putAgent_ne (by ports_differ)]))
 
 /-- The second argument but for its lowest successor, three actions for
 each agent. -/
@@ -108,9 +108,15 @@ theorem four_threads_race_last (m n : Nat) (hm : 4 ≤ m)
   rw [e0]
   have r1 := turn_reader_ready (m' + 1) (p + 1) 2 K3 (by omega) (by omega) (by omega) (by omega)
     (by omega)
-  have r1e : RdAt (m' + 1) (p + 1 + 1) ⟨chainL (p + 1 + 1) (m' + 1 - 2) ++ (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (p + 1 + 1) (m' + 1 - 2 + (2 + 1))).take (2 + 1)))), .idle⟩
-      (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) ⟨([3], .zero) :: [([p + 1 + 1 + 3 + (m' + 1 - 2 + 2) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 2 + 1) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 2) + 1], .succ)], .ready [2] [0, p + 1 + 1 + 4] .zero .add⟩ := r1
+  have r1e : RdAt (m' + 1) (p + 1 + 1) ⟨chainL (p + 1 + 1) (m' + 1 - 2) ++
+      (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+            (chainL (p + 1 + 1) (m' + 1 - 2 + (2 + 1))).take (2 + 1)))), .idle⟩
+      (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) ⟨([3], .zero) ::
+          [([p + 1 + 1 + 3 + (m' + 1 - 2 + 2) + 1], .succ),
+          ([p + 1 + 1 + 3 + (m' + 1 - 2 + 1) + 1], .succ),
+          ([p + 1 + 1 + 3 + (m' + 1 - 2) + 1], .succ)], .ready [2]
+          [0, p + 1 + 1 + 4] .zero .add⟩ := r1
   have q0 := turn_reader_at_zero (m' + 1) (p + 1) 1 K2 (by omega) (by omega) (by omega)
   have p0 := turn_reader_near_zero (m' + 1) p 0 K1 (by omega) (by omega) (by omega)
   have hx4 : assoc [4] (sum (m' + 1 + 1) (p + 1 + 1)).agents = some Arith.succ :=
@@ -120,12 +126,18 @@ theorem four_threads_race_last (m n : Nat) (hm : 4 ≤ m)
     (solo_snd_forever (m' + 1) (p + 1 + 1) (j := 4) (by omega) (by omega) hx4 _))
   have p2 := p1.step (XMach.act_look
     (solo_look_snd (m' + 1) (p + 1 + 1) (j := 4) (by omega) (by omega) _).1)
-  have ht0 : Tops (p + 1 + 1) [([p + 1 + 1 + 3 + (m' + 1 - 0) + 1], .succ)] := tops_cons (by omega) _ (tops_nil _)
-  have ht1 : Tops (p + 1 + 1) [([p + 1 + 1 + 3 + (m' + 1 - 1 + 1) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 1) + 1], .succ)] :=
+  have ht0 : Tops (p + 1 + 1) [([p + 1 + 1 + 3 + (m' + 1 - 0) + 1], .succ)] := tops_cons
+      (by omega) _ (tops_nil _)
+  have ht1 : Tops (p + 1 + 1) [([p + 1 + 1 + 3 + (m' + 1 - 1 + 1) + 1], .succ),
+      ([p + 1 + 1 + 3 + (m' + 1 - 1) + 1], .succ)] :=
     tops_cons (by omega) _ (tops_cons (by omega) _ (tops_nil _))
-  have ht2 : Tops (p + 1 + 1) [([p + 1 + 1 + 3 + (m' + 1 - 2 + 2) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 2 + 1) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 2) + 1], .succ)] :=
+  have ht2 : Tops (p + 1 + 1) [([p + 1 + 1 + 3 + (m' + 1 - 2 + 2) + 1], .succ),
+      ([p + 1 + 1 + 3 + (m' + 1 - 2 + 1) + 1], .succ),
+      ([p + 1 + 1 + 3 + (m' + 1 - 2) + 1], .succ)] :=
     tops_cons (by omega) _ (tops_cons (by omega) _ (tops_cons (by omega) _ (tops_nil _)))
-  have neR : (⟨([3], .zero) :: [([p + 1 + 1 + 3 + (m' + 1 - 2 + 2) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 2 + 1) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 2) + 1], .succ)], .ready [2] [0, p + 1 + 1 + 4] .zero .add⟩ : XThread Arith) ≠ ⟨[], .idle⟩ := fun h => by
+  have neR : (⟨([3], .zero) :: [([p + 1 + 1 + 3 + (m' + 1 - 2 + 2) + 1], .succ),
+      ([p + 1 + 1 + 3 + (m' + 1 - 2 + 1) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 2) + 1], .succ)],
+      .ready [2] [0, p + 1 + 1 + 4] .zero .add⟩ : XThread Arith) ≠ ⟨[], .idle⟩ := fun h => by
     injection h with _ h2
     cases h2
   have hK : (K2 = K3 ∧ K1 = K3) ∨ (K2 = K3 + 1 ∧ K1 = K3 + 1) ∨ (K2 = K3 ∧ K1 = K3 + 1) := by
@@ -133,64 +145,106 @@ theorem four_threads_race_last (m n : Nat) (hm : 4 ≤ m)
   have pkg : ∃ (Q1 Q2 : XThread Arith) (WQ : Nat),
       EntryAll (m' + 1) (p + 1 + 1) (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)
         [⟨chainL (p + 1 + 1) (m' + 1 - 0) ++ (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (p + 1 + 1) (m' + 1 - 0 + (0 + 1))).take (0 + 1)))), .idle⟩,
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+            (chainL (p + 1 + 1) (m' + 1 - 0 + (0 + 1))).take (0 + 1)))), .idle⟩,
           ⟨chainL (p + 1 + 1) (m' + 1 - 1) ++ (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (p + 1 + 1) (m' + 1 - 1 + (1 + 1))).take (1 + 1)))), .idle⟩,
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+            (chainL (p + 1 + 1) (m' + 1 - 1 + (1 + 1))).take (1 + 1)))), .idle⟩,
           ⟨chainL (p + 1 + 1) (m' + 1 - 2) ++ (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (p + 1 + 1) (m' + 1 - 2 + (2 + 1))).take (2 + 1)))), .idle⟩]
-        [Q1, Q2, ⟨([3], .zero) :: [([p + 1 + 1 + 3 + (m' + 1 - 2 + 2) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 2 + 1) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 2) + 1], .succ)], .ready [2] [0, p + 1 + 1 + 4] .zero .add⟩] ∧
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+            (chainL (p + 1 + 1) (m' + 1 - 2 + (2 + 1))).take (2 + 1)))), .idle⟩]
+        [Q1, Q2, ⟨([3], .zero) :: [([p + 1 + 1 + 3 + (m' + 1 - 2 + 2) + 1], .succ),
+            ([p + 1 + 1 + 3 + (m' + 1 - 2 + 1) + 1], .succ),
+            ([p + 1 + 1 + 3 + (m' + 1 - 2) + 1], .succ)], .ready [2]
+            [0, p + 1 + 1 + 4] .zero .add⟩] ∧
       Beside (m' + 1) (p + 1 + 1) [Q1, Q2] WQ ∧
-      2 * (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) + 10 + WQ = 3 * (m' + 1 - 1) + 3 * (p + 1) + 5 + K2 + 9 + (3 * (m' + 1 - 0) + 3 * (p + 1) + 5 + K1 + 5) := by
+      2 * (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) + 10 + WQ = 3 * (m' + 1 - 1) + 3 *
+          (p + 1) + 5 + K2 + 9 + (3 * (m' + 1 - 0) + 3 * (p + 1) + 5 + K1 + 5) := by
     rcases hK with ⟨e2, e1⟩ | ⟨e2, e1⟩ | ⟨e2, e1⟩
-    · have hal := solo_alive_zero (m' + 1) (p + 1 + 1) (j := 2) (u := 3 * (m' + 1 - 1) + 3 * (p + 1) + 5 + K2 + 1) (by omega) (by omega)
+    · have hal := solo_alive_zero (m' + 1) (p + 1 + 1) (j := 2)
+          (u := 3 * (m' + 1 - 1) + 3 * (p + 1) + 5 + K2 + 1) (by omega) (by omega)
         (by omega) (sum_zero_agent (m' + 1) (p + 1 + 1))
       have q1 := q0.step (XMach.act_idle_pos (e := ([2], Arith.zero)) hal)
-      have q1e : RdAt (m' + 1) (p + 1 + 1) ⟨chainL (p + 1 + 1) (m' + 1 - 1) ++ (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (p + 1 + 1) (m' + 1 - 1 + (1 + 1))).take (1 + 1)))), .idle⟩
-          (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) ⟨([3], .zero) :: [([p + 1 + 1 + 3 + (m' + 1 - 1 + 1) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 1) + 1], .succ)], .look [2] .zero⟩ := q1.cast (by omega)
-      have p2e : RdAt (m' + 1) (p + 1 + 1) ⟨chainL (p + 1 + 1) (m' + 1 - 0) ++ (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (p + 1 + 1) (m' + 1 - 0 + (0 + 1))).take (0 + 1)))), .idle⟩
-          (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) ⟨([1], .add) :: ([2], .zero) :: ([3], .zero) :: [([p + 1 + 1 + 3 + (m' + 1 - 0) + 1], .succ)], .seek [4] .succ ([4], 0) ([5], 1)⟩ := p2.cast (by omega)
+      have q1e : RdAt (m' + 1) (p + 1 + 1) ⟨chainL (p + 1 + 1) (m' + 1 - 1) ++
+          (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+            (chainL (p + 1 + 1) (m' + 1 - 1 + (1 + 1))).take (1 + 1)))), .idle⟩
+          (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)
+              ⟨([3], .zero) :: [([p + 1 + 1 + 3 + (m' + 1 - 1 + 1) + 1], .succ),
+              ([p + 1 + 1 + 3 + (m' + 1 - 1) + 1], .succ)], .look [2] .zero⟩ := q1.cast (by omega)
+      have p2e : RdAt (m' + 1) (p + 1 + 1) ⟨chainL (p + 1 + 1) (m' + 1 - 0) ++
+          (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+            (chainL (p + 1 + 1) (m' + 1 - 0 + (0 + 1))).take (0 + 1)))), .idle⟩
+          (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)
+              ⟨([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+              [([p + 1 + 1 + 3 + (m' + 1 - 0) + 1], .succ)], .seek [4] .succ ([4], 0)
+              ([5], 1)⟩ := p2.cast (by omega)
       exact ⟨_, _, _, .cons p2e (fun h => by
           injection h with _ h2
           cases h2) (.cons q1e (fun h => by
           injection h with _ h2
           cases h2) (.cons r1e neR .nil)),
-        .cons (beside_late_s (m' + 1) (by omega) ht0) (.cons (beside_adj_a (m' + 1) (by omega) ht1) (Beside.nil _ _)), by
-          show 2 * (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) + 10 + ((1 + 1) + ((2 + 1) + 0)) = _
+        .cons (beside_late_s (m' + 1) (by omega) ht0) (.cons (beside_adj_a (m' + 1) (by omega) ht1)
+            (Beside.nil _ _)), by
+          show 2 * (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) + 10 +
+              ((1 + 1) + ((2 + 1) + 0)) = _
           omega⟩
-    · have q0e : RdAt (m' + 1) (p + 1 + 1) ⟨chainL (p + 1 + 1) (m' + 1 - 1) ++ (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (p + 1 + 1) (m' + 1 - 1 + (1 + 1))).take (1 + 1)))), .idle⟩
-          (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) ⟨([2], .zero) :: ([3], .zero) :: [([p + 1 + 1 + 3 + (m' + 1 - 1 + 1) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 1) + 1], .succ)], .idle⟩ := q0.cast (by omega)
-      have p1e : RdAt (m' + 1) (p + 1 + 1) ⟨chainL (p + 1 + 1) (m' + 1 - 0) ++ (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (p + 1 + 1) (m' + 1 - 0 + (0 + 1))).take (0 + 1)))), .idle⟩
-          (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) ⟨([1], .add) :: ([2], .zero) :: ([3], .zero) :: [([p + 1 + 1 + 3 + (m' + 1 - 0) + 1], .succ)], .look [4] .succ⟩ := p1.cast (by omega)
+    · have q0e : RdAt (m' + 1) (p + 1 + 1) ⟨chainL (p + 1 + 1) (m' + 1 - 1) ++
+          (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+            (chainL (p + 1 + 1) (m' + 1 - 1 + (1 + 1))).take (1 + 1)))), .idle⟩
+          (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)
+              ⟨([2], .zero) :: ([3], .zero) :: [([p + 1 + 1 + 3 + (m' + 1 - 1 + 1) + 1], .succ),
+              ([p + 1 + 1 + 3 + (m' + 1 - 1) + 1], .succ)], .idle⟩ := q0.cast (by omega)
+      have p1e : RdAt (m' + 1) (p + 1 + 1) ⟨chainL (p + 1 + 1) (m' + 1 - 0) ++
+          (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+            (chainL (p + 1 + 1) (m' + 1 - 0 + (0 + 1))).take (0 + 1)))), .idle⟩
+          (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)
+              ⟨([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+              [([p + 1 + 1 + 3 + (m' + 1 - 0) + 1], .succ)], .look [4] .succ⟩ := p1.cast (by omega)
       exact ⟨_, _, _, .cons p1e (fun h => by
           injection h with _ h2
           cases h2) (.cons q0e (fun h => by cases h) (.cons r1e neR .nil)),
-        .cons (beside_late_l (m' + 1) (by omega) ht0) (.cons (beside_adj_b (m' + 1) (by omega) ht1) (Beside.nil _ _)), by
-          show 2 * (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) + 10 + ((1 + 1 + 1) + ((2 + 1 + 1) + 0)) = _
+        .cons (beside_late_l (m' + 1) (by omega) ht0) (.cons (beside_adj_b (m' + 1) (by omega) ht1)
+            (Beside.nil _ _)), by
+          show 2 * (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) + 10 +
+              ((1 + 1 + 1) + ((2 + 1 + 1) + 0)) = _
           omega⟩
-    · have hal := solo_alive_zero (m' + 1) (p + 1 + 1) (j := 2) (u := 3 * (m' + 1 - 1) + 3 * (p + 1) + 5 + K2 + 1) (by omega) (by omega)
+    · have hal := solo_alive_zero (m' + 1) (p + 1 + 1) (j := 2)
+          (u := 3 * (m' + 1 - 1) + 3 * (p + 1) + 5 + K2 + 1) (by omega) (by omega)
         (by omega) (sum_zero_agent (m' + 1) (p + 1 + 1))
       have q1 := q0.step (XMach.act_idle_pos (e := ([2], Arith.zero)) hal)
-      have q1e : RdAt (m' + 1) (p + 1 + 1) ⟨chainL (p + 1 + 1) (m' + 1 - 1) ++ (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (p + 1 + 1) (m' + 1 - 1 + (1 + 1))).take (1 + 1)))), .idle⟩
-          (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) ⟨([3], .zero) :: [([p + 1 + 1 + 3 + (m' + 1 - 1 + 1) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 1) + 1], .succ)], .look [2] .zero⟩ := q1.cast (by omega)
-      have p1e : RdAt (m' + 1) (p + 1 + 1) ⟨chainL (p + 1 + 1) (m' + 1 - 0) ++ (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (p + 1 + 1) (m' + 1 - 0 + (0 + 1))).take (0 + 1)))), .idle⟩
-          (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) ⟨([1], .add) :: ([2], .zero) :: ([3], .zero) :: [([p + 1 + 1 + 3 + (m' + 1 - 0) + 1], .succ)], .look [4] .succ⟩ := p1.cast (by omega)
+      have q1e : RdAt (m' + 1) (p + 1 + 1) ⟨chainL (p + 1 + 1) (m' + 1 - 1) ++
+          (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+            (chainL (p + 1 + 1) (m' + 1 - 1 + (1 + 1))).take (1 + 1)))), .idle⟩
+          (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)
+              ⟨([3], .zero) :: [([p + 1 + 1 + 3 + (m' + 1 - 1 + 1) + 1], .succ),
+              ([p + 1 + 1 + 3 + (m' + 1 - 1) + 1], .succ)], .look [2] .zero⟩ := q1.cast (by omega)
+      have p1e : RdAt (m' + 1) (p + 1 + 1) ⟨chainL (p + 1 + 1) (m' + 1 - 0) ++
+          (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+            (chainL (p + 1 + 1) (m' + 1 - 0 + (0 + 1))).take (0 + 1)))), .idle⟩
+          (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)
+              ⟨([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+              [([p + 1 + 1 + 3 + (m' + 1 - 0) + 1], .succ)], .look [4] .succ⟩ := p1.cast (by omega)
       exact ⟨_, _, _, .cons p1e (fun h => by
           injection h with _ h2
           cases h2) (.cons q1e (fun h => by
           injection h with _ h2
           cases h2) (.cons r1e neR .nil)),
-        .cons (beside_late_l (m' + 1) (by omega) ht0) (.cons (beside_adj_a (m' + 1) (by omega) ht1) (Beside.nil _ _)), by
-          show 2 * (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) + 10 + ((1 + 1 + 1) + ((2 + 1) + 0)) = _
+        .cons (beside_late_l (m' + 1) (by omega) ht0) (.cons (beside_adj_a (m' + 1) (by omega) ht1)
+            (Beside.nil _ _)), by
+          show 2 * (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4) + 10 +
+              ((1 + 1 + 1) + ((2 + 1) + 0)) = _
           omega⟩
   obtain ⟨Q1, Q2, WQ, EA, hQ, hW⟩ := pkg
   have e2 : ([Q1, Q2] : List (XThread Arith)).length = 2 := rfl
-  have e3 : ([([p + 1 + 1 + 3 + (m' + 1 - 2 + 2) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 2 + 1) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 2) + 1], .succ)] : List (Id × Arith)).length = 3 := rfl
+  have e3 : ([([p + 1 + 1 + 3 + (m' + 1 - 2 + 2) + 1], .succ),
+      ([p + 1 + 1 + 3 + (m' + 1 - 2 + 1) + 1], .succ),
+      ([p + 1 + 1 + 3 + (m' + 1 - 2) + 1], .succ)] : List (Id × Arith)).length = 3 := rfl
   obtain ⟨V, todo, rest, p5, q5, p6, q6, p7, q7, p8, q8, B, s11, s12, s13, s14, s15⟩ :=
     race_write (m' + 1) (p + 1 + 1) (by omega)
   obtain ⟨s16, s17, s18, s19, s20⟩ := B.states
@@ -220,25 +274,34 @@ theorem four_threads_race_last (m n : Nat) (hm : 4 ≤ m)
       have h := assoc_mem (solo_look_snd (m' + 1) (p + 1 + 1) (j := j) a b (17 * (m' + 1) + 13)).1
       rw [s13] at h
       exact h
-  have hinit : XMach.init (sum (m' + 1 + 1) (p + 1 + 1)) 4 = ⟨(sum (m' + 1 + 1) (p + 1 + 1)), [⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩,
+  have hinit : XMach.init (sum (m' + 1 + 1) (p + 1 + 1)) 4 =
+      ⟨(sum (m' + 1 + 1) (p + 1 + 1)), [⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩,
       ⟨chainL (p + 1 + 1) (m' + 1 - 0) ++ (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (p + 1 + 1) (m' + 1 - 0 + (0 + 1))).take (0 + 1)))), .idle⟩,
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+            (chainL (p + 1 + 1) (m' + 1 - 0 + (0 + 1))).take (0 + 1)))), .idle⟩,
       ⟨chainL (p + 1 + 1) (m' + 1 - 1) ++ (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (p + 1 + 1) (m' + 1 - 1 + (1 + 1))).take (1 + 1)))), .idle⟩,
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+            (chainL (p + 1 + 1) (m' + 1 - 1 + (1 + 1))).take (1 + 1)))), .idle⟩,
       ⟨chainL (p + 1 + 1) (m' + 1 - 2) ++ (([p + 1 + 1 + 3], .succ) :: (sndL (p + 1) ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (p + 1 + 1) (m' + 1 - 2 + (2 + 1))).take (2 + 1)))), .idle⟩]⟩ :=
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) ::
+            (chainL (p + 1 + 1) (m' + 1 - 2 + (2 + 1))).take (2 + 1)))), .idle⟩]⟩ :=
     (XMach.init_succ (sum (m' + 1 + 1) (p + 1 + 1)) 3).trans (by
-      rw [← turn_list_succ (m' + 1) (p + 1) 0 (by omega), ← turn_list_succ (m' + 1) (p + 1) 1 (by omega),
+      rw [← turn_list_succ (m' + 1) (p + 1) 0 (by omega), ← turn_list_succ (m' + 1) (p + 1) 1
+          (by omega),
         ← turn_list_succ (m' + 1) (p + 1) 2 (by omega)]
       rfl)
   rw [hinit]
   have hd' : d = 0 ∨ d = 1 ∨ d = 2 ∨ d = 3 ∨ d = 4 ∨ d = 5 ∨ d = 6 ∨ d = 7 ∨ d = 8 ∨ d = 9 := by
     omega
   rcases hd' with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-  · have es := solo_at s11 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 * (m' + 1) + 11 by omega)
-    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1)) ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩ (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
+  · have es := solo_at s11 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 *
+        (m' + 1) + 11 by omega)
+    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1))
+        ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩
+        (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
       rw [es]
-      show (⟨todo, .write [] [(p5, q5), (p6, q6), (p7, q7), (p8, q8)]⟩ : XThread Arith) ≠ ⟨[], .idle⟩
+      show (⟨todo, .write [] [(p5, q5), (p6, q6), (p7, q7), (p8, q8)]⟩ : XThread Arith) ≠
+          ⟨[], .idle⟩
       exact fun h => by
         injection h with _ h2
         cases h2
@@ -248,8 +311,11 @@ theorem four_threads_race_last (m n : Nat) (hm : 4 ≤ m)
     exact (total_after 4 tr wk (race_k_d0 B todo _ lk12 lk13 sk13 sk14 hS11 hQ)).cast (by
       rw [eR, ite_neg' (by omega), e2]
       omega)
-  · have es := solo_at s12 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 * (m' + 1) + 12 by omega)
-    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1)) ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩ (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
+  · have es := solo_at s12 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 *
+        (m' + 1) + 12 by omega)
+    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1))
+        ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩
+        (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
       rw [es]
       show (⟨todo, .write [] [(p6, q6), (p7, q7), (p8, q8)]⟩ : XThread Arith) ≠ ⟨[], .idle⟩
       exact fun h => by
@@ -261,8 +327,11 @@ theorem four_threads_race_last (m n : Nat) (hm : 4 ≤ m)
     exact (total_after 4 tr wk (race_k_d1 B todo _ lk13 lk14 sk14 hS12 hQ)).cast (by
       rw [eR, ite_neg' (by omega), e2]
       omega)
-  · have es := solo_at s13 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 * (m' + 1) + 13 by omega)
-    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1)) ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩ (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
+  · have es := solo_at s13 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 *
+        (m' + 1) + 13 by omega)
+    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1))
+        ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩
+        (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
       rw [es]
       show (⟨todo, .write [] [(p7, q7), (p8, q8)]⟩ : XThread Arith) ≠ ⟨[], .idle⟩
       exact fun h => by
@@ -274,8 +343,11 @@ theorem four_threads_race_last (m n : Nat) (hm : 4 ≤ m)
     exact (total_after 4 tr wk (race_k_d2 B todo _ lk14 hS13 hQ)).cast (by
       rw [eR, ite_neg' (by omega), e2]
       omega)
-  · have es := solo_at s14 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 * (m' + 1) + 14 by omega)
-    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1)) ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩ (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
+  · have es := solo_at s14 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 *
+        (m' + 1) + 14 by omega)
+    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1))
+        ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩
+        (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
       rw [es]
       show (⟨todo, .write [] [(p8, q8)]⟩ : XThread Arith) ≠ ⟨[], .idle⟩
       exact fun h => by
@@ -287,8 +359,11 @@ theorem four_threads_race_last (m n : Nat) (hm : 4 ≤ m)
     exact (total_after 4 tr wk (race_k_d3 B todo _ hQ)).cast (by
       rw [eR, ite_neg' (by omega), e2]
       omega)
-  · have es := solo_at s15 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 * (m' + 1) + 15 by omega)
-    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1)) ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩ (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
+  · have es := solo_at s15 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 *
+        (m' + 1) + 15 by omega)
+    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1))
+        ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩
+        (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
       rw [es]
       show (⟨todo, .write [] []⟩ : XThread Arith) ≠ ⟨[], .idle⟩
       exact fun h => by
@@ -300,10 +375,14 @@ theorem four_threads_race_last (m n : Nat) (hm : 4 ≤ m)
     exact (total_after 4 tr wk (race_k_d4 B todo _ hQ)).cast (by
       rw [eR, ite_neg' (by omega), e2]
       omega)
-  · have es := solo_at s16 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 * (m' + 1) + 16 by omega)
-    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1)) ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩ (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
+  · have es := solo_at s16 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 *
+        (m' + 1) + 16 by omega)
+    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1))
+        ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩
+        (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
       rw [es]
-      show (⟨((((V.putLink p5 q5).putLink p6 q6).putLink p7 q7).putLink p8 q8).agents, .idle⟩ : XThread Arith) ≠ ⟨[], .idle⟩
+      show (⟨((((V.putLink p5 q5).putLink p6 q6).putLink p7 q7).putLink p8 q8).agents,
+          .idle⟩ : XThread Arith) ≠ ⟨[], .idle⟩
       rw [B.agents]
       exact fun h => by cases h
     obtain ⟨tr, wk⟩ := entry_all EA hb0
@@ -312,8 +391,11 @@ theorem four_threads_race_last (m n : Nat) (hm : 4 ≤ m)
     exact (total_after 4 tr wk (race_k_d5 B _ hQ)).cast (by
       rw [eR, ite_neg' (by omega), e2]
       omega)
-  · have es := solo_at s17 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 * (m' + 1) + 17 by omega)
-    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1)) ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩ (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
+  · have es := solo_at s17 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 *
+        (m' + 1) + 17 by omega)
+    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1))
+        ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩
+        (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
       rw [es]
       show (⟨rest, .look [0, p + 1 + 1 + 4] .add⟩ : XThread Arith) ≠ ⟨[], .idle⟩
       exact fun h => by
@@ -325,10 +407,14 @@ theorem four_threads_race_last (m n : Nat) (hm : 4 ≤ m)
     exact (total_after 4 tr wk (race_k_d6 B _ hQ)).cast (by
       rw [eR, ite_neg' (by omega), e2]
       omega)
-  · have es := solo_at s18 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 * (m' + 1) + 18 by omega)
-    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1)) ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩ (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
+  · have es := solo_at s18 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 *
+        (m' + 1) + 18 by omega)
+    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1))
+        ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩
+        (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
       rw [es]
-      show (⟨rest, .seek [0, p + 1 + 1 + 4] .add ([0, p + 1 + 1 + 4], 0) ([p + 1 + 1 + 4], 1)⟩ : XThread Arith) ≠ ⟨[], .idle⟩
+      show (⟨rest, .seek [0, p + 1 + 1 + 4] .add ([0, p + 1 + 1 + 4], 0)
+          ([p + 1 + 1 + 4], 1)⟩ : XThread Arith) ≠ ⟨[], .idle⟩
       exact fun h => by
         injection h with _ h2
         cases h2
@@ -338,23 +424,33 @@ theorem four_threads_race_last (m n : Nat) (hm : 4 ≤ m)
     exact (total_after 4 tr wk (race_k_d7 B _ hQ)).cast (by
       rw [eR, ite_neg' (by omega), e2]
       omega)
-  · have es := solo_at s19 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 * (m' + 1) + 19 by omega)
-    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1)) ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩ (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
+  · have es := solo_at s19 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 *
+        (m' + 1) + 19 by omega)
+    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1))
+        ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩
+        (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
       rw [es]
-      show (⟨rest, .seek [0, p + 1 + 1 + 4] .add ([p + 1 + 1 + 4], 1) ([2], 0)⟩ : XThread Arith) ≠ ⟨[], .idle⟩
+      show (⟨rest, .seek [0, p + 1 + 1 + 4] .add ([p + 1 + 1 + 4], 1) ([2], 0)⟩ : XThread Arith) ≠
+          ⟨[], .idle⟩
       exact fun h => by
         injection h with _ h2
         cases h2
     obtain ⟨tr, wk⟩ := entry_all EA hb0
     rw [es] at tr
     have eR : raceWork (m' + 1) (p + 1 + 1) 8 = 39 * (m' + 1) + 3 * (p + 1 + 1) + 60 := rfl
-    exact (total_after 4 tr wk (race_k_d8 B (tops := [([p + 1 + 1 + 3 + (m' + 1 - 2 + 2) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 2 + 1) + 1], .succ), ([p + 1 + 1 + 3 + (m' + 1 - 2) + 1], .succ)]) ht2 (by
+    exact (total_after 4 tr wk (race_k_d8 B (tops :=
+        [([p + 1 + 1 + 3 + (m' + 1 - 2 + 2) + 1], .succ),
+        ([p + 1 + 1 + 3 + (m' + 1 - 2 + 1) + 1], .succ),
+        ([p + 1 + 1 + 3 + (m' + 1 - 2) + 1], .succ)]) ht2 (by
           rw [e3]
           omega) hQ)).cast (by
       rw [eR, ite_pos' (by omega), e2, e3]
       omega)
-  · have es := solo_at s20 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 * (m' + 1) + 20 by omega)
-    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1)) ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩ (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
+  · have es := solo_at s20 (show 3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4 = 17 *
+        (m' + 1) + 20 by omega)
+    have hb0 : (XMach.solo xsys (sum (m' + 1 + 1) (p + 1 + 1))
+        ⟨(sum (m' + 1 + 1) (p + 1 + 1)).agents, .idle⟩
+        (3 * (m' + 1 - 2) + 3 * (p + 1) + 5 + K3 + 4)).2 ≠ ⟨[], .idle⟩ := by
       rw [es]
       show (⟨rest, .ready [0, p + 1 + 1 + 4] [2] .add .zero⟩ : XThread Arith) ≠ ⟨[], .idle⟩
       exact fun h => by
@@ -779,7 +875,8 @@ theorem RdAt.three {m n : Nat} {T0 : XThread Arith} {a : Nat} {l : List (Id × A
   intro a' ha'
   have e0 : (XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T0 a).st =
       .idle := by rw [h.1]
-  have r0 : (XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T0 a).st.Reading := by
+  have r0 : (XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents,
+      .idle⟩ T0 a).st.Reading := by
     rw [e0]
     exact trivial
   have s1 : St1 (XMach.reader xsys (sum (m + 1) n) ⟨(sum (m + 1) n).agents, .idle⟩ T0
@@ -978,9 +1075,12 @@ zero, three for the zero of the second argument and one for each top
 successor, which is gone for good. -/
 theorem early_reader_end (m n' k : Nat) (hm : k + 2 ≤ m)
     (hA : turnAt m (n' + 1) k ≤ 17 * m + 6) (hG : 17 * k ≤ turnAt m (n' + 1) k + 1) :
-    ∃ s : Nat → XThread Arith, s 0 = (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith) ∧
-      (∀ w, XMach.act xsys ((XMach.init (sum (m + 1) (n' + 1)) (k + 1)).trace xsys (fun i => i % (k + 1)) ((k + 1) * (w + 1))).1.mem (s w) =
-        (((XMach.init (sum (m + 1) (n' + 1)) (k + 1)).trace xsys (fun i => i % (k + 1)) ((k + 1) * (w + 1))).1.mem, s (w + 1), 0)) ∧
+    ∃ s : Nat → XThread Arith, s 0 = (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++
+        (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith) ∧
+      (∀ w, XMach.act xsys ((XMach.init (sum (m + 1) (n' + 1)) (k + 1)).trace xsys
+          (fun i => i % (k + 1)) ((k + 1) * (w + 1))).1.mem (s w) =
+        (((XMach.init (sum (m + 1) (n' + 1)) (k + 1)).trace xsys (fun i => i % (k + 1))
+            ((k + 1) * (w + 1))).1.mem, s (w + 1), 0)) ∧
       (∀ j, j < turnAt m (n' + 1) k + 3 + 3 + (k + 1) → s j ≠ ⟨[], .idle⟩) ∧
       (∀ j, turnAt m (n' + 1) k + 3 + 3 + (k + 1) ≤ j → s j = ⟨[], .idle⟩) := by
   obtain ⟨K, hK⟩ : ∃ K, (3 * (m - k) + 11) / 16 = K + 1 :=
@@ -991,7 +1091,8 @@ theorem early_reader_end (m n' k : Nat) (hm : k + 2 ≤ m)
   rw [XMach.init_succ, eA]
   rw [eA] at hA hG
   have q0 := turn_reader_at_zero m n' k K (by omega) (by omega) (by omega)
-  have hal := solo_alive_zero m (n' + 1) (j := 2) (u := 3 * (m - k) + 3 * n' + 5 + K + 1) (by omega) (by omega)
+  have hal := solo_alive_zero m (n' + 1) (j := 2) (u := 3 * (m - k) + 3 * n' + 5 + K + 1) (by omega)
+      (by omega)
     (by omega) (sum_zero_agent m (n' + 1))
   have q1 := q0.pass3 hal (solo_look_two m (n' + 1) _) (show ¬ (1 : Nat) = 0 by decide)
     ((solo_seek_two m (n' + 1) (by omega) _).2 (by omega))
@@ -1004,14 +1105,27 @@ theorem early_reader_end (m n' k : Nat) (hm : k + 2 ≤ m)
     (show ¬ (1 : Nat) = 0 by decide)
     (solo_look_snd m (n' + 1) (j := 3) (by omega) (by omega) _).2
   rw [← turn_list_succ m n' k (by omega)] at q2
-  have hlenT : ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))).length = k := by
+  have hlenT : ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+      (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))).length = k := by
     rw [List.length_map, List.length_range]
-  have hL : (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length = k + 1 := by
-    show ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))).length + 1 = k + 1
+  have hL : (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ::
+      ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+      (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length = k + 1 := by
+    show ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+        (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))).length + 1 = k + 1
     rw [hlenT]
-  have hRds : ∀ T, T ∈ ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))) → ∀ a, a < 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 →
-      (XMach.act xsys (XMach.solo xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (a + 1)).1 (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ T a)).1 = (XMach.solo xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (a + 1)).1 ∧
-        (XMach.act xsys (XMach.solo xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (a + 1)).1 (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ T a)).2.2 = 0 := by
+  have hRds : ∀ T, T ∈ ((List.range k).map (fun t =>
+      (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1),
+      .idle⟩ : XThread Arith))) → ∀ a, a < 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 →
+      (XMach.act xsys (XMach.solo xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩
+          (a + 1)).1 (XMach.reader xsys (sum (m + 1) (n' + 1))
+          ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ T a)).1 =
+          (XMach.solo xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩
+          (a + 1)).1 ∧
+        (XMach.act xsys (XMach.solo xsys (sum (m + 1) (n' + 1))
+            ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (a + 1)).1
+            (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents,
+            .idle⟩ T a)).2.2 = 0 := by
     intro T hT a ha
     obtain ⟨t, ht, rfl⟩ := List.mem_map.1 hT
     have htk : t < k := List.mem_range.1 ht
@@ -1020,29 +1134,76 @@ theorem early_reader_end (m n' k : Nat) (hm : k + 2 ≤ m)
     have qt := turn_reader_at_zero m n' t Kt (by omega) (by omega) (by omega)
     rw [← turn_list_succ m n' t (by omega)] at qt
     exact qt.three a (by omega)
-  have hcalm : ∀ T, T ∈ ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))) → ∀ a, a ≤ 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 →
-      Calm (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ T a).st := by
+  have hcalm : ∀ T, T ∈ ((List.range k).map (fun t =>
+      (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1),
+      .idle⟩ : XThread Arith))) → ∀ a, a ≤ 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 →
+      Calm (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents,
+          .idle⟩ T a).st := by
     intro T hT a ha
     have hc : Calm T.st := by
       obtain ⟨t, -, rfl⟩ := List.mem_map.1 hT
       exact trivial
     exact reader_calm hc a (fun a' ha' => hRds T hT a' (by omega))
   have trB : ∀ a, a ≤ 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 →
-      ((⟨(sum (m + 1) (n' + 1)), (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))))⟩ : XMach Arith).trace xsys (fun i => i % (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length) ((⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length * (a))).1 =
-        ⟨(XMach.solo xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (a)).1, (XMach.solo xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (a)).2 ::
-          ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))).map fun T => XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ T a⟩ := fun a ha =>
+      ((⟨(sum (m + 1) (n' + 1)), (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ::
+          ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (t + 1),
+          .idle⟩ : XThread Arith))))⟩ : XMach Arith).trace xsys
+          (fun i => i % (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ::
+          ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length)
+          ((⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map
+          (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length * (a))).1 =
+        ⟨(XMach.solo xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (a)).1,
+            (XMach.solo xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (a)).2 ::
+          ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+              (sum (m + 1) (n' + 1)).agents.take (t + 1),
+              .idle⟩ : XThread Arith))).map fun T => XMach.reader xsys (sum (m + 1) (n' + 1))
+              ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ T a⟩ := fun a ha =>
     congrArg Prod.fst (XMach.trace_readers (xs := xsys) (X := (sum (m + 1) (n' + 1)))
-      (T₀ := ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩) (Ts := ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))) (A := 3 * (m - k) + 3 * n' + 5 + K + 3 + 3) hRds a ha)
-  have hlenTops : ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)).length = k + 1 := tops_length (n' + 1) (m - k) k
-  have gone : ∀ e, e ∈ ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)) → ∀ v, 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 ≤ v →
-      assoc e.1 ((⟨(sum (m + 1) (n' + 1)), (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))))⟩ : XMach Arith).trace xsys (fun i => i % (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length) ((⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length * (v))).1.mem.agents = none := by
+      (T₀ := ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩) (Ts :=
+          ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))))
+          (A := 3 * (m - k) + 3 * n' + 5 + K + 3 + 3) hRds a ha)
+  have hlenTops : ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)).length = k + 1 := tops_length
+      (n' + 1) (m - k) k
+  have gone : ∀ e, e ∈ ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)) → ∀ v, 3 *
+      (m - k) + 3 * n' + 5 + K + 3 + 3 ≤ v →
+      assoc e.1 ((⟨(sum (m + 1) (n' + 1)), (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ::
+          ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (t + 1),
+          .idle⟩ : XThread Arith))))⟩ : XMach Arith).trace xsys
+          (fun i => i % (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ::
+          ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length)
+          ((⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map
+          (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length *
+          (v))).1.mem.agents = none := by
     intro e he v hv
     obtain ⟨r, hr1, hr2, rfl⟩ := mem_tops k e he
-    obtain ⟨d, rfl⟩ : ∃ d, v = 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + d := ⟨v - (3 * (m - k) + 3 * n' + 5 + K + 3 + 3), by omega⟩
-    rw [trace_mod_add (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length (⟨(sum (m + 1) (n' + 1)), (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))))⟩ : XMach Arith) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) d, trB (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) (Nat.le_refl _)]
-    exact (trace_gone (j := n' + 1 + 3 + r + 1) (by omega) (fun i => i % (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length)
-      (M := ⟨(XMach.solo xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (3 * (m - k) + 3 * n' + 5 + K + 3 + 3)).1, (XMach.solo xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (3 * (m - k) + 3 * n' + 5 + K + 3 + 3)).2 ::
-        ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))).map fun T => XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ T (3 * (m - k) + 3 * n' + 5 + K + 3 + 3)⟩)
+    obtain ⟨d, rfl⟩ : ∃ d, v = 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + d :=
+        ⟨v - (3 * (m - k) + 3 * n' + 5 + K + 3 + 3), by omega⟩
+    rw [trace_mod_add (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ::
+        ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+        (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length
+        (⟨(sum (m + 1) (n' + 1)), (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ::
+        ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+        (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))))⟩ : XMach Arith)
+        (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) d, trB (3 * (m - k) + 3 * n' + 5 + K + 3 + 3)
+        (Nat.le_refl _)]
+    exact (trace_gone (j := n' + 1 + 3 + r + 1) (by omega)
+        (fun i => i % (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ::
+        ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+        (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length)
+      (M := ⟨(XMach.solo xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩
+          (3 * (m - k) + 3 * n' + 5 + K + 3 + 3)).1, (XMach.solo xsys (sum (m + 1) (n' + 1))
+          ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (3 * (m - k) + 3 * n' + 5 + K + 3 + 3)).2 ::
+        ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+            (sum (m + 1) (n' + 1)).agents.take (t + 1),
+            .idle⟩ : XThread Arith))).map fun T => XMach.reader xsys (sum (m + 1) (n' + 1))
+            ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ T (3 * (m - k) + 3 * n' + 5 + K + 3 + 3)⟩)
       (solo_gone_top m (n' + 1) (by omega) (by omega))
       (fun T hT => by
         rcases List.mem_cons.1 hT with e | hT
@@ -1050,35 +1211,96 @@ theorem early_reader_end (m n' k : Nat) (hm : k + 2 ≤ m)
           exact solo_clear_top m (n' + 1) (by omega) (by omega)
         · obtain ⟨T', hT', rfl⟩ := List.mem_map.1 hT
           exact calm_clear (hcalm T' hT' (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) (Nat.le_refl _)) _)
-      ((⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length * d)).1
-  have hs : ∀ w, XMach.act xsys ((⟨(sum (m + 1) (n' + 1)), (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))))⟩ : XMach Arith).trace xsys (fun i => i % (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length) ((⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length * (w + 1))).1.mem ((thenPops (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith)) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))) w) =
-      (((⟨(sum (m + 1) (n' + 1)), (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))))⟩ : XMach Arith).trace xsys (fun i => i % (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length) ((⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length * (w + 1))).1.mem, (thenPops (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith)) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))) (w + 1), 0) := by
+      ((⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map
+          (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length * d)).1
+  have hs : ∀ w, XMach.act xsys ((⟨(sum (m + 1) (n' + 1)),
+      (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map
+      (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take
+      (t + 1), .idle⟩ : XThread Arith))))⟩ : XMach Arith).trace xsys
+      (fun i => i % (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ::
+      ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+      (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length)
+      ((⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map
+      (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take
+      (t + 1), .idle⟩ : XThread Arith)))).length * (w + 1))).1.mem
+      ((thenPops (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩
+      (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1),
+      .idle⟩ : XThread Arith)) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3)
+      ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))) w) =
+      (((⟨(sum (m + 1) (n' + 1)), (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ::
+          ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (t + 1),
+          .idle⟩ : XThread Arith))))⟩ : XMach Arith).trace xsys
+          (fun i => i % (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ::
+          ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length)
+          ((⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map
+          (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length *
+          (w + 1))).1.mem, (thenPops (XMach.reader xsys (sum (m + 1) (n' + 1))
+          ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith))
+          (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)))
+          (w + 1), 0) := by
     intro w
     by_cases hw : w < 3 * (m - k) + 3 * n' + 5 + K + 3 + 3
-    · have em : ((⟨(sum (m + 1) (n' + 1)), (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith))))⟩ : XMach Arith).trace xsys (fun i => i % (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length) ((⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++ (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length * (w + 1))).1.mem = (XMach.solo xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (w + 1)).1 :=
+    · have em : ((⟨(sum (m + 1) (n' + 1)), (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ::
+          ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (t + 1),
+          .idle⟩ : XThread Arith))))⟩ : XMach Arith).trace xsys
+          (fun i => i % (⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ ::
+          ((List.range k).map (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length)
+          ((⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ :: ((List.range k).map
+          (fun t => (⟨(sum (m + 1) (n' + 1)).agents.drop (t + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (t + 1), .idle⟩ : XThread Arith)))).length *
+          (w + 1))).1.mem = (XMach.solo xsys (sum (m + 1) (n' + 1))
+          ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (w + 1)).1 :=
         congrArg XMach.mem (trB (w + 1) (by omega))
-      rw [em, thenPops_le (show w ≤ 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 by omega), thenPops_le (show w + 1 ≤ 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 by omega)]
+      rw [em, thenPops_le (show w ≤ 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 by omega), thenPops_le
+          (show w + 1 ≤ 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 by omega)]
       exact prod3 (q2.2 w hw).1 rfl (q2.2 w hw).2
-    · obtain ⟨d, rfl⟩ : ∃ d, w = 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + d := ⟨w - (3 * (m - k) + 3 * n' + 5 + K + 3 + 3), by omega⟩
-      have e1 : (thenPops (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith)) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + d) = ⟨((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)).drop d, .idle⟩ := by
+    · obtain ⟨d, rfl⟩ : ∃ d, w = 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + d :=
+          ⟨w - (3 * (m - k) + 3 * n' + 5 + K + 3 + 3), by omega⟩
+      have e1 : (thenPops (XMach.reader xsys (sum (m + 1) (n' + 1))
+          ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith))
+          (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)))
+          (3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + d) = ⟨((chainL (n' + 1) (m - k + (k + 1))).take
+          (k + 1)).drop d, .idle⟩ := by
         by_cases hd : d = 0
         · subst hd
-          show (thenPops (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith)) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) = ⟨((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)), .idle⟩
+          show (thenPops (XMach.reader xsys (sum (m + 1) (n' + 1))
+              ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++
+              (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith))
+              (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) ((chainL (n' + 1) (m - k + (k + 1))).take
+              (k + 1))) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) =
+              ⟨((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)), .idle⟩
           rw [thenPops_le (Nat.le_refl _)]
           exact q2.1
-        · rw [thenPops_gt (by omega), show 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + d - (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) = d by omega]
-      have e2 : (thenPops (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith)) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + d + 1) = ⟨((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)).drop (d + 1), .idle⟩ := by
-        rw [thenPops_gt (by omega), show 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + d + 1 - (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) = d + 1 by omega]
+        · rw [thenPops_gt (by omega), show 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + d -
+              (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) = d by omega]
+      have e2 : (thenPops (XMach.reader xsys (sum (m + 1) (n' + 1))
+          ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++
+          (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith))
+          (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)))
+          (3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + d + 1) =
+          ⟨((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)).drop (d + 1), .idle⟩ := by
+        rw [thenPops_gt (by omega), show 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + d + 1 -
+            (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) = d + 1 by omega]
       rw [e1, e2]
       cases hdr : ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)).drop d with
       | nil =>
         have e3 : ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)).drop (d + 1) = [] :=
-          (drop_succ' d ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))).symm.trans (congrArg (List.drop 1) hdr)
+          (drop_succ' d ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))).symm.trans
+              (congrArg (List.drop 1) hdr)
         rw [e3]
         rfl
       | cons e L' =>
         have e3 : ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)).drop (d + 1) = L' :=
-          (drop_succ' d ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))).symm.trans (congrArg (List.drop 1) hdr)
+          (drop_succ' d ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))).symm.trans
+              (congrArg (List.drop 1) hdr)
         rw [e3]
         have he : e ∈ ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)) := List.mem_of_mem_drop (by
           rw [hdr]
@@ -1086,29 +1308,47 @@ theorem early_reader_end (m n' k : Nat) (hm : k + 2 ≤ m)
         exact XMach.act_idle_neg (e := e) (fun h => by
           rw [gone e he (3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + d + 1) (by omega)] at h
           cases h)
-  have hne0 : XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) ≠ ⟨[], .idle⟩ := fun e => by
+  have hne0 : XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩
+      (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1),
+      .idle⟩ : XThread Arith) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) ≠ ⟨[], .idle⟩ := fun e => by
     rw [q2.1] at e
-    have e' : ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)).length = 0 := congrArg (fun T : XThread Arith => T.todo.length) e
+    have e' : ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)).length = 0 := congrArg
+        (fun T : XThread Arith => T.todo.length) e
     omega
-  have h1 : ∀ j, j < 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + (k + 1) → (thenPops (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith)) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))) j ≠ ⟨[], .idle⟩ := by
+  have h1 : ∀ j, j < 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + (k + 1) →
+      (thenPops (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩
+      (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1),
+      .idle⟩ : XThread Arith)) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3)
+      ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))) j ≠ ⟨[], .idle⟩ := by
     intro j hj
     by_cases c : j ≤ 3 * (m - k) + 3 * n' + 5 + K + 3 + 3
     · rw [thenPops_le c]
-      exact reader_busy_upto (X := (sum (m + 1) (n' + 1))) (F0 := ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩) (T0 := (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith))
+      exact reader_busy_upto (X := (sum (m + 1) (n' + 1)))
+          (F0 := ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩)
+          (T0 := (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take
+          (k + 1), .idle⟩ : XThread Arith))
         (b := 3 * (m - k) + 3 * n' + 5 + K + 3 + 3) hne0 j c
     · rw [thenPops_gt (by omega)]
       intro e
-      have e' : (((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)).drop (j - (3 * (m - k) + 3 * n' + 5 + K + 3 + 3))).length = 0 :=
+      have e' : (((chainL (n' + 1) (m - k + (k + 1))).take (k + 1)).drop
+          (j - (3 * (m - k) + 3 * n' + 5 + K + 3 + 3))).length = 0 :=
         congrArg (fun T : XThread Arith => T.todo.length) e
       rw [List.length_drop, hlenTops] at e'
       omega
-  have h0 : ∀ j, 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + (k + 1) ≤ j → (thenPops (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith)) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))) j = ⟨[], .idle⟩ := by
+  have h0 : ∀ j, 3 * (m - k) + 3 * n' + 5 + K + 3 + 3 + (k + 1) ≤ j →
+      (thenPops (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩
+      (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1),
+      .idle⟩ : XThread Arith)) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3)
+      ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))) j = ⟨[], .idle⟩ := by
     intro j hj
     rw [thenPops_gt (by omega), List.drop_eq_nil_of_le (by
       rw [hlenTops]
       omega)]
   rw [hL] at hs
-  exact ⟨(thenPops (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩ (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1), .idle⟩ : XThread Arith)) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3) ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))), thenPops_le (Nat.zero_le _), hs, h1, h0⟩
+  exact ⟨(thenPops (XMach.reader xsys (sum (m + 1) (n' + 1)) ⟨(sum (m + 1) (n' + 1)).agents, .idle⟩
+      (⟨(sum (m + 1) (n' + 1)).agents.drop (k + 1) ++ (sum (m + 1) (n' + 1)).agents.take (k + 1),
+      .idle⟩ : XThread Arith)) (3 * (m - k) + 3 * n' + 5 + K + 3 + 3)
+      ((chainL (n' + 1) (m - k + (k + 1))).take (k + 1))), thenPops_le (Nat.zero_le _), hs, h1, h0⟩
 
 /-- **A thread that passes the zero of the first argument before the race
 adds exactly its own actions to the work of the threads before it**:

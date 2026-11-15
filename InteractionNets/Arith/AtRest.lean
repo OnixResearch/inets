@@ -21,11 +21,11 @@ local macro "ports_differ" : tactic =>
 
 local macro "under_wires" : tactic =>
   `(tactic| repeat (first | rw [wires_takeAgent] | rw [wires_putAgent] |
-      rw [assoc_wires_putLink (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))] | rw [nextSeg_putLink (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))]))
+      rw [assoc_wires_putLink (by ports_differ)] | rw [nextSeg_putLink (by ports_differ)]))
 
 local macro "under_agents" : tactic =>
-  `(tactic| repeat (first | rw [agents_putLink] | rw [assoc_takeAgent_ne (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))] |
-      rw [assoc_putAgent_ne (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))]))
+  `(tactic| repeat (first | rw [agents_putLink] | rw [assoc_takeAgent_ne (by ports_differ)] |
+      rw [assoc_putAgent_ne (by ports_differ)]))
 
 /-- **A net within a larger memory**: the segments of `X` are in `Y` with
 the tag `c` at the end of every name, and the agents and the free ports

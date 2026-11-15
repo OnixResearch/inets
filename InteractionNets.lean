@@ -3580,8 +3580,8 @@ holds up to equality rather than up to renaming.
   and the factorial are cases (`Peano.prod_rest`, `Peano.power_rest`,
   `Peano.fac_rest`, and the fair versions), on the nets `Peano.prod m n`,
   `Peano.power e b` and `Peano.facNet n`, so the chain from their rules
-  to the machine goes through the general theorems alone.  The adder is not a case of these: its result is not
-  made of new agents only.  It is a case of the next item.
+  to the machine goes through the general theorems alone.  The adder is not a case of these: its
+  result is not made of new agents only.  It is a case of the next item.
 * Expressions over any operators that compute (`Core.GExpr`).  An
   operator is data (`Peano.Op1`, `Peano.Op2`): a symbol, its function,
   its cost and the proof that alone with numerals it reduces in that
@@ -3693,6 +3693,7 @@ is, by evaluating the reducer and the validators inside the kernel.
 The runs of the program (`Comb.xgg2_exec` and the examples after
 `Arith.sum_exec`) are longer and use `decide +kernel`, which leaves the
 whole evaluation to the kernel; it adds no axiom.
+No line of the development is longer than 100 characters.
 The theorems depend only on Lean's three standard axioms `propext`,
 `Quot.sound` and `Classical.choice`; `Step.diamond` does not use the last.
 -/

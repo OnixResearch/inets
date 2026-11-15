@@ -3077,7 +3077,8 @@ theorem XMach.ends_sweeps {M : XMach S} {X : XNet S} {P Q : XThread S} {w kP kQ 
     (sP : Stays xs X P ⟨[], .idle⟩ kP) (sQ : Stays xs X Q ⟨[], .idle⟩ kQ)
     (hP : 1 ≤ kP) (hQ : 1 ≤ kQ) (hW : W = 2 * w + (kP + kQ)) : M.Ends xs W := by
   subst hW
-  have hb : ∀ (t : Nat) (T : XThread S), (⟨X, [P, Q]⟩ : XMach S).ths[t]? = some T → T ≠ ⟨[], .idle⟩ := by
+  have hb : ∀ (t : Nat) (T : XThread S), (⟨X, [P, Q]⟩ : XMach S).ths[t]? = some T → T ≠
+      ⟨[], .idle⟩ := by
     intro t T hT
     cases t with
     | zero =>

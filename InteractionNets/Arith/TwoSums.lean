@@ -21,11 +21,11 @@ local macro "ports_differ" : tactic =>
 
 local macro "under_wires" : tactic =>
   `(tactic| repeat (first | rw [wires_takeAgent] | rw [wires_putAgent] |
-      rw [assoc_wires_putLink (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))] | rw [nextSeg_putLink (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))]))
+      rw [assoc_wires_putLink (by ports_differ)] | rw [nextSeg_putLink (by ports_differ)]))
 
 local macro "under_agents" : tactic =>
-  `(tactic| repeat (first | rw [agents_putLink] | rw [assoc_takeAgent_ne (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))] |
-      rw [assoc_putAgent_ne (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))]))
+  `(tactic| repeat (first | rw [agents_putLink] | rw [assoc_takeAgent_ne (by ports_differ)] |
+      rw [assoc_putAgent_ne (by ports_differ)]))
 
 /-- **The second thread before the top successor**, second argument not
 zero: outside the race it has only read, for one action less than
@@ -35,7 +35,8 @@ theorem reader_top_succ (m n' : Nat) (hm : 2 ≤ m)
     (hw : turnAt m (n' + 1) 0 ≤ 17 * m + 6 ∨ 17 * m + 17 ≤ turnAt m (n' + 1) 0) :
     ∃ b, turnRest m (n' + 1) 0 = b + 1 ∧
       RdAt m (n' + 1) ⟨chainL (n' + 1) (m - 0) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - 0 + (0 + 1))).take (0 + 1)))), .idle⟩ b
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - 0 + (0 + 1))).take
+            (0 + 1)))), .idle⟩ b
         ⟨(chainL (n' + 1) (m - 0 + (0 + 1))).take (0 + 1), .idle⟩ := by
   obtain ⟨K, hK⟩ : ∃ K, (3 * (m - 0) + 11) / 16 = K + 1 :=
     ⟨(3 * (m - 0) + 11) / 16 - 1, by omega⟩
@@ -52,17 +53,20 @@ theorem reader_top_succ (m n' : Nat) (hm : 2 ≤ m)
         (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self)))
   have tail : ∀ a, 17 * 0 + 1 ≤ a →
       RdAt m (n' + 1) ⟨chainL (n' + 1) (m - 0) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - 0 + (0 + 1))).take (0 + 1)))), .idle⟩ a
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - 0 + (0 + 1))).take
+            (0 + 1)))), .idle⟩ a
         ⟨([3], .zero) :: (chainL (n' + 1) (m - 0 + (0 + 1))).take (0 + 1), .idle⟩ →
       RdAt m (n' + 1) ⟨chainL (n' + 1) (m - 0) ++ (([n' + 1 + 3], .succ) :: (sndL n' ++
-        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - 0 + (0 + 1))).take (0 + 1)))), .idle⟩ (a + 3)
+        (([1], .add) :: ([2], .zero) :: ([3], .zero) :: (chainL (n' + 1) (m - 0 + (0 + 1))).take
+            (0 + 1)))), .idle⟩ (a + 3)
         ⟨(chainL (n' + 1) (m - 0 + (0 + 1))).take (0 + 1), .idle⟩ := fun a _ h =>
     h.pass3 (solo_snd_forever m (n' + 1) (j := 3) (by omega) (by omega) hx3 _)
       (solo_look_snd m (n' + 1) (j := 3) (by omega) (by omega) _).1
       (show ¬ (1 : Nat) = 0 by decide)
       (solo_look_snd m (n' + 1) (j := 3) (by omega) (by omega) _).2
   by_cases h1 : 3 * (m - 0) + 3 * n' + 5 + K ≤ 17 * m + 6
-  · have hal := solo_alive_zero m (n' + 1) (j := 2) (u := 3 * (m - 0) + 3 * n' + 5 + K + 1) (by omega) (by omega)
+  · have hal := solo_alive_zero m (n' + 1) (j := 2) (u := 3 * (m - 0) + 3 * n' + 5 + K + 1)
+        (by omega) (by omega)
       (by omega) (sum_zero_agent m (n' + 1))
     have r1 := r0.pass3 hal (solo_look_two m (n' + 1) _) (show ¬ (1 : Nat) = 0 by decide)
       ((solo_seek_two m (n' + 1) (by omega) _).2 (by omega))
@@ -72,13 +76,15 @@ theorem reader_top_succ (m n' : Nat) (hm : 2 ≤ m)
       exact ite_pos' h1
     exact ⟨3 * (m - 0) + 3 * n' + 5 + K + 3 + 3, by omega, tail _ (by omega) r1⟩
   · by_cases h2 : 3 * (m - 0) + 3 * n' + 5 + K ≤ 17 * m + 20
-    · have hal := solo_alive_zero m (n' + 1) (j := 2) (u := 3 * (m - 0) + 3 * n' + 5 + K + 1) (by omega) (by omega)
+    · have hal := solo_alive_zero m (n' + 1) (j := 2) (u := 3 * (m - 0) + 3 * n' + 5 + K + 1)
+          (by omega) (by omega)
         (by omega) (sum_zero_agent m (n' + 1))
       have s1 := r0.step (XMach.act_idle_pos (e := ([2], Arith.zero)) hal)
       have s2 := s1.step (XMach.act_look (solo_look_two m (n' + 1) _))
       have s3 := s2.step (XMach.act_seek_next (seek_aux_none _ _ 1 (by decide))
         ((solo_seek_two m (n' + 1) (by omega) _).1 (by omega)))
-      have hg := solo_gone_adder m (n' + 1) (u := 3 * (m - 0) + 3 * n' + 5 + K + 1 + 1 + 1 + 1) (by omega)
+      have hg := solo_gone_adder m (n' + 1) (u := 3 * (m - 0) + 3 * n' + 5 + K + 1 + 1 + 1 + 1)
+          (by omega)
       have s4 := s3.step (XMach.act_seek_stop ((ite_pos' rfl).trans hg)
         (solo_stop_adder m (n' + 1) (by omega) _))
       have ez : zeroCost m (turnAt m (n' + 1) 0) = 4 := by

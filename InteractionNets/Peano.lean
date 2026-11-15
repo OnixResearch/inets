@@ -60,7 +60,7 @@ def mulSucc : RuleData Peano :=
       (.new (some false) 0 1, .new (some false) 1 0),   -- first copy — first argument of `add`
       (.new (some false) 0 2, .new (some true) 0 1),    -- second copy — second argument of `mul`
       (.ifc true 0, .new (some true) 0 0),              -- `x` — first argument of `mul`
-      (.new (some true) 0 2, .new (some false) 1 1),    -- result of `mul` — second argument of `add`
+      (.new (some true) 0 2, .new (some false) 1 1), -- result of `mul` — 2nd argument of `add`
       (.new (some false) 1 2, .ifc false 1)]            -- result of `add` — result
 
 /-- A copy of `0` is two zeros. -/
@@ -102,7 +102,7 @@ def powSucc : RuleData Peano :=
       (.new (some false) 0 1, .new (some false) 1 0),   -- first copy — first argument of `mul`
       (.new (some false) 0 2, .new (some true) 0 1),    -- second copy — base of `pow`
       (.ifc true 0, .new (some true) 0 0),              -- `x` — exponent of `pow`
-      (.new (some true) 0 2, .new (some false) 1 1),    -- result of `pow` — second argument of `mul`
+      (.new (some true) 0 2, .new (some false) 1 1), -- result of `pow` — 2nd argument of `mul`
       (.new (some false) 1 2, .ifc false 1)]            -- result of `mul` — result
 
 /-- `0! = 1`: a new `succ` on a new `zero` on the result. -/

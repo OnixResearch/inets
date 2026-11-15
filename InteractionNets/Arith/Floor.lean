@@ -21,11 +21,11 @@ local macro "ports_differ" : tactic =>
 
 local macro "under_wires" : tactic =>
   `(tactic| repeat (first | rw [wires_takeAgent] | rw [wires_putAgent] |
-      rw [assoc_wires_putLink (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))] | rw [nextSeg_putLink (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))]))
+      rw [assoc_wires_putLink (by ports_differ)] | rw [nextSeg_putLink (by ports_differ)]))
 
 local macro "under_agents" : tactic =>
-  `(tactic| repeat (first | rw [agents_putLink] | rw [assoc_takeAgent_ne (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))] |
-      rw [assoc_putAgent_ne (by first | (intro e; simp at e; done) | (intro e; simp at e; omega))]))
+  `(tactic| repeat (first | rw [agents_putLink] | rw [assoc_takeAgent_ne (by ports_differ)] |
+      rw [assoc_putAgent_ne (by ports_differ)]))
 
 /-- One for a successor. -/
 def isSucc (α : Arith) : Nat := if α = Arith.succ then 1 else 0
@@ -1440,7 +1440,8 @@ theorem act_cost3 {N : Nat → Nat} {K : Nat} (B : Nat) {X : XNet Arith} {T : XT
         rw [XMach.act_seek_stop (xs := xsys) (todo := todo) (a := a) (α := α) hc hn]
         show 15 * 0 + 0 + 8 * (adders X.agents + 0) + 0 + min todo.length B +
             (2 * min (sndCnt N todo) K + walk N (.seek a α p q)) ≤
-          1 + 0 + 1 + 8 * (adders X.agents + 0) + min todo.length B + (2 * min (sndCnt N todo) K + 0)
+          1 + 0 + 1 + 8 * (adders X.agents + 0) + min todo.length B +
+              (2 * min (sndCnt N todo) K + 0)
         have w := walk_le_two N (.seek a α p q)
         omega
       | some q' =>
@@ -1460,12 +1461,14 @@ theorem act_cost3 {N : Nat → Nat} {K : Nat} (B : Nat) {X : XNet Arith} {T : XT
         rw [XMach.act_seek_found (xs := xsys) (todo := todo) (p := p) hc hr]
         show 15 * 0 + 2 + 8 * (adders X.agents + 0) + 0 + min todo.length B +
             (2 * min (sndCnt N todo) K + walk N (.seek a α p q)) ≤
-          1 + 0 + 1 + 8 * (adders X.agents + 0) + min todo.length B + (2 * min (sndCnt N todo) K + 0)
+          1 + 0 + 1 + 8 * (adders X.agents + 0) + min todo.length B +
+              (2 * min (sndCnt N todo) K + 0)
         omega
       · rw [XMach.act_seek_norule (xs := xsys) (todo := todo) (p := p) hc hr]
         show 15 * 0 + 0 + 8 * (adders X.agents + 0) + 0 + min todo.length B +
             (2 * min (sndCnt N todo) K + walk N (.seek a α p q)) ≤
-          1 + 0 + 1 + 8 * (adders X.agents + 0) + min todo.length B + (2 * min (sndCnt N todo) K + 0)
+          1 + 0 + 1 + 8 * (adders X.agents + 0) + min todo.length B +
+              (2 * min (sndCnt N todo) K + 0)
         have w := walk_le_two N (.seek a α p q)
         omega
   | ready a b α β =>
@@ -1477,7 +1480,8 @@ theorem act_cost3 {N : Nat → Nat} {K : Nat} (B : Nat) {X : XNet Arith} {T : XT
         1 + 0 + 2 + 8 * (adders X.agents + 0) + min todo.length B + (2 * min (sndCnt N todo) K + 0)
       omega
     · rw [XMach.act_ready_neg (xs := xsys) (todo := todo) (b := b) (β := β) ha]
-      show 15 * 0 + 0 + 8 * (adders X.agents + 0) + 0 + min todo.length B + (2 * min (sndCnt N todo) K + 0) ≤
+      show 15 * 0 + 0 + 8 * (adders X.agents + 0) + 0 + min todo.length B +
+          (2 * min (sndCnt N todo) K + 0) ≤
         1 + 0 + 2 + 8 * (adders X.agents + 0) + min todo.length B + (2 * min (sndCnt N todo) K + 0)
       omega
   | half a b α β =>
@@ -1485,8 +1489,10 @@ theorem act_cost3 {N : Nat → Nat} {K : Nat} (B : Nat) {X : XNet Arith} {T : XT
     · cases hR : xsys.rule α β with
       | none =>
         rw [XMach.act_half_none (xs := xsys) (todo := todo) ((ite_pos' hc).trans hR)]
-        show 15 * 0 + 0 + 8 * (isAdd α + adders X.agents + 0) + 0 + min todo.length B + (2 * min (sndCnt N todo) K + 0) ≤
-          1 + 0 + 3 + 8 * (adders X.agents + isAdd α) + min todo.length B + (2 * min (sndCnt N todo) K + 0)
+        show 15 * 0 + 0 + 8 * (isAdd α + adders X.agents + 0) + 0 + min todo.length B +
+            (2 * min (sndCnt N todo) K + 0) ≤
+          1 + 0 + 3 + 8 * (adders X.agents + isAdd α) + min todo.length B +
+              (2 * min (sndCnt N todo) K + 0)
         omega
       | some R =>
         rw [XMach.act_half (xs := xsys) (todo := todo) ((ite_pos' hc).trans hR)]
@@ -1498,8 +1504,10 @@ theorem act_cost3 {N : Nat → Nat} {K : Nat} (B : Nat) {X : XNet Arith} {T : XT
             8 * (adders X.agents + isAdd α) + min todo.length B + (2 * min (sndCnt N todo) K + 0)
         omega
     · rw [XMach.act_half_none (xs := xsys) (todo := todo) (ite_neg' hc)]
-      show 15 * 0 + 0 + 8 * (isAdd α + adders X.agents + 0) + 0 + min todo.length B + (2 * min (sndCnt N todo) K + 0) ≤
-        1 + 0 + 3 + 8 * (adders X.agents + isAdd α) + min todo.length B + (2 * min (sndCnt N todo) K + 0)
+      show 15 * 0 + 0 + 8 * (isAdd α + adders X.agents + 0) + 0 + min todo.length B +
+          (2 * min (sndCnt N todo) K + 0) ≤
+        1 + 0 + 3 + 8 * (adders X.agents + isAdd α) + min todo.length B +
+            (2 * min (sndCnt N todo) K + 0)
       omega
   | write as ls =>
     cases as with
@@ -1516,10 +1524,12 @@ theorem act_cost3 {N : Nat → Nat} {K : Nat} (B : Nat) {X : XNet Arith} {T : XT
         obtain ⟨p, q⟩ := e
         show 15 * 0 + 0 + 8 * (adders X.agents + 0) + (0 + (ls.length + 1) + 1) +
             min todo.length B + (2 * min (sndCnt N todo) K + 0) ≤
-          1 + (0 + ls.length + 1) + 0 + 8 * (adders X.agents + 0) + min todo.length B + (2 * min (sndCnt N todo) K + 0)
+          1 + (0 + ls.length + 1) + 0 + 8 * (adders X.agents + 0) + min todo.length B +
+              (2 * min (sndCnt N todo) K + 0)
         omega
       | nil =>
-        show 15 * 0 + 0 + 8 * (adders X.agents + 0) + (0 + 0 + 1) + min todo.length B + (2 * min (sndCnt N todo) K + 0) ≤
+        show 15 * 0 + 0 + 8 * (adders X.agents + 0) + (0 + 0 + 1) + min todo.length B +
+            (2 * min (sndCnt N todo) K + 0) ≤
           1 + 0 + 0 + 8 * (adders X.agents + 0) + min X.agents.length B +
             (2 * min (sndCnt N X.agents) K + 0)
         omega

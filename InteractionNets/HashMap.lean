@@ -215,7 +215,8 @@ theorem HNet.nbhd_toNet {ar : S → Nat} {H : HNet S} {a b : Id} {α β : S}
           rw [← e']
           exact he
         obtain ⟨hA, hw⟩ := HNet.mem_nearWires.1 he'
-        exact ⟨hm.symm hw, hA.elim (fun h => .inr (.inr (.inl h.1))) (fun h => .inr (.inr (.inr h.1)))⟩
+        exact ⟨hm.symm hw, hA.elim (fun h => .inr (.inr (.inl h.1)))
+            (fun h => .inr (.inr (.inr h.1)))⟩
     · rintro ⟨hl, ho⟩
       rcases ho with e | e | e | e
       · exact .inl (HNet.mem_nearWires.2 ⟨.inl ⟨e, ka hl e⟩, hl⟩)
@@ -766,7 +767,8 @@ theorem Net.reach_nbhd_of_fire (hR : R.WF ar α β) {e x : Port} (he : e.1 = a �
       · exact .inr ⟨x, hE, ih⟩
       · have hon := Net.on_of_reach_nbhd hR he ih hE
         rcases hl with hl | hl
-        · exact .inl (.tail ih (.inl ⟨hl, hon.elim (fun h => Or.inl h) (fun h => Or.inr (Or.inl h))⟩))
+        · exact .inl (.tail ih (.inl ⟨hl, hon.elim (fun h => Or.inl h)
+              (fun h => Or.inr (Or.inl h))⟩))
         · exact .inl (.tail ih (.inr hl))
     · exact .inr ih
 

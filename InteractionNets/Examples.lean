@@ -631,10 +631,12 @@ theorem ggOut_conn :
   have j₁ : ∀ k, ¬ ggOut.End ar ([1], k) := site.not_end_fire_sel true
   refine ⟨⟨([0], 1), ([1], 2), ?_⟩, ⟨([0], 2), ([1], 1), ?_⟩⟩
   · refine .cons (.inl rfl) (j₀ 1) (w := ([1], 2)) (by decide) ?_
-    refine .cons (.inr ⟨.ifc false 0, .ifc true 1, rfl, rfl, rfl⟩) (j₁ 2) (w := ([5], 0)) (by decide) ?_
+    refine .cons (.inr ⟨.ifc false 0, .ifc true 1, rfl, rfl, rfl⟩) (j₁ 2) (w := ([5], 0))
+        (by decide) ?_
     exact .single (.inl rfl)
   · refine .cons (.inl rfl) (j₀ 2) (w := ([1], 1)) (by decide) ?_
-    refine .cons (.inr ⟨.ifc false 1, .ifc true 0, rfl, rfl, rfl⟩) (j₁ 1) (w := ([4], 0)) (by decide) ?_
+    refine .cons (.inr ⟨.ifc false 1, .ifc true 0, rfl, rfl, rfl⟩) (j₁ 1) (w := ([4], 0))
+        (by decide) ?_
     exact .single (.inl rfl)
 
 /-- The compact form of the result consists of exactly those two wires: the
@@ -969,7 +971,8 @@ theorem xloop_dead : (xloop.toNet.fire [0] [1] (rAnn true)).DeadCount ar 3 := by
     obtain ⟨e, he, rfl⟩ := hall p hp
     exact ⟨⟨e.2, .inl he⟩, fun q _ => hnoend q⟩
   · have hne : ∀ p ∈ ([([0], 0), ([0], 1), ([0], 2)] : List Port),
-        ∀ q ∈ ([([0], 0), ([0], 1), ([0], 2)] : List Port), loopColour p = loopColour q → p = q := by
+        ∀ q ∈ ([([0], 0), ([0], 1), ([0], 2)] : List Port),
+            loopColour p = loopColour q → p = q := by
       decide
     have hnd : ([([0], 0), ([0], 1), ([0], 2)] : List Port).Pairwise (· ≠ ·) := by decide
     exact hnd.imp_of_mem fun hp hq hpq hr => hpq (hne _ hp _ hq (hreach hr))

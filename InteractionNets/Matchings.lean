@@ -736,7 +736,8 @@ theorem XNet.runLoops_spec {xs : XSys S} :
           have rN : Redex xs.sys N a b α β R.toRhs := (Net.compact_obs xs.sys.ar N).symm.redex rC
           have site := rN.site hN
           have hRwf := xs.sys.rule_wf rN.rule
-          have hc₁ : (N.fire a b R.toRhs).compact xs.sys.ar = (X.fire xs.sys.ar a b α β R).toNet := by
+          have hc₁ : (N.fire a b R.toRhs).compact xs.sys.ar =
+              (X.fire xs.sys.ar a b α β R).toNet := by
             rw [site.compact_fire hRwf, hc, XNet.fire_toNet hX r hR]
           have hA : AuxCount xs.sys.ar ((N.compact xs.sys.ar).fire a b R.toRhs) a b α β ℓ := by
             rw [hc]
