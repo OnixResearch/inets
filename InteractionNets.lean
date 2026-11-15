@@ -56,6 +56,7 @@ import InteractionNets.PeanoProd
 import InteractionNets.PeanoPow
 import InteractionNets.PeanoFact
 import InteractionNets.PeanoRec
+import InteractionNets.PeanoRun
 import InteractionNets.Union
 import InteractionNets.UnionExamples
 import InteractionNets.PeanoExpr
@@ -2053,6 +2054,13 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              the power and the factorial follow, with
                              the same costs; a new agent, the lazy
                              caterer, proved by the theorem alone
+* `INet.Peano.unary_rest`, `INet.Peano.unary_fair`, `INet.Peano.binary_rest`,
+  `INet.Peano.binary_fair`, `INet.Peano.cater_rest`, `INet.Peano.cater_fair`
+                             the machine, proved once for every agent
+                             that computes, of one or two arguments: a
+                             run at rest has made exactly the counted
+                             interactions and holds the value; a fair
+                             run comes to rest
 * `INet.Peano.PExpr.rest`, `INet.Peano.PExpr.fair`, `INet.Peano.PExpr.good`,
   `INet.Peano.add_evals`, `INet.Peano.mul_evals`, `INet.Peano.system_sided`
                              every expression built from numerals with
@@ -3471,8 +3479,20 @@ holds up to equality rather than up to renaming.
   (`Peano.caterSucc`), which is the template on the predecessor with the
   adder.  It computes `c n = n (n + 1) / 2 + 1` (`Peano.cater_computes`,
   `Peano.two_mul_cate`) by the theorem on recursion alone, and the
-  reducer stops on `c 3` with `7` after `caterCost 3 = 20` steps.  Its
-  theorems for the machine are not proved.
+  reducer stops on `c 3` with `7` after `caterCost 3 = 20` steps.
+* The theorems for the machine are proved once for every agent that
+  computes (`PeanoRun`).  For an agent of one argument, on the net
+  `Peano.unaryNet op n`, and of two, on `Peano.binaryNet op m n`: with
+  any number of threads and any schedule, a run at rest has made exactly
+  `c n` (or `c m n`) interactions and holds the numeral of the value
+  (`Peano.unary_rest`, `Peano.binary_rest`), and a fair run comes to rest
+  (`Peano.unary_fair`, `Peano.binary_fair`).  The multiplier, the power,
+  the factorial and the lazy caterer are cases (`Peano.prod_rest'`,
+  `Peano.power_rest'`, `Peano.fac_rest'`, `Peano.cater_rest`, and the
+  fair versions), through the theorems derived from recursion, so for
+  them the chain from the rules to the machine goes through the general
+  theorems alone.  The adder is not a case: its result is not made of
+  new agents only.
 * Expressions built from numerals with `+`, `*` and `^` (`Peano.PExpr`)
   have nets (`PExpr.net`): the nets of the two arguments and an adder, a
   multiplier or a power that waits, side by side under the tags `0`,
