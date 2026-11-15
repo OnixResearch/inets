@@ -15,15 +15,17 @@ principal wires ran into the fired pair may come to face each other.  After
 a claim of such a rule (one that *joins*) the thread takes a fresh copy of
 the list of agents, as `XMach` does after every claim.
 
-A thread writes the segments that reach the principal port of a new agent
-last (`XRhs.orderedLinks`): until then no new agent can be taken, so another
-thread that finds a segment missing finds it at a new agent that is still
-there.  The program only reads memory where `XMach` does and writes the
+A thread writes the segments of a right-hand side before its agents
+(`Mach` lets the two lists be written in any order): while a segment is
+missing, none of the new agents is in memory, so none can be taken, and a
+thread that finds the segment missing has found a new agent still to be
+written.  The program only reads memory where `XMach` does and writes the
 same right-hand side, so it is still an execution of the machine `Mach`
 (`WMach.act_sim`, `WMach.exec_run`), and the evaluable test of
 `XMach.exec_agrees` carries over (`WMach.exec_agrees`).  That every active
 pair a firing makes is an old one or has a new agent in it, when the rule
-joins no interface ports, is `Redex.of_fire`.
+joins no interface ports, is `Redex.of_fire`; with it `WorkLive.lean` shows
+that the threads never all rest before the normal form.
 
 What it buys, measured by evaluation with one thread (actions until rest):
 
@@ -67,29 +69,6 @@ def XRhs.joins (R : XRhs S) (ar : S → Nat) (α β : S) : Bool :=
 
 variable [DecidableEq S]
 
-/-- The segment reaches the principal port of one of the agents listed. -/
-def reachesPrincipal (ids : List Id) (e : Port × Port) : Bool :=
-  (e.1.2 == 0 && ids.contains e.1.1) || (e.2.2 == 0 && ids.contains e.2.1)
-
-/-- The segments to write when `a` and `b` fire, those that reach the
-principal port of a new agent last.  Until the last of them is written no
-new agent can be taken, so a segment still to be written always has a new
-agent that is still there at one of its ends. -/
-def XRhs.orderedLinks (R : XRhs S) (ar : S → Nat) (a b : Id) (α β : S) : List (Port × Port) :=
-  (R.newLinks ar a b α β).filter (fun e => !reachesPrincipal ((R.newAgents a b).map Prod.fst) e) ++
-    (R.newLinks ar a b α β).filter (reachesPrincipal ((R.newAgents a b).map Prod.fst))
-
-omit [DecidableEq S] in
-theorem mem_filter_not_append {A : Type} (f : A → Bool) (l : List A) (x : A) :
-    x ∈ l.filter (fun e => !f e) ++ l.filter f ↔ x ∈ l := by
-  rw [List.mem_append, List.mem_filter, List.mem_filter]
-  cases f x <;> simp
-
-omit [DecidableEq S] in
-theorem XRhs.mem_orderedLinks (R : XRhs S) (ar : S → Nat) (a b : Id) (α β : S) (e : Port × Port) :
-    e ∈ R.orderedLinks ar a b α β ↔ e ∈ R.newLinks ar a b α β :=
-  mem_filter_not_append _ _ _
-
 /-- One action of a thread on the memory `X`: the new memory, the new
 thread, and `1` if the action completed a claim. -/
 def WMach.act (xs : XSys S) (X : XNet S) (T : WThread S) : XNet S × WThread S × Nat :=
@@ -98,9 +77,11 @@ def WMach.act (xs : XSys S) (X : XNet S) (T : WThread S) : XNet S × WThread S �
     match (if assoc b X.agents = some β ∧ a ≠ b then xs.rule α β else none) with
     | some R =>
       (X.takeAgent b, ⟨R.newAgents a b ++ T.todo,
-        .write (R.newAgents a b) (R.orderedLinks xs.sys.ar a b α β),
+        .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β),
         T.again || R.joins xs.sys.ar α β⟩, 1)
     | none => (X.putAgent a α, ⟨T.todo, .idle, T.again⟩, 0)
+  | .write as ((p, q) :: ls) => (X.putLink p q, ⟨T.todo, .write as ls, T.again⟩, 0)
+  | .write ((i, γ) :: as) [] => (X.putAgent i γ, ⟨T.todo, .write as [], T.again⟩, 0)
   | .write [] [] =>
     if T.again then (X, ⟨X.agents, .idle, false⟩, 0) else (X, ⟨T.todo, .idle, false⟩, 0)
   | _ =>
@@ -108,30 +89,43 @@ def WMach.act (xs : XSys S) (X : XNet S) (T : WThread S) : XNet S × WThread S �
       ⟨(XMach.act xs X T.toX).2.1.todo, (XMach.act xs X T.toX).2.1.st, T.again⟩,
       (XMach.act xs X T.toX).2.2)
 
-/-- Away from a claim, an action of the program does to the memory and to
+/-- Away from writing, an action of the program does to the memory and to
 the state of the thread what an action of `XMach` does. -/
 theorem WMach.act_agree (xs : XSys S) (X : XNet S) (T : WThread S)
-    (hT : ∀ a b α β, T.st ≠ .half a b α β) :
-    (WMach.act xs X T).1 = (XMach.act xs X T.toX).1 ∧
-      (WMach.act xs X T).2.1.st = (XMach.act xs X T.toX).2.1.st ∧
-      (WMach.act xs X T).2.2 = (XMach.act xs X T.toX).2.2 := by
+    (hT : ∀ as ls, T.st ≠ .write as ls) :
+    WMach.act xs X T = ((XMach.act xs X T.toX).1,
+      ⟨(XMach.act xs X T.toX).2.1.todo, (XMach.act xs X T.toX).2.1.st, T.again⟩,
+      (XMach.act xs X T.toX).2.2) ∨
+    ∃ a b α β R, T.st = .half a b α β ∧
+      (if assoc b X.agents = some β ∧ a ≠ b then xs.rule α β else none) = some R ∧
+      WMach.act xs X T = (X.takeAgent b, ⟨R.newAgents a b ++ T.todo,
+        .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β),
+        T.again || R.joins xs.sys.ar α β⟩, 1) ∧
+      XMach.act xs X T.toX = (X.takeAgent b,
+        ⟨T.todo, .write (R.newAgents a b) (R.newLinks xs.sys.ar a b α β)⟩, 1) := by
   obtain ⟨todo, st, again⟩ := T
   cases st with
-  | idle => exact ⟨rfl, rfl, rfl⟩
-  | look a α => exact ⟨rfl, rfl, rfl⟩
-  | seek a α p c => exact ⟨rfl, rfl, rfl⟩
-  | ready a b α β => exact ⟨rfl, rfl, rfl⟩
-  | half a b α β => exact absurd rfl (hT a b α β)
-  | write as ls =>
-    cases as with
-    | cons e as => exact ⟨rfl, rfl, rfl⟩
-    | nil =>
-      cases ls with
-      | cons e ls => exact ⟨rfl, rfl, rfl⟩
-      | nil =>
-        unfold WMach.act
+  | idle => exact .inl rfl
+  | look a α => exact .inl rfl
+  | seek a α p c => exact .inl rfl
+  | ready a b α β => exact .inl rfl
+  | half a b α β =>
+    cases h : (if assoc b X.agents = some β ∧ a ≠ b then xs.rule α β else none) with
+    | some R =>
+      refine .inr ⟨a, b, α, β, R, rfl, h, ?_, ?_⟩
+      · unfold WMach.act
         dsimp only
-        split <;> exact ⟨rfl, rfl, rfl⟩
+        rw [h]
+      · unfold XMach.act
+        dsimp only [WThread.toX]
+        rw [h]
+    | none =>
+      refine .inl ?_
+      unfold WMach.act XMach.act
+      dsimp only [WThread.toX]
+      rw [h]
+      rfl
+  | write as ls => exact absurd rfl (hT as ls)
 
 /-- **An action of the program is an action of the machine**, or changes
 neither the memory nor the state of the thread. -/
@@ -141,37 +135,46 @@ theorem WMach.act_sim (xs : XSys S) (X : XNet S) (T : WThread S) (th : Nat → T
         (WMach.act xs X T).2.2 = 0) ∨
       MStep xs.sys (WMach.act xs X T).2.2 ⟨X.toNet, th⟩
         ⟨(WMach.act xs X T).1.toNet, upd th t (WMach.act xs X T).2.1.st⟩ := by
-  by_cases hT : ∀ a b α β, T.st ≠ .half a b α β
-  · obtain ⟨e₁, e₂, e₃⟩ := WMach.act_agree xs X T hT
-    rw [e₁, e₂, e₃]
-    exact XMach.act_sim xs X T.toX th t hs
-  · obtain ⟨a, b, α, β, hh⟩ : ∃ a b α β, T.st = .half a b α β := by
+  by_cases hT : ∀ as ls, T.st ≠ .write as ls
+  · rcases WMach.act_agree xs X T hT with e | ⟨a, b, α, β, R, -, -, e, ex⟩
+    · rw [e]
+      exact XMach.act_sim xs X T.toX th t hs
+    · have h := XMach.act_sim xs X T.toX th t hs
+      rw [ex] at h
+      rw [e]
+      rcases h with ⟨-, -, h⟩ | h
+      · cases h
+      · exact .inr h
+  · obtain ⟨as, ls, hw⟩ : ∃ as ls, T.st = .write as ls := by
       apply Classical.byContradiction
       intro hn
-      exact hT fun a b α β e => hn ⟨a, b, α, β, e⟩
+      exact hT fun as ls e => hn ⟨as, ls, e⟩
     obtain ⟨todo, st, again⟩ := T
-    dsimp only at hh
-    subst hh
-    have hs' : th t = .half a b α β := hs
-    unfold WMach.act
-    dsimp only
-    split
-    · rename_i R hR
-      split at hR
-      · rename_i hc
-        obtain ⟨hsys, hw⟩ := xs.writes hc.2 hR
-        have hw' : Writes a b R.toRhs (R.newAgents a b) (R.orderedLinks xs.sys.ar a b α β) :=
-          ⟨hw.agent, hw.nodup, fun {p q} => (R.mem_orderedLinks _ a b α β (p, q)).trans hw.link⟩
-        refine .inr ?_
-        show MStep xs.sys 1 ⟨X.toNet, th⟩ ⟨(X.takeAgent b).toNet,
-          upd th t (.write (R.newAgents a b) (R.orderedLinks xs.sys.ar a b α β))⟩
-        rw [XNet.takeAgent_toNet]
-        exact .cas₂ (M := ⟨X.toNet, th⟩) hs' (assoc_mem hc.1) hc.2 hsys hw'
-      · cases hR
-    · refine .inr ?_
-      show MStep xs.sys 0 ⟨X.toNet, th⟩ ⟨(X.putAgent a α).toNet, upd th t .idle⟩
-      rw [XNet.putAgent_toNet]
-      exact .undo (M := ⟨X.toNet, th⟩) hs'
+    dsimp only at hw
+    subst hw
+    refine .inr ?_
+    cases ls with
+    | cons e ls =>
+      obtain ⟨p, q⟩ := e
+      have hs' : th t = .write as ((p, q) :: ls) := hs
+      show MStep xs.sys 0 ⟨X.toNet, th⟩ ⟨(X.putLink p q).toNet, upd th t (.write as ls)⟩
+      rw [XNet.putLink_toNet]
+      exact .link (M := ⟨X.toNet, th⟩) hs'
+    | nil =>
+      cases as with
+      | cons e as =>
+        obtain ⟨i, γ⟩ := e
+        have hs' : th t = .write ((i, γ) :: as) [] := hs
+        show MStep xs.sys 0 ⟨X.toNet, th⟩ ⟨(X.putAgent i γ).toNet, upd th t (.write as [])⟩
+        rw [XNet.putAgent_toNet]
+        exact .agent (M := ⟨X.toNet, th⟩) hs'
+      | nil =>
+        have hs' : th t = .write [] [] := hs
+        unfold WMach.act
+        dsimp only
+        split
+        · exact .done (M := ⟨X.toNet, th⟩) hs'
+        · exact .done (M := ⟨X.toNet, th⟩) hs'
 
 omit [DecidableEq S] in
 theorem threadOf_map_eq {ths : List (WThread S)} {t : Nat} {T : WThread S}

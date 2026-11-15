@@ -67,6 +67,7 @@ import InteractionNets.RoundRobin
 import InteractionNets.Extra
 import InteractionNets.Arith.Bound
 import InteractionNets.WorkList
+import InteractionNets.WorkLive
 import InteractionNets.Peano.WorkList
 import InteractionNets.Union
 import InteractionNets.UnionExamples
@@ -3295,8 +3296,13 @@ holds up to equality rather than up to renaming.
   front of it, and takes a fresh list only after a rule that wires two
   of its interface ports together; it takes 103, 203 and 403.  It is an
   execution of the machine like `XMach` (`WMach.exec_run`), with the same
-  evaluable test (`WMach.exec_agrees`); its completeness and bound are
-  not yet proved.
+  evaluable test (`WMach.exec_agrees`), and its threads never all rest
+  before the normal form (`WMach.exec_rest`): a writer that does not
+  rescan has the agents it writes in its list, every active pair its
+  claim makes has one of them in it (`Redex.of_fire`), and it writes its
+  segments before its agents, so a thread that finds a segment missing
+  has found one of them.  That fair runs come to rest, and in how many
+  actions, is not yet proved for it.
   Tags are one way to keep the names of nets apart, and they are what
   asks for rules with sides.  Without them, two nets can be put side by
   side as they are (`Net.union`) when no name of one, with any numbers
