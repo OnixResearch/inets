@@ -3545,6 +3545,11 @@ holds up to equality rather than up to renaming.
   combinators have `J = 2` (`Comb.rests_multi`); on chains of annihilating
   pairs (`CombChain`) the bound is 54 to 66 times the actions measured, 24
   to 29 with `K` the size of the normal form.
+  The `n log n` comes from the representation, not from interaction nets:
+  firing leaves the ports of the agents fired as points of the wires, and a
+  walk crosses them, as a union by size would.  The reducer on hash maps,
+  which joins wires directly, takes a bounded number of operations per step
+  (`HNet.runC_cost`): linear, as the theory promises.
   These bounds are for one thread, and they do not carry over to several:
   under one schedule that lets claims run ahead of walks (`jAdversary`, a
   measuring program), the walks grow with the number of threads, more than
@@ -3564,8 +3569,9 @@ holds up to equality rather than up to renaming.
   most `nt (7 |agents| + K) + n (C + D + 1 + 9 J) + 7 C n + K +
   J (4 K log (K + 1) + 6 K)` (`JMach.worked_cs`, `JMach.worked_csSched`):
   each thread scans every agent once, then claims and walks cost what they
-  cost with one thread.  The turns given to threads at rest are not
-  counted; on
+  cost with one thread.  On that schedule a window of `nt` turns with no
+  action at work leaves every thread at rest, so all are at rest after `nt`
+  times that bound, plus `nt` (`JMach.rests_csSched`).  On
   `joinChain` (in order and bit-reversed, 1 to 256 threads) the walks
   measured cost exactly what they cost with one thread.
   Both programs run expressions in any system with the core, with a

@@ -541,4 +541,174 @@ theorem JMach.worked_csSched {J : Nat} (hJ : xs.JoinsAtMost J) {X : XNet S}
     cases hU
     rfl
 
+/-! ## All threads at rest -/
+
+theorem JMach.worked_mono (xs : XSys S) (σ : Nat → Nat) (M : JMach S) {j : Nat} :
+    ∀ d, JMach.worked xs σ M j ≤ JMach.worked xs σ M (j + d)
+  | 0 => Nat.le_refl _
+  | d + 1 => Nat.le_trans (JMach.worked_mono xs σ M d) (Nat.le_add_right _ _)
+
+theorem JMach.atRest_stays (xs : XSys S) (σ : Nat → Nat) (M : JMach S) {j u : Nat}
+    (h : (M.trace xs σ j).1.AtRest u) : ∀ d, (M.trace xs σ (j + d)).1.AtRest u
+  | 0 => h
+  | d + 1 => by
+    obtain ⟨g, js, wk, h'⟩ := JMach.atRest_stays xs σ M h d
+    exact ⟨g, js, wk, JMach.step_rest _ _ h'⟩
+
+omit [DecidableEq S] in
+theorem JMach.busyAct_zero {M : JMach S} {t : Nat} {T : JThread S} (ht : M.ths[t]? = some T)
+    (h : M.busyAct t = 0) : M.AtRest t := by
+  unfold JMach.busyAct at h
+  rw [ht] at h
+  obtain ⟨todo, st, g, js, wk⟩ := T
+  dsimp only at h
+  cases hto : todo with
+  | cons _ _ => rw [hto] at h; simp at h
+  | nil =>
+    cases st with
+    | idle => subst hto; exact ⟨g, js, wk, ht⟩
+    | _ => rw [hto] at h; simp [TState.isIdle] at h
+
+omit [DecidableEq S] in
+theorem JMach.busyAct_critical {M : JMach S} {t : Nat} {T : JThread S}
+    (ht : M.ths[t]? = some T) (hc : T.critical = true) : M.busyAct t = 1 := by
+  unfold JMach.busyAct
+  rw [ht]
+  obtain ⟨todo, st, g, js, wk⟩ := T
+  unfold JThread.critical at hc
+  dsimp only at hc ⊢
+  cases st <;> simp_all [TState.isIdle]
+
+/-- **On the schedule `csSched`, a window of `nt` actions none of which is
+at work leaves every thread at rest.** -/
+theorem JMach.csSched_window {X : XNet S} {nt : Nat} (hnt : 0 < nt) {j : Nat}
+    (h : ∀ m, j ≤ m → m < j + nt →
+      JMach.busyAct ((JMach.init X nt).trace xs (JMach.csSched xs (JMach.init X nt) nt) m).1
+        (JMach.csSched xs (JMach.init X nt) nt m) = 0) :
+    ∀ u, u < nt →
+      ((JMach.init X nt).trace xs (JMach.csSched xs (JMach.init X nt) nt)
+        (j + nt)).1.AtRest u := by
+  intro u hu
+  have hlen : ∀ m, ((JMach.init X nt).trace xs (JMach.csSched xs (JMach.init X nt) nt)
+      m).1.ths.length = nt := by
+    intro m
+    rw [JMach.trace_length]
+    simp [JMach.init]
+  -- the action of the window that falls to `u`
+  have hq := Nat.div_add_mod j nt
+  have hjm := Nat.mod_lt j hnt
+  obtain ⟨m, hm₁, hm₂, hmu⟩ : ∃ m, j ≤ m ∧ m < j + nt ∧ m % nt = u := by
+    rcases Nat.lt_or_ge u (j % nt) with h' | h'
+    · refine ⟨u + nt * (j / nt + 1), by rw [Nat.mul_add]; omega, by rw [Nat.mul_add]; omega, ?_⟩
+      rw [Nat.add_mul_mod_self_left, Nat.mod_eq_of_lt hu]
+    · refine ⟨u + nt * (j / nt), by omega, by omega, ?_⟩
+      rw [Nat.add_mul_mod_self_left, Nat.mod_eq_of_lt hu]
+  have hb := h m hm₁ hm₂
+  -- no thread is in a claim then, so the turn is `m % nt`
+  have hpick : JMach.csSched xs (JMach.init X nt) nt m = u := by
+    unfold JMach.csSched JMach.csPick
+    cases hf : (List.range (JMach.csState xs (JMach.init X nt) nt m).ths.length).find?
+        (JMach.csState xs (JMach.init X nt) nt m).critAt with
+    | none => exact hmu
+    | some u₀ =>
+      exfalso
+      obtain ⟨U, hU, hc⟩ := JMach.critAt_iff.1 (List.find?_some hf)
+      have hσ : JMach.csSched xs (JMach.init X nt) nt m = u₀ := by
+        unfold JMach.csSched JMach.csPick
+        rw [hf]
+        rfl
+      rw [← JMach.csState_trace] at hU
+      have := JMach.busyAct_critical hU hc
+      rw [hσ] at hb
+      omega
+  rw [hpick] at hb
+  have hlt : u < ((JMach.init X nt).trace xs (JMach.csSched xs (JMach.init X nt) nt)
+      m).1.ths.length := by
+    rw [hlen]
+    exact hu
+  have hrest := JMach.busyAct_zero (List.getElem?_eq_getElem hlt) hb
+  have e : j + nt = m + (j + nt - m) := by omega
+  rw [e]
+  exact JMach.atRest_stays xs _ _ hrest _
+
+/-- **With any number of threads, on the schedule where the first thread in
+a claim keeps the turn, all threads are at rest after `nt (B + 1)`
+actions**, `B` the bound on the work of `JMach.worked_csSched`. -/
+theorem JMach.rests_csSched {J : Nat} (hJ : xs.JoinsAtMost J) {X : XNet S}
+    (hX : X.toNet.WF xs.sys.ar) (hnd : (X.agents.map Prod.fst).Nodup) {nt : Nat} (hnt : 0 < nt)
+    {C D : Nat} (hb : xs.Bounded C D) {n : Nat} {N' : Net S}
+    (hs : Steps (Step xs.sys) n X.toNet N') (hn : Normal (Step xs.sys) N') (i : Nat)
+    (hi : nt * (nt * (7 * X.agents.length + (X.wires.length + D * n)) +
+        n * (C + D + 1 + 9 * J) +
+        7 * (C * n) + (X.wires.length + D * n) +
+        J * (4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
+          6 * (X.wires.length + D * n)) + 1) ≤ i) :
+    ((JMach.init X nt).trace xs (JMach.csSched xs (JMach.init X nt) nt) i).1.resting = true := by
+  generalize hB : nt * (7 * X.agents.length + (X.wires.length + D * n)) +
+      n * (C + D + 1 + 9 * J) +
+      7 * (C * n) + (X.wires.length + D * n) +
+      J * (4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
+        6 * (X.wires.length + D * n)) = B at hi
+  have hwork : ∀ i,
+      JMach.worked xs (JMach.csSched xs (JMach.init X nt) nt) (JMach.init X nt) i ≤ B :=
+    fun i => hB ▸ JMach.worked_csSched hJ hX hnd hnt hb hs hn i
+  -- some window among the first `B + 1` has no action at work
+  have hwin : ∃ k, k ≤ B ∧ ∀ m, k * nt ≤ m → m < k * nt + nt →
+      JMach.busyAct ((JMach.init X nt).trace xs (JMach.csSched xs (JMach.init X nt) nt) m).1
+        (JMach.csSched xs (JMach.init X nt) nt m) = 0 := by
+    refine Classical.byContradiction fun hno => ?_
+    have grow : ∀ k, k ≤ B + 1 →
+        k ≤ JMach.worked xs (JMach.csSched xs (JMach.init X nt) nt) (JMach.init X nt)
+          (k * nt) := by
+      intro k
+      induction k with
+      | zero => intro _; exact Nat.zero_le _
+      | succ k ih =>
+        intro hk
+        have ih' := ih (by omega)
+        obtain ⟨m, hm₁, hm₂, hm⟩ : ∃ m, k * nt ≤ m ∧ m < k * nt + nt ∧
+            JMach.busyAct ((JMach.init X nt).trace xs (JMach.csSched xs (JMach.init X nt) nt)
+              m).1 (JMach.csSched xs (JMach.init X nt) nt m) ≠ 0 := by
+          refine Classical.byContradiction fun hall => hno ⟨k, by omega, fun m h₁ h₂ => ?_⟩
+          exact Classical.byContradiction fun hne => hall ⟨m, h₁, h₂, hne⟩
+        have step :
+            JMach.worked xs (JMach.csSched xs (JMach.init X nt) nt) (JMach.init X nt) (m + 1) =
+            JMach.worked xs (JMach.csSched xs (JMach.init X nt) nt) (JMach.init X nt) m +
+              JMach.busyAct ((JMach.init X nt).trace xs (JMach.csSched xs (JMach.init X nt) nt)
+                m).1 (JMach.csSched xs (JMach.init X nt) nt m) := rfl
+        have m₁ := JMach.worked_mono xs (JMach.csSched xs (JMach.init X nt) nt) (JMach.init X nt)
+          (j := k * nt) (m - k * nt)
+        have m₂ := JMach.worked_mono xs (JMach.csSched xs (JMach.init X nt) nt) (JMach.init X nt)
+          (j := m + 1) ((k + 1) * nt - (m + 1))
+        rw [show k * nt + (m - k * nt) = m by omega] at m₁
+        rw [show m + 1 + ((k + 1) * nt - (m + 1)) = (k + 1) * nt by
+          rw [Nat.succ_mul]; omega] at m₂
+        omega
+    have := grow (B + 1) (Nat.le_refl _)
+    have := hwork ((B + 1) * nt)
+    omega
+  obtain ⟨k, hk, hzero⟩ := hwin
+  have hall := JMach.csSched_window (xs := xs) (X := X) hnt (j := k * nt) hzero
+  -- all at rest at the end of that window, and so at `i`
+  have hle : k * nt + nt ≤ i := by
+    have : (k + 1) * nt ≤ (B + 1) * nt := Nat.mul_le_mul_right _ (by omega)
+    rw [Nat.succ_mul] at this
+    have : (B + 1) * nt ≤ i := by rw [Nat.mul_comm]; exact hi
+    omega
+  refine List.all_eq_true.2 fun T hT => ?_
+  obtain ⟨u, hu⟩ := List.getElem?_of_mem hT
+  have hlen : ((JMach.init X nt).trace xs (JMach.csSched xs (JMach.init X nt) nt)
+      i).1.ths.length = nt := by
+    rw [JMach.trace_length]
+    simp [JMach.init]
+  have hlt : u < nt := by
+    rw [← hlen]
+    exact (List.getElem?_eq_some_iff.1 hu).1
+  obtain ⟨g, js, wk, h⟩ := hall u hlt
+  have e : i = k * nt + nt + (i - (k * nt + nt)) := by omega
+  obtain ⟨g', js', wk', h'⟩ := JMach.atRest_stays xs _ _ ⟨g, js, wk, h⟩ (i - (k * nt + nt))
+  rw [← e, hu] at h'
+  rw [Option.some.inj h']
+  rfl
+
 end INet
