@@ -349,4 +349,196 @@ theorem JMach.cs_total_step {J : Nat} (hJ : xs.JoinsAtMost J) {M : JMach S} (hL 
         cases (T.todo.isEmpty && T.st.isIdle) <;> simp
       exact ⟨b', hb'', by omega⟩
 
+/-- **With any number of threads, if a thread in a claim keeps the turn,
+the actions of threads at work are at most
+`nt (7 |agents| + K) + n (C + D + 1 + 9 J) + 7 C n + K + J (4 K log (K + 1) + 6 K)`**,
+`K = |wires| + D n`: each thread scans every agent once at the start, then
+claims and walks cost what they cost with one thread. -/
+theorem JMach.worked_cs {J : Nat} (hJ : xs.JoinsAtMost J) {X : XNet S}
+    (hX : X.toNet.WF xs.sys.ar) (hnd : (X.agents.map Prod.fst).Nodup) {nt : Nat} (hnt : 0 < nt)
+    {C D : Nat} (hb : xs.Bounded C D) {n : Nat} {N' : Net S}
+    (hs : Steps (Step xs.sys) n X.toNet N') (hn : Normal (Step xs.sys) N') (σ : Nat → Nat)
+    (hcs : ∀ i u U, ((JMach.init X nt).trace xs σ i).1.ths[u]? = some U → U.critical = true →
+      σ i = u)
+    (i : Nat) :
+    JMach.worked xs σ (JMach.init X nt) i ≤
+      nt * (7 * X.agents.length + (X.wires.length + D * n)) + n * (C + D + 1 + 9 * J) +
+        7 * (C * n) + (X.wires.length + D * n) +
+        J * (4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
+          6 * (X.wires.length + D * n)) := by
+  classical
+  have live := JMach.trace_live (xs := xs) σ (JMach.init_live hX hnt)
+  have run : ∀ i, MRun xs.sys ((JMach.init X nt).trace xs σ i).2 (Mach.init X.toNet)
+      ((JMach.init X nt).trace xs σ i).1.toMach := by
+    intro i
+    have h := JMach.trace_run xs σ (JMach.init X nt) i
+    rw [JMach.init_toMach] at h
+    exact h
+  have bound : ∀ i, ((JMach.init X nt).trace xs σ i).2 ≤ n :=
+    fun i => (run i).claims_le hX hs hn
+  have hA : ∀ i, ((JMach.init X nt).trace xs σ i).1.toW.heads ≤
+      X.agents.length + (C - 2) * n := by
+    intro i
+    have h := (JMach.trace_sizes σ (JMach.init X nt) hb i).2
+    rw [JMach.init_toW, WMach.init_heads] at h
+    exact Nat.le_trans h (Nat.add_le_add_left (Nat.mul_le_mul_left (C - 2) (bound i)) _)
+  have nd : ∀ i, (((JMach.init X nt).trace xs σ i).1.mem.agents.map Prod.fst).Nodup := by
+    intro i
+    induction i with
+    | zero => exact hnd
+    | succ i ih => exact JMach.step_nodup (live i) ih (σ i)
+  have ahead : ∀ i, ((JMach.init X nt).trace xs σ i).1.toW.toX.Ahead N' :=
+    fun i => XMach.ahead_of_run (M := ((JMach.init X nt).trace xs σ i).1.toW.toX)
+      (live i).inv hX (run i) hs hn
+  have born := JMach.born_inv hb live ahead
+  have hN' := Steps.wf hX hs
+  have hH := XNet.normal_sized hX hb hs hn
+  generalize hK : X.wires.length + D * n = K at hH
+  generalize hAA : X.agents.length + (C - 2) * n = A at hA
+  have hR : ∀ i, N'.scan K (JMach.born xs σ (JMach.init X nt) i) ≤ 7 * (C * n) + K := by
+    intro i
+    obtain ⟨h₁, -, h₃, h₄⟩ := born i
+    have := Net.scan_le hH _ h₁ h₃
+    have h5 : C * ((JMach.init X nt).trace xs σ i).2 ≤ C * n :=
+      Nat.mul_le_mul_left C (bound i)
+    omega
+  obtain ⟨W, hWK, hWl⟩ := hH.fin
+  let l : List Id := (dedupList (W.map fun e => e.1.1)).filter
+    fun k => decide (∀ x y, N'.link (k, 0) x → N'.link (k, 0) y → x = y)
+  have hlnd : l.Nodup := (dedupList_nodup _).filter _
+  have hok : ∀ j, PayOk xs.sys.ar W l ((JMach.init X nt).trace xs σ j).1.toMach.goal := by
+    intro j
+    have hG := (live j).inv.wf
+    refine ⟨hG, fun u v h => hWl ((ahead j).link h), fun k γ hk => ?_⟩
+    have hE : ((JMach.init X nt).trace xs σ j).1.toMach.goal.End xs.sys.ar (k, 0) :=
+      .inr ⟨γ, hk, Nat.zero_le _⟩
+    obtain ⟨q, hq⟩ := hG.end_wired hE
+    refine List.mem_filter.2 ⟨mem_dedupList.2 (List.mem_map.2 ⟨_, hWl ((ahead j).link hq), rfl⟩),
+      decide_eq_true fun x y hx hy => ?_⟩
+    have hu : ((JMach.init X nt).trace xs σ j).1.toMach.goal.Used k := .inl ⟨γ, hk⟩
+    exact hG.end_unique hE ((ahead j).principal hu hx) ((ahead j).principal hu hy)
+  have hΦ : payΦ K W l ((JMach.init X nt).trace xs σ i).1.toMach.goal ≤
+      4 * (K * Nat.log2 (K + 1)) + 6 * K := by
+    have hmono : payΦ K W l ((JMach.init X nt).trace xs σ i).1.toMach.goal ≤
+        payΦ K W l N' := payΦ_mono fun h => (ahead i).link h
+    have hle := payΦ_le_ends (K := K) hN'.symm hN'.deg (fun h => hWl h) hlnd
+      (fun k hk x y hx hy => of_decide_eq_true (List.mem_filter.1 hk).2 x y hx hy)
+    have hllen : l.length ≤ W.length :=
+      Nat.le_trans (List.length_filter_le _ _)
+        (Nat.le_trans (dedupList_length _) (Nat.le_of_eq (List.length_map _)))
+    have hmul₁ : W.length * Nat.log2 (K + 1) ≤ K * Nat.log2 (K + 1) := Nat.mul_le_mul_right _ hWK
+    omega
+  -- the measures at the start: each thread scans every agent
+  have h0 : (JMach.init X nt).potAll N' K A ≤ nt * (7 * X.agents.length + K) := by
+    obtain ⟨-, pr⟩ := Steps.links hX hs
+    have hag : ∀ e : Id × S, e ∈ X.agents → X.toNet.agent e.1 e.2 := fun _ he => he
+    have hscan : N'.scan K X.agents ≤ 7 * X.agents.length + K :=
+      Net.scan_le hH X.agents hnd fun e he q q' h h' =>
+        hX.end_unique (.inr ⟨e.2, hag e he, Nat.zero_le _⟩) (pr (.inl ⟨e.2, hag e he⟩) h)
+          (pr (.inl ⟨e.2, hag e he⟩) h')
+    have each : ∀ t, potV N' K A (⟨X.agents.drop t ++ X.agents.take t, .idle, false, [], none⟩ :
+        JThread S) = N'.scan K X.agents := by
+      intro t
+      show N'.scan K (X.agents.drop t ++ X.agents.take t) = _
+      rw [Net.scan_append]
+      have e : N'.scan K X.agents = N'.scan K (X.agents.take t) +
+          N'.scan K (X.agents.drop t) := by
+        rw [← Net.scan_append, List.take_append_drop]
+      rw [e]
+      exact Nat.add_comm _ _
+    unfold JMach.potAll JMach.init
+    rw [List.map_map]
+    have hm : ((List.range nt).map ((potV N' K A) ∘ fun t =>
+        (⟨X.agents.drop t ++ X.agents.take t, .idle, false, [], none⟩ : JThread S))) =
+        (List.range nt).map fun _ => N'.scan K X.agents :=
+      List.map_congr_left fun t _ => each t
+    rw [hm, sum_map_const, List.length_range]
+    exact Nat.mul_le_mul_left _ hscan
+  have key : ∀ i, ∃ b, ((JMach.init X nt).trace xs σ i).1.OwesAll N' K b ∧
+      JMach.worked xs σ (JMach.init X nt) i + ((JMach.init X nt).trace xs σ i).1.potAll N' K A +
+          b + J * payΦ K W l X.toNet ≤
+        (JMach.init X nt).potAll N' K A +
+          J * payΦ K W l ((JMach.init X nt).trace xs σ i).1.toMach.goal +
+          ((JMach.init X nt).trace xs σ i).2 * (C + D + 1 + 9 * J) +
+          N'.scan K (JMach.born xs σ (JMach.init X nt) i) := by
+    intro i
+    induction i with
+    | zero =>
+      have eg : (JMach.init X nt).toMach.goal = X.toNet := by
+        rw [JMach.init_toMach X nt]
+        exact congrArg CState.goal (Mach.init_quiet X.toNet).abs
+      refine ⟨0, fun u T hT => ?_, ?_⟩
+      · change (JMach.init X nt).ths[u]? = some T at hT
+        unfold JMach.init at hT
+        rw [List.getElem?_map] at hT
+        cases hr : (List.range nt)[u]? with
+        | none => rw [hr] at hT; cases hT
+        | some t =>
+          rw [hr] at hT
+          cases hT
+          refine ⟨fun w h => ?_, fun _ => trivial⟩
+          cases h
+      · show 0 + (JMach.init X nt).potAll N' K A + 0 + _ ≤ _ +
+          J * payΦ K W l (JMach.init X nt).toMach.goal + 0 * (C + D + 1 + 9 * J) + N'.scan K []
+        rw [eg]
+        have : N'.scan K ([] : List (Id × S)) = 0 := rfl
+        omega
+    | succ i ih =>
+      obtain ⟨b, hb', hle⟩ := ih
+      have hsucc : ((JMach.init X nt).trace xs σ (i + 1)) =
+          ((((JMach.init X nt).trace xs σ i).1.step xs (σ i)).1,
+          ((JMach.init X nt).trace xs σ i).2 +
+            (((JMach.init X nt).trace xs σ i).1.step xs (σ i)).2) := rfl
+      have hbs : JMach.born xs σ (JMach.init X nt) (i + 1) =
+          JMach.born xs σ (JMach.init X nt) i ++
+            JMach.stepKids xs ((JMach.init X nt).trace xs σ i).1 (σ i) := rfl
+      have hok' := hok (i + 1)
+      have hM' := ahead (i + 1)
+      rw [hsucc] at hok' hM'
+      obtain ⟨b', hb'', hstep⟩ := JMach.cs_total_step hJ (live i)
+        (fun u U hU hc => (hcs i u U hU hc).symm) (nd i) hb hH (ahead i) hM' (hA i) hWK
+        (hok i) hok' hb'
+      refine ⟨b', ?_, ?_⟩
+      · rw [hsucc]
+        exact hb''
+      · show JMach.worked xs σ (JMach.init X nt) i +
+            JMach.busyAct ((JMach.init X nt).trace xs σ i).1 (σ i) +
+            ((JMach.init X nt).trace xs σ (i + 1)).1.potAll N' K A + b' +
+            J * payΦ K W l X.toNet ≤
+          (JMach.init X nt).potAll N' K A +
+            J * payΦ K W l ((JMach.init X nt).trace xs σ (i + 1)).1.toMach.goal +
+            ((JMach.init X nt).trace xs σ (i + 1)).2 * (C + D + 1 + 9 * J) +
+            N'.scan K (JMach.born xs σ (JMach.init X nt) (i + 1))
+        rw [hbs, Net.scan_append, hsucc]
+        dsimp only
+        rw [Nat.add_mul]
+        omega
+  obtain ⟨b, -, hle⟩ := key i
+  have := Nat.mul_le_mul_left J hΦ
+  have := hR i
+  have hc : ((JMach.init X nt).trace xs σ i).2 * (C + D + 1 + 9 * J) ≤
+      n * (C + D + 1 + 9 * J) := Nat.mul_le_mul_right _ (bound i)
+  omega
+
+/-- **The same bound on the schedule where the first thread in a claim
+keeps the turn**, with no hypothesis left. -/
+theorem JMach.worked_csSched {J : Nat} (hJ : xs.JoinsAtMost J) {X : XNet S}
+    (hX : X.toNet.WF xs.sys.ar) (hnd : (X.agents.map Prod.fst).Nodup) {nt : Nat} (hnt : 0 < nt)
+    {C D : Nat} (hb : xs.Bounded C D) {n : Nat} {N' : Net S}
+    (hs : Steps (Step xs.sys) n X.toNet N') (hn : Normal (Step xs.sys) N') (i : Nat) :
+    JMach.worked xs (JMach.csSched xs (JMach.init X nt) nt) (JMach.init X nt) i ≤
+      nt * (7 * X.agents.length + (X.wires.length + D * n)) + n * (C + D + 1 + 9 * J) +
+        7 * (C * n) + (X.wires.length + D * n) +
+        J * (4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
+          6 * (X.wires.length + D * n)) := by
+  refine JMach.worked_cs hJ hX hnd hnt hb hs hn _ (JMach.csSched_hcs xs fun u U hU => ?_) i
+  unfold JMach.init at hU
+  rw [List.getElem?_map] at hU
+  cases hr : (List.range nt)[u]? with
+  | none => rw [hr] at hU; cases hU
+  | some t =>
+    rw [hr] at hU
+    cases hU
+    rfl
+
 end INet

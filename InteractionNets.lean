@@ -3560,7 +3560,12 @@ holds up to equality rather than up to renaming.
   `9 J n + J (4 K log (K + 1) + 6 K)` (`JMach.walked_cs`; the schedule
   that gives the turn to the first thread in a claim meets the hypothesis,
   `JMach.walked_csSched`).  The other threads wait while one is in a claim.
-  Only the actions of walks are bounded so, not the actions until rest; on
+  The work of all the threads, the actions of threads not at rest, is at
+  most `nt (7 |agents| + K) + n (C + D + 1 + 9 J) + 7 C n + K +
+  J (4 K log (K + 1) + 6 K)` (`JMach.worked_cs`, `JMach.worked_csSched`):
+  each thread scans every agent once, then claims and walks cost what they
+  cost with one thread.  The turns given to threads at rest are not
+  counted; on
   `joinChain` (in order and bit-reversed, 1 to 256 threads) the walks
   measured cost exactly what they cost with one thread.
   Both programs run expressions in any system with the core, with a
