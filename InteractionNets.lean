@@ -3531,9 +3531,10 @@ holds up to equality rather than up to renaming.
   bounding the segments of the normal form, `JMach.rests_multi_sized`; with
   `K` the size of a memory holding it, `JMach.rests_multi_out`); so Peano
   arithmetic with multiplication and powers (`Peano.rests_multi`).  None of
-  the earlier systems has a rule that both joins and writes agents; `Mix`
-  (`JoinWrite`) has one, and the bound applies to it (`Mix.rests`), its run
-  on a chain checked in the kernel for eight pairs.  The charge of
+  the systems checked in `JoinSystems` has a rule that both joins and
+  writes agents; `Mix` (`JoinWrite`) has one, and the bound of one thread
+  applies to it (`Mix.rests`), its run on a chain of eight pairs checked in
+  the kernel.  The charge of
   twice the
   shorter side cannot be lowered: a walk has found nothing while both its
   sides go (`JWalk.found_none_before`, for the walk of `JMach`); and the
@@ -3555,8 +3556,12 @@ holds up to equality rather than up to renaming.
   (`JThread.critical`), a walk runs on a memory that holds the goal
   (`JMach.like_goal_cs`) and the charge of one thread goes through
   (`JMach.cs_step`): with any number of threads the walks cost at most
-  `9 J n + J (4 K log (K + 1) + 6 K)` (`JMach.walked_cs`), and measured
-  they cost exactly what they cost with one thread.
+  `9 J n + J (4 K log (K + 1) + 6 K)` (`JMach.walked_cs`; the schedule
+  that gives the turn to the first thread in a claim meets the hypothesis,
+  `JMach.walked_csSched`).  The other threads wait while one is in a claim.
+  Only the actions of walks are bounded so, not the actions until rest; on
+  `joinChain` (in order and bit-reversed, 1 to 256 threads) the walks
+  measured cost exactly what they cost with one thread.
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,

@@ -9,9 +9,14 @@ state `half` to the end of its writing (`JThread.critical`, a hypothesis on
 the schedule), the walks cost what they cost with one thread: a walk then
 runs on a memory that holds the goal (`JMach.like_goal_cs`), the goal does
 not change between a claim and its walks, and the charge of `JoinMulti`
-goes through, whatever the other threads are doing (`JMach.cs_step`).  The
-actions of walks of any number of threads are at most
-`9 J n + J (4 K log (K + 1) + 6 K)` (`JMach.walked_cs`).
+goes through (`JMach.cs_step`).  The other threads may scan between claims,
+but wait while a thread is in a claim.  The actions of walks of any number
+of threads are then at most `9 J n + J (4 K log (K + 1) + 6 K)`
+(`JMach.walked_cs`), the walk term of the bound of one thread.  Such a
+schedule exists for any number of threads: give the turn to the first
+thread in a claim, if any (`JMach.csSched`, `JMach.csSched_hcs`,
+`JMach.walked_csSched`).  Only the actions of walks are bounded here, not
+the actions until rest.
 -/
 
 namespace INet
@@ -449,5 +454,126 @@ theorem JMach.walked_cs {J : Nat} (hJ : xs.JoinsAtMost J) {X : XNet S}
   have hc : ((JMach.init X nt).trace xs σ i).2 * (9 * J) ≤ n * (9 * J) :=
     Nat.mul_le_mul_right _ (bound i)
   omega
+
+/-! ## A schedule that meets the hypothesis -/
+
+/-- The thread is in a claim, as a test on a position. -/
+def JMach.critAt (M : JMach S) (u : Nat) : Bool :=
+  match M.ths[u]? with
+  | some T => T.critical
+  | none => false
+
+/-- The turn: the first thread in a claim, if any; otherwise threads take
+turns. -/
+def JMach.csPick (M : JMach S) (nt i : Nat) : Nat :=
+  ((List.range M.ths.length).find? M.critAt).getD (i % nt)
+
+/-- The states of the run where a thread in a claim keeps the turn. -/
+def JMach.csState (xs : XSys S) (M : JMach S) (nt : Nat) : Nat → JMach S
+  | 0 => M
+  | i + 1 => ((JMach.csState xs M nt i).step xs ((JMach.csState xs M nt i).csPick nt i)).1
+
+/-- **The schedule where a thread in a claim keeps the turn.** -/
+def JMach.csSched (xs : XSys S) (M : JMach S) (nt : Nat) (i : Nat) : Nat :=
+  (JMach.csState xs M nt i).csPick nt i
+
+theorem JMach.csState_trace (xs : XSys S) (M : JMach S) (nt : Nat) :
+    ∀ i, (M.trace xs (JMach.csSched xs M nt) i).1 = JMach.csState xs M nt i
+  | 0 => rfl
+  | i + 1 => by
+    show ((M.trace xs (JMach.csSched xs M nt) i).1.step xs (JMach.csSched xs M nt i)).1 = _
+    rw [JMach.csState_trace xs M nt i]
+    rfl
+
+omit [DecidableEq S] in
+theorem JMach.critAt_iff {M : JMach S} {u : Nat} :
+    M.critAt u = true ↔ ∃ U, M.ths[u]? = some U ∧ U.critical = true := by
+  unfold JMach.critAt
+  cases h : M.ths[u]? with
+  | none => simp
+  | some U => simp
+
+/-- **Along that schedule at most one thread is in a claim, and it has the
+turn.** -/
+theorem JMach.csSched_hcs (xs : XSys S) {X : XNet S} {nt : Nat}
+    (h0 : ∀ (u : Nat) (U : JThread S), (JMach.init X nt).ths[u]? = some U →
+      U.critical = false) :
+    ∀ i u U, ((JMach.init X nt).trace xs (JMach.csSched xs (JMach.init X nt) nt) i).1.ths[u]? =
+      some U → U.critical = true → JMach.csSched xs (JMach.init X nt) nt i = u := by
+  -- at most one thread is in a claim at a time
+  have one : ∀ i u v, (JMach.csState xs (JMach.init X nt) nt i).critAt u = true →
+      (JMach.csState xs (JMach.init X nt) nt i).critAt v = true → u = v := by
+    intro i
+    induction i with
+    | zero =>
+      intro u v hu
+      obtain ⟨U, hU, hc⟩ := JMach.critAt_iff.1 hu
+      rw [h0 u U hU] at hc
+      cases hc
+    | succ i ih =>
+      -- every thread in a claim after the step is the one that acted
+      have only : ∀ w, (JMach.csState xs (JMach.init X nt) nt (i + 1)).critAt w = true →
+          w = (JMach.csState xs (JMach.init X nt) nt i).csPick nt i := by
+        intro w hw
+        refine Classical.byContradiction fun hne => ?_
+        have hsame : (JMach.csState xs (JMach.init X nt) nt (i + 1)).ths[w]? =
+            (JMach.csState xs (JMach.init X nt) nt i).ths[w]? := by
+          show (((JMach.csState xs (JMach.init X nt) nt i).step xs
+            ((JMach.csState xs (JMach.init X nt) nt i).csPick nt i)).1).ths[w]? = _
+          unfold JMach.step
+          split
+          · exact List.getElem?_set_ne (Ne.symm hne)
+          · rfl
+        have hw' : (JMach.csState xs (JMach.init X nt) nt i).critAt w = true := by
+          unfold JMach.critAt at hw ⊢
+          rw [← hsame]
+          exact hw
+        apply hne
+        -- the pick is the first thread in a claim, which is `w`
+        unfold JMach.csPick
+        cases hf : (List.range (JMach.csState xs (JMach.init X nt) nt i).ths.length).find?
+            (JMach.csState xs (JMach.init X nt) nt i).critAt with
+        | none =>
+          exfalso
+          have hlt : w < (JMach.csState xs (JMach.init X nt) nt i).ths.length := by
+            obtain ⟨U, hU, -⟩ := JMach.critAt_iff.1 hw'
+            exact (List.getElem?_eq_some_iff.1 hU).1
+          exact (List.find?_eq_none.1 hf) w (List.mem_range.2 hlt) hw'
+        | some u₀ =>
+          exact ih w u₀ hw' (List.find?_some hf)
+      intro u v hu hv
+      rw [only u hu, only v hv]
+  intro i u U hU hc
+  rw [JMach.csState_trace] at hU
+  have hu : (JMach.csState xs (JMach.init X nt) nt i).critAt u = true :=
+    JMach.critAt_iff.2 ⟨U, hU, hc⟩
+  unfold JMach.csSched JMach.csPick
+  cases hf : (List.range (JMach.csState xs (JMach.init X nt) nt i).ths.length).find?
+      (JMach.csState xs (JMach.init X nt) nt i).critAt with
+  | none =>
+    exfalso
+    have hlt : u < (JMach.csState xs (JMach.init X nt) nt i).ths.length :=
+      (List.getElem?_eq_some_iff.1 hU).1
+    exact (List.find?_eq_none.1 hf) u (List.mem_range.2 hlt) hu
+  | some u₀ => exact one i u₀ u (List.find?_some hf) hu
+
+/-- **With any number of threads, on the schedule where a thread in a claim
+keeps the turn, the walks cost at most `9 J n + J (4 K log (K + 1) + 6 K)`.** -/
+theorem JMach.walked_csSched {J : Nat} (hJ : xs.JoinsAtMost J) {X : XNet S}
+    (hX : X.toNet.WF xs.sys.ar) {nt : Nat} (hnt : 0 < nt) {C D : Nat} (hb : xs.Bounded C D)
+    {n : Nat} {N' : Net S} (hs : Steps (Step xs.sys) n X.toNet N') (hn : Normal (Step xs.sys) N')
+    (i : Nat) :
+    JMach.walked xs (JMach.csSched xs (JMach.init X nt) nt) (JMach.init X nt) i ≤ n * (9 * J) +
+      J * (4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
+        6 * (X.wires.length + D * n)) := by
+  refine JMach.walked_cs hJ hX hnt hb hs hn _ (JMach.csSched_hcs xs fun u U hU => ?_) i
+  unfold JMach.init at hU
+  rw [List.getElem?_map] at hU
+  cases hr : (List.range nt)[u]? with
+  | none => rw [hr] at hU; cases hU
+  | some t =>
+    rw [hr] at hU
+    cases hU
+    rfl
 
 end INet

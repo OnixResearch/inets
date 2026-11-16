@@ -13,7 +13,8 @@ one agent and eight ports at most (`Mix.xsys_joinsAtMost`,
 actions (`Mix.rests`).  `mixChain` chains `m`s by their first two ports,
 like `joinChain`; its run is checked in the kernel for eight pairs, and
 measured: 4, 9, 21, 53, 133, 325, 773 actions of walks for 1 to 64 pairs
-in bit-reversed order, the same as `joinChain`. -/
+in bit-reversed order, the same as `joinChain` (`2 n b + 5` for `n = 2 ^ b`,
+`b ≥ 1`). -/
 
 namespace INet
 
