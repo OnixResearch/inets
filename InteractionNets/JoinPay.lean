@@ -824,6 +824,95 @@ def XSys.PureJoin (xs : XSys S) : Prop :=
     xs.rule α β = some R → Redex xs.sys G a b α β R.toRhs →
     R.joinPairs xs.sys.ar a b α β = [(p, q)] → Joined G (G.fire a b R.toRhs) p q
 
+omit [DecidableEq S] in
+/-- How many segments a rule joins does not depend on the names of the
+pair. -/
+theorem XRhs.joinPairs_length (R : XRhs S) (ar : S → Nat) (a b a' b' : Id) (α β : S) :
+    (R.joinPairs ar a b α β).length = (R.joinPairs ar a' b' α β).length := by
+  unfold XRhs.joinPairs
+  induction ifcPorts ar α β with
+  | nil => rfl
+  | cons x L ih =>
+    simp only [List.filterMap_cons]
+    cases R.wire x with
+    | none => exact ih
+    | some y =>
+      dsimp only
+      by_cases hc : (!y.isNew && decide (x.rank < y.rank)) = true
+      · rw [ite_pos' hc, ite_pos' hc]
+        simp only [List.length_cons, ih]
+      · rw [ite_neg' hc, ite_neg' hc]
+        exact ih
+
+omit [DecidableEq S] in
+/-- One join at most, checked on one pair of names. -/
+theorem XSys.oneJoin_of
+    (h : ∀ α β R, xs.rule α β = some R → (R.joinPairs xs.sys.ar [] [] α β).length ≤ 1) :
+    xs.OneJoin := fun α β R a b hR => by
+  rw [XRhs.joinPairs_length R xs.sys.ar a b [] [] α β]
+  exact h α β R hR
+
+omit [DecidableEq S] in
+/-- **The joins of a system do nothing else** when every rule that joins
+interface ports writes no agent: then every segment it writes joins two
+interface ports, and when it joins one pair only, it is that one. -/
+theorem XSys.pureJoin_of
+    (hb : ∀ α β R, xs.rule α β = some R → R.joins xs.sys.ar α β = true → R.slots = []) :
+    xs.PureJoin := by
+  intro G a b α β R p q hG hR rg hjp
+  have hwf : R.toRhs.WF xs.sys.ar α β := xs.sys.rule_wf (by rw [xs.rule_spec, hR]; rfl)
+  have hmem : (p, q) ∈ R.joinPairs xs.sys.ar a b α β := by rw [hjp]; exact List.mem_singleton_self _
+  have hsl := hb α β R hR (XRhs.joins_of_mem hmem)
+  have nolab : ∀ o j, R.lab o j = none := by
+    intro o j
+    cases hl : R.lab o j with
+    | none => rfl
+    | some γ =>
+      have := xs.slots_spec hR hl
+      rw [hsl] at this
+      exact absurd this List.not_mem_nil
+  have ifc : ∀ {x y}, R.wire x = some y → ∃ s k, x = .ifc s k ∧ k < xs.sys.ar (sel α β s) := by
+    intro x y hw
+    have hv := hwf.valid (x := x) (y := y) hw
+    cases x with
+    | ifc s k => exact ⟨s, k, rfl, hv⟩
+    | new o j k =>
+      obtain ⟨γ, hγ, -⟩ := hv
+      have : R.toRhs.lab o j = none := nolab o j
+      rw [this] at hγ
+      cases hγ
+  obtain ⟨s, k, s', k', hw, hx, rfl, rfl⟩ := XRhs.mem_joinPairs hmem
+  obtain ⟨s₀, k₀, e₀, hk⟩ := ifc hw
+  cases e₀
+  obtain ⟨s₁, k₁, e₁, hk'⟩ := ifc (hwf.symm (x := .ifc s k) (y := .ifc s' k') hw)
+  cases e₁
+  have hagent : ∀ s, G.agent (sel a b s) (sel α β s) := by
+    intro s
+    cases s
+    · exact rg.ha
+    · exact rg.hb
+  have hend : ∀ s k, k < xs.sys.ar (sel α β s) → ∀ x y, G.link (emb a b (.ifc s k)) x →
+      G.link (emb a b (.ifc s k)) y → x = y := by
+    intro s k hk x y hx hy
+    exact hG.end_unique (.inr ⟨sel α β s, hagent s, by simp only [emb]; omega⟩) hx hy
+  refine ⟨fun u v => ⟨fun h => ?_, fun h => ?_⟩, hend s k hk, hend s' k' hk',
+    by simp [emb], by simp [emb]⟩
+  · rcases h with h | ⟨x, y, hxy, rfl, rfl⟩
+    · exact .inl h
+    · obtain ⟨s₂, k₂, rfl, -⟩ := ifc hxy
+      obtain ⟨s₃, k₃, rfl, -⟩ := ifc (hwf.symm (x := .ifc s₂ k₂) (y := y) hxy)
+      rcases XRhs.joinPairs_of_wire (a := a) (b := b) hwf hxy with hm | hm
+      · rw [hjp] at hm
+        obtain ⟨e₁, e₂⟩ := Prod.mk.inj (List.mem_singleton.1 hm)
+        exact .inr (.inl ⟨e₁, e₂⟩)
+      · rw [hjp] at hm
+        obtain ⟨e₁, e₂⟩ := Prod.mk.inj (List.mem_singleton.1 hm)
+        exact .inr (.inr ⟨e₂, e₁⟩)
+  · rcases h with h | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+    · exact .inl h
+    · exact .inr ⟨_, _, hw, rfl, rfl⟩
+    · exact .inr ⟨_, _, hwf.symm (x := .ifc s k) (y := .ifc s' k') hw, rfl, rfl⟩
+
 /-- What the measure needs of a goal: it is well formed, `W` holds its
 segments, and `l` the names of its agents. -/
 def PayOk (ar : S → Nat) (W : List (Port × Port)) (l : List Id) (G : Net S) : Prop :=
@@ -880,6 +969,50 @@ theorem payΦ_le (K : Nat) (W : List (Port × Port)) (l : List Id) (G : Net S) :
   have h₃ : (W.map fun e => cycAt G.link e.1).sum ≤ W.length := by
     have := sum_mono W (fun e => cycAt G.link e.1) (fun _ => 1) fun e _ => cycAt_le_one _ _
     rwa [sum_map_const, Nat.mul_one] at this
+  omega
+
+/-- **The walks of one thread, along the whole of a run, cost at most
+`3 n + 4 K log (K + 1) + 2 K (K + 1) + 2 K`**, where `n` is the number of
+steps to the normal form and `K = |wires| + D n` bounds its segments, for a
+system whose rules join one segment at most and do nothing else when they
+join. -/
+theorem JMach.walked_bound (hJ : xs.OneJoin) (hP : xs.PureJoin) {X : XNet S}
+    (hX : X.toNet.WF xs.sys.ar) {C D : Nat} (hb : xs.Bounded C D) {n : Nat} {N' : Net S}
+    (hs : Steps (Step xs.sys) n X.toNet N') (hn : Normal (Step xs.sys) N') (i : Nat) :
+    JMach.walked xs (fun _ => 0) (JMach.init X 1) i ≤
+      3 * n + 4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
+        2 * ((X.wires.length + D * n) * (X.wires.length + D * n + 1)) +
+        2 * (X.wires.length + D * n) := by
+  have live := JMach.trace_live (xs := xs) (fun _ => 0) (JMach.init_live hX Nat.one_pos)
+  have run : ∀ i, MRun xs.sys ((JMach.init X 1).trace xs (fun _ => 0) i).2 (Mach.init X.toNet)
+      ((JMach.init X 1).trace xs (fun _ => 0) i).1.toMach := by
+    intro i
+    have h := JMach.trace_run xs (fun _ => 0) (JMach.init X 1) i
+    rw [JMach.init_toMach] at h
+    exact h
+  have bound : ∀ i, ((JMach.init X 1).trace xs (fun _ => 0) i).2 ≤ n :=
+    fun i => (run i).claims_le hX hs hn
+  have ahead : ∀ i, ((JMach.init X 1).trace xs (fun _ => 0) i).1.toW.toX.Ahead N' :=
+    fun i => XMach.ahead_of_run (M := ((JMach.init X 1).trace xs (fun _ => 0) i).1.toW.toX)
+      (live i).inv hX (run i) hs hn
+  have hH := XNet.normal_sized hX hb hs hn
+  generalize X.wires.length + D * n = K at hH ⊢
+  obtain ⟨W, hWK, hWl⟩ := hH.fin
+  let l : List Id := W.map fun e => e.1.1
+  have hok : ∀ j, j ≤ i → PayOk xs.sys.ar W l
+      ((JMach.init X 1).trace xs (fun _ => 0) j).1.toMach.goal := by
+    intro j _
+    have hG := (live j).inv.wf
+    refine ⟨hG, fun u v h => hWl ((ahead j).link h), fun k γ hk => ?_⟩
+    obtain ⟨q, hq⟩ := hG.end_wired (p := (k, 0)) (.inr ⟨γ, hk, Nat.zero_le _⟩)
+    exact List.mem_map.2 ⟨_, hWl ((ahead j).link hq), rfl⟩
+  have h := JMach.walked_payΦ hJ hP hX hWK hok
+  have hle := payΦ_le K W l ((JMach.init X 1).trace xs (fun _ => 0) i).1.toMach.goal
+  have hl : l.length = W.length := List.length_map _
+  have hmul₁ : W.length * Nat.log2 (K + 1) ≤ K * Nat.log2 (K + 1) := Nat.mul_le_mul_right _ hWK
+  have hmul₂ : l.length * (K + 1) ≤ K * (K + 1) := by rw [hl]; exact Nat.mul_le_mul_right _ hWK
+  have hmul₃ : 3 * ((JMach.init X 1).trace xs (fun _ => 0) i).2 ≤ 3 * n :=
+    Nat.mul_le_mul_left _ (bound i)
   omega
 
 end Run

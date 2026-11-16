@@ -91,6 +91,7 @@ import InteractionNets.Arith.JoinChain
 import InteractionNets.WireFar
 import InteractionNets.JoinFast
 import InteractionNets.JoinPay
+import InteractionNets.JoinSystems
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
 
@@ -3471,8 +3472,18 @@ holds up to equality rather than up to renaming.
   nothing else (`XSys.PureJoin`) pays its walks (`XSys.walkPaid_payΦ`), and
   along a run of one thread the actions of walks are at most three per
   claim and the growth of `payΦ` (`JMach.walked_payΦ`), which is at most
-  `4 |W| log (K + 1) + 2 |l| (K + 1) + 2 |W|` (`payΦ_le`).  The middle term
-  is not yet `O(|W|)`, so the bound is not yet `O(S log S)`.
+  `4 |W| log (K + 1) + 2 |l| (K + 1) + 2 |W|` (`payΦ_le`).  Over a whole
+  run to a normal form of `n` steps, with `K = |wires| + D n`, the walks of
+  one thread cost at most `3 n + 4 K log (K + 1) + 2 K (K + 1) + 2 K`
+  (`JMach.walked_bound`).  The middle term is not yet `O(K)`, so the bound
+  is not yet `O(K log K)`, which is what was measured.  A system pays only
+  for joins that do nothing else when its joining rules write no agent
+  (`XSys.pureJoin_of`), and joins one segment at most if it does on one pair
+  of names (`XSys.oneJoin_of`).  `JoinSystems` checks both rule by rule:
+  arithmetic, Peano arithmetic, `Extra`, `Window`, `LongRun` and the
+  one-symbol system have both (so `Arith.walked_bound`); the interaction
+  combinators join two segments when they annihilate
+  (`Comb.dsystem_not_oneJoin`).
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
