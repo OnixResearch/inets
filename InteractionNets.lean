@@ -93,6 +93,7 @@ import InteractionNets.JoinFast
 import InteractionNets.JoinPay
 import InteractionNets.JoinSystems
 import InteractionNets.JoinTotal
+import InteractionNets.JoinMulti
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
 
@@ -3513,6 +3514,14 @@ holds up to equality rather than up to renaming.
   measured, against 300 to 39000 times for the bound of `JoinBound`, which
   charges each joining claim a scan of the memory and a walk of the
   longest wire.
+  Rules that join several segments (`JoinMulti`): if every rule joins at
+  most `J` segments and joining is all it does, each interface port on one
+  of them (`XSys.PureJoins`, checked rule by rule by `XSys.pureJoins_of`),
+  each walk is that of one segment added to the net with the others
+  (`joined_of_pure`), and one thread reaches the normal form after
+  `7 |agents| + 2 K + J (4 K log (K + 1) + 6 K) + n (C + D + 1 + 9 J) + 7 C n`
+  actions (`JMach.rests_multi`, `JMach.rests_multi_final`).  The
+  interaction combinators have `J = 2` (`Comb.rests_multi`).
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
