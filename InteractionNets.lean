@@ -3523,6 +3523,10 @@ holds up to equality rather than up to renaming.
   `7 |agents| + 2 K + J (4 K log (K + 1) + 6 K) + n (C + D + 1 + 9 J) + 7 C n`
   actions (`JMach.rests_multi`, `JMach.rests_multi_final`; with any `K`
   bounding the segments of the normal form, `JMach.rests_multi_sized`).  The
+  The charge of twice the shorter side cannot be lowered: a walk has found
+  nothing while both its sides go (`JWalk.found_none_before`); and the walks
+  on bit-reversed `joinChain` cost `2 n b + 5` for `n = 2 ^ b`, checked in
+  the kernel up to `b = 5`, so the order `n log n` is reached there.  The
   interaction combinators have `J = 2` (`Comb.rests_multi`); on chains of
   annihilating pairs (`CombChain`) the bound is 54 to 66 times the actions
   measured.

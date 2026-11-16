@@ -726,6 +726,23 @@ theorem JMach.rests_multi {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins) 
   JMach.rests_multi_sized hJ hP hX hnd hb hs hn (XNet.normal_sized hX hb hs hn)
 
 omit [DecidableEq S] in
+/-- **A walk cannot be over while both sides go**: after `m` advances with
+`(m + 1) / 2 < r₁` and `m / 2 < r₂` it has found nothing.  So the walk of
+`found_stop₁` takes `2 r₁ - 1` advances exactly, and the charge of twice the
+shorter side cannot be lowered. -/
+theorem JWalk.found_none_before (X : XNet S) (w : JWalk S) (ht : w.turn = true)
+    {r₁ r₂ : Nat}
+    (h₁ : ∀ i, (JCur.iter X w.s₂ i w.c₁).going = true ↔ i < r₁)
+    (h₂ : ∀ i, (JCur.iter X w.s₁ i w.c₂).going = true ↔ i < r₂) {m : Nat}
+    (hm₁ : (m + 1) / 2 < r₁) (hm₂ : m / 2 < r₂) : (JWalk.iter X m w).found = none := by
+  rw [JWalk.iter_both X w ht h₁ h₂ m (fun m' hm' => ⟨by omega, by omega⟩)]
+  have g₁ := (h₁ _).2 hm₁
+  have g₂ := (h₂ _).2 hm₂
+  generalize JCur.iter X w.s₂ ((m + 1) / 2) w.c₁ = c₁ at g₁
+  generalize JCur.iter X w.s₁ (m / 2) w.c₂ = c₂ at g₂
+  cases c₁ <;> cases c₂ <;> simp_all [JCur.going, JWalk.found]
+
+omit [DecidableEq S] in
 /-- A well formed net held in memory has as many segments, at most, as the
 memory lists. -/
 theorem XNet.sized_of_toNet {Y : XNet S} {ar : S → Nat} (hY : Y.toNet.WF ar) :

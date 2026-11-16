@@ -102,4 +102,17 @@ example :
     JMach.walked Arith.xsys (fun _ => 0) (JMach.init (joinChain 3 (bitRev 3)) 1) 125 = 53 := by
   decide +kernel
 
+/-- With the bits reversed the walks cost `2 n b + 5` for `n = 2 ^ b`
+adders: 133 for 16, 325 for 32 (and 773 for 64, measured).  The order
+`n log n` of `JMach.walked_log` is reached on this family; that it is
+reached for every `b` is measured, not proved. -/
+example :
+    JMach.walked Arith.xsys (fun _ => 0) (JMach.init (joinChain 4 (bitRev 4)) 1) 300 =
+      2 * 16 * 4 + 5 := by
+  decide +kernel
+example :
+    JMach.walked Arith.xsys (fun _ => 0) (JMach.init (joinChain 5 (bitRev 5)) 1) 700 =
+      2 * 32 * 5 + 5 := by
+  decide +kernel
+
 end INet
