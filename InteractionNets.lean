@@ -92,6 +92,7 @@ import InteractionNets.WireFar
 import InteractionNets.JoinFast
 import InteractionNets.JoinPay
 import InteractionNets.JoinSystems
+import InteractionNets.JoinTotal
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
 
@@ -3492,6 +3493,14 @@ holds up to equality rather than up to renaming.
   one-symbol system have both (so `Arith.walked_log`); the interaction
   combinators join two segments when they annihilate
   (`Comb.dsystem_not_oneJoin`), so they are not covered.
+  Towards all the actions of one thread (`JoinTotal`): a measure of the
+  thread that does not count walks and drops the charge for scanning the
+  memory again (`potV`) goes down at every action outside a walk but a
+  claim (`JMach.act_potV`); a walk that finds a pair is paid with the scan
+  of the agent it finds by the growth of `payΦ` (`walk_pays_found`, using
+  `walk_isPath`: the wire between two principal ports is a path of the
+  normal form); and each action lowers that measure plus what the thread
+  owes to walks (`JMach.total_step`).
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
