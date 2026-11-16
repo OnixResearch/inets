@@ -94,6 +94,7 @@ import InteractionNets.JoinPay
 import InteractionNets.JoinSystems
 import InteractionNets.JoinTotal
 import InteractionNets.JoinMulti
+import InteractionNets.CombChain
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
 
@@ -3521,7 +3522,9 @@ holds up to equality rather than up to renaming.
   (`joined_of_pure`), and one thread reaches the normal form after
   `7 |agents| + 2 K + J (4 K log (K + 1) + 6 K) + n (C + D + 1 + 9 J) + 7 C n`
   actions (`JMach.rests_multi`, `JMach.rests_multi_final`).  The
-  interaction combinators have `J = 2` (`Comb.rests_multi`).
+  interaction combinators have `J = 2` (`Comb.rests_multi`); on chains of
+  annihilating pairs (`CombChain`) the bound is 54 to 66 times the actions
+  measured.
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
