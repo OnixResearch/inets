@@ -3500,7 +3500,16 @@ holds up to equality rather than up to renaming.
   of the agent it finds by the growth of `payΦ` (`walk_pays_found`, using
   `walk_isPath`: the wire between two principal ports is a path of the
   normal form); and each action lowers that measure plus what the thread
-  owes to walks (`JMach.total_step`).
+  owes to walks (`JMach.total_step`).  So **one thread of `JMach` is at
+  rest after `O(n + K log K)` actions** in all, walks included,
+  `K = |wires| + D n`: at most
+  `7 |agents| + 2 K + 4 K log (K + 1) + 6 K + n (C + D + 10) + 7 C n`
+  (`JMach.rests_log`, `Arith.rests_log`), for a system whose rules join one
+  segment at most and do nothing else when they join.  On the bit-reversed
+  chains of `MeasureJoin` the bound is some 26 to 28 times the actions
+  measured, against 300 to 39000 times for the bound of `JoinBound`, which
+  charges each joining claim a scan of the memory and a walk of the
+  longest wire.
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,

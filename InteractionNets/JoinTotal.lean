@@ -696,4 +696,219 @@ theorem JMach.total_step (hJ : xs.OneJoin) (hP : xs.PureJoin) {M : JMach S} (hL 
         rw [h0] at this
         cases this
 
+/-- The measure of the thread numbered `0`. -/
+noncomputable def JMach.potV0 (H : Net S) (K A : Nat) (M : JMach S) : Nat :=
+  match M.ths[0]? with
+  | some T => potV H K A T
+  | none => 0
+
+/-- **One thread of the program that walks the joined wires is at rest
+after `O(n + K log K)` actions**: at most
+`7 |agents| + 2 K + 4 K log (K + 1) + 6 K + n (C + D + 10) + 7 C n`, where
+`n` is the number of steps to the normal form and `K = |wires| + D n`, for
+a system whose rules write at most `C` agents and `D` segments and join one
+segment at most, doing nothing else when they join. -/
+theorem JMach.rests_log (hJ : xs.OneJoin) (hP : xs.PureJoin) {X : XNet S}
+    (hX : X.toNet.WF xs.sys.ar) (hnd : (X.agents.map Prod.fst).Nodup) {C D : Nat}
+    (hb : xs.Bounded C D) {n : Nat} {N' : Net S} (hs : Steps (Step xs.sys) n X.toNet N')
+    (hn : Normal (Step xs.sys) N') :
+    ∀ i, 7 * X.agents.length + 2 * (X.wires.length + D * n) +
+        4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
+        6 * (X.wires.length + D * n) + n * (C + D + 10) + 7 * (C * n) < i →
+      ((JMach.init X 1).trace xs (fun _ => 0) i).1.resting = true := by
+  classical
+  have live := JMach.trace_live (xs := xs) (fun _ => 0) (JMach.init_live hX Nat.one_pos)
+  have run : ∀ i, MRun xs.sys ((JMach.init X 1).trace xs (fun _ => 0) i).2 (Mach.init X.toNet)
+      ((JMach.init X 1).trace xs (fun _ => 0) i).1.toMach := by
+    intro i
+    have h := JMach.trace_run xs (fun _ => 0) (JMach.init X 1) i
+    rw [JMach.init_toMach] at h
+    exact h
+  have bound : ∀ i, ((JMach.init X 1).trace xs (fun _ => 0) i).2 ≤ n :=
+    fun i => (run i).claims_le hX hs hn
+  have one : ∀ i, ∃ T, ((JMach.init X 1).trace xs (fun _ => 0) i).1.ths = [T] := by
+    intro i
+    apply JMach.one_thread
+    rw [JMach.trace_length]
+    simp [JMach.init]
+  have hA : ∀ i, ((JMach.init X 1).trace xs (fun _ => 0) i).1.toW.heads ≤
+      X.agents.length + (C - 2) * n := by
+    intro i
+    have h := (JMach.trace_sizes (fun _ => 0) (JMach.init X 1) hb i).2
+    rw [JMach.init_toW, WMach.init_heads] at h
+    exact Nat.le_trans h (Nat.add_le_add_left (Nat.mul_le_mul_left (C - 2) (bound i)) _)
+  have nd : ∀ i, (((JMach.init X 1).trace xs (fun _ => 0) i).1.mem.agents.map Prod.fst).Nodup := by
+    intro i
+    induction i with
+    | zero => exact hnd
+    | succ i ih => exact JMach.step_nodup (live i) ih 0
+  have ahead : ∀ i, ((JMach.init X 1).trace xs (fun _ => 0) i).1.toW.toX.Ahead N' :=
+    fun i => XMach.ahead_of_run (M := ((JMach.init X 1).trace xs (fun _ => 0) i).1.toW.toX)
+      (live i).inv hX (run i) hs hn
+  have born := JMach.born_inv hb live ahead
+  have hN' := Steps.wf hX hs
+  have hH := XNet.normal_sized hX hb hs hn
+  generalize hK : X.wires.length + D * n = K at hH
+  generalize hAA : X.agents.length + (C - 2) * n = A at hA
+  have hR : ∀ i, N'.scan K (JMach.born xs (fun _ => 0) (JMach.init X 1) i) ≤ 7 * (C * n) + K := by
+    intro i
+    obtain ⟨h₁, -, h₃, h₄⟩ := born i
+    have := Net.scan_le hH _ h₁ h₃
+    have h5 : C * ((JMach.init X 1).trace xs (fun _ => 0) i).2 ≤ C * n :=
+      Nat.mul_le_mul_left C (bound i)
+    omega
+  obtain ⟨W, hWK, hWl⟩ := hH.fin
+  let l : List Id := (dedupList (W.map fun e => e.1.1)).filter
+    fun k => decide (∀ x y, N'.link (k, 0) x → N'.link (k, 0) y → x = y)
+  have hlnd : l.Nodup := (dedupList_nodup _).filter _
+  have hok : ∀ j, PayOk xs.sys.ar W l ((JMach.init X 1).trace xs (fun _ => 0) j).1.toMach.goal := by
+    intro j
+    have hG := (live j).inv.wf
+    refine ⟨hG, fun u v h => hWl ((ahead j).link h), fun k γ hk => ?_⟩
+    have hE : ((JMach.init X 1).trace xs (fun _ => 0) j).1.toMach.goal.End xs.sys.ar (k, 0) :=
+      .inr ⟨γ, hk, Nat.zero_le _⟩
+    obtain ⟨q, hq⟩ := hG.end_wired hE
+    refine List.mem_filter.2 ⟨mem_dedupList.2 (List.mem_map.2 ⟨_, hWl ((ahead j).link hq), rfl⟩),
+      decide_eq_true fun x y hx hy => ?_⟩
+    have hu : ((JMach.init X 1).trace xs (fun _ => 0) j).1.toMach.goal.Used k := .inl ⟨γ, hk⟩
+    exact hG.end_unique hE ((ahead j).principal hu hx) ((ahead j).principal hu hy)
+  -- the measure at the end of the run, and at the start
+  have hΦ : ∀ j, payΦ K W l ((JMach.init X 1).trace xs (fun _ => 0) j).1.toMach.goal ≤
+      4 * (K * Nat.log2 (K + 1)) + 6 * K := by
+    intro j
+    have hmono : payΦ K W l ((JMach.init X 1).trace xs (fun _ => 0) j).1.toMach.goal ≤
+        payΦ K W l N' := payΦ_mono fun h => (ahead j).link h
+    have hle := payΦ_le_ends (K := K) hN'.symm hN'.deg (fun h => hWl h) hlnd
+      (fun k hk x y hx hy => of_decide_eq_true (List.mem_filter.1 hk).2 x y hx hy)
+    have hllen : l.length ≤ W.length :=
+      Nat.le_trans (List.length_filter_le _ _)
+        (Nat.le_trans (dedupList_length _) (Nat.le_of_eq (List.length_map _)))
+    have hmul₁ : W.length * Nat.log2 (K + 1) ≤ K * Nat.log2 (K + 1) := Nat.mul_le_mul_right _ hWK
+    omega
+  have h0 : JMach.potV0 N' K A (JMach.init X 1) ≤ 7 * X.agents.length + K := by
+    obtain ⟨-, pr⟩ := Steps.links hX hs
+    have hag : ∀ e : Id × S, e ∈ X.agents → X.toNet.agent e.1 e.2 := fun _ he => he
+    have hscan : N'.scan K X.agents ≤ 7 * X.agents.length + K :=
+      Net.scan_le hH X.agents hnd fun e he q q' h h' =>
+        hX.end_unique (.inr ⟨e.2, hag e he, Nat.zero_le _⟩) (pr (.inl ⟨e.2, hag e he⟩) h)
+          (pr (.inl ⟨e.2, hag e he⟩) h')
+    show N'.scan K (X.agents.drop 0 ++ X.agents.take 0) ≤ _
+    simpa using hscan
+  -- while no action has been at rest, each lowers the measure
+  have key : ∀ i, (∀ j, j < i → ¬ ((JMach.init X 1).trace xs (fun _ => 0) j).1.AtRest 0) →
+      ∃ b, ((JMach.init X 1).trace xs (fun _ => 0) i).1.OwesC N' K b ∧
+        i + JMach.potV0 N' K A ((JMach.init X 1).trace xs (fun _ => 0) i).1 + b +
+            payΦ K W l X.toNet ≤
+          JMach.potV0 N' K A (JMach.init X 1) +
+            payΦ K W l ((JMach.init X 1).trace xs (fun _ => 0) i).1.toMach.goal +
+            ((JMach.init X 1).trace xs (fun _ => 0) i).2 * (C + D + 10) +
+            N'.scan K (JMach.born xs (fun _ => 0) (JMach.init X 1) i) := by
+    intro i
+    induction i with
+    | zero =>
+      intro _
+      have eg : (JMach.init X 1).toMach.goal = X.toNet := by
+        rw [JMach.init_toMach X 1]
+        exact congrArg CState.goal (Mach.init_quiet X.toNet).abs
+      refine ⟨0, fun T hT => ?_, ?_⟩
+      · change (JMach.init X 1).ths[0]? = some T at hT
+        simp only [JMach.init, List.range_one, List.map_cons, List.map_nil,
+          List.getElem?_cons_zero, Option.some.injEq] at hT
+        subst hT
+        refine ⟨fun w h => ?_, fun _ p q js h => ?_⟩
+        · cases h
+        · cases h
+      · show 0 + JMach.potV0 N' K A (JMach.init X 1) + 0 + _ ≤ _ +
+          payΦ K W l (JMach.init X 1).toMach.goal + 0 * (C + D + 10) + N'.scan K []
+        rw [eg]
+        have : N'.scan K ([] : List (Id × S)) = 0 := rfl
+        omega
+    | succ i ih =>
+      intro hno
+      obtain ⟨b, hb', hle⟩ := ih fun j hj => hno j (by omega)
+      obtain ⟨T, h1⟩ := one i
+      have ht : ((JMach.init X 1).trace xs (fun _ => 0) i).1.ths[0]? = some T := by
+        rw [h1]; rfl
+      have hsucc : ((JMach.init X 1).trace xs (fun _ => 0) (i + 1)) =
+          ((((JMach.init X 1).trace xs (fun _ => 0) i).1.step xs 0).1,
+          ((JMach.init X 1).trace xs (fun _ => 0) i).2 +
+            (((JMach.init X 1).trace xs (fun _ => 0) i).1.step xs 0).2) := rfl
+      have hbs : JMach.born xs (fun _ => 0) (JMach.init X 1) (i + 1) =
+          JMach.born xs (fun _ => 0) (JMach.init X 1) i ++
+            JMach.stepKids xs ((JMach.init X 1).trace xs (fun _ => 0) i).1 0 := rfl
+      have hok' := hok (i + 1)
+      have hM' := ahead (i + 1)
+      rw [hsucc] at hok' hM'
+      rcases JMach.total_step hJ hP (live i) h1 (nd i) hb hH (ahead i) hM' (hA i) hWK (hok i) hok'
+          hb' with ⟨hto, hst⟩ | ⟨b', hb'', hstep⟩
+      · exfalso
+        obtain ⟨todo, st, g, js, wk⟩ := T
+        dsimp only at hto hst
+        subst hto hst
+        exact hno i (by omega) ⟨g, js, wk, ht⟩
+      · refine ⟨b', ?_, ?_⟩
+        · rw [hsucc]
+          exact hb''
+        · have hp : JMach.potV0 N' K A ((JMach.init X 1).trace xs (fun _ => 0) (i + 1)).1 =
+              potV N' K A
+                (JMach.act xs ((JMach.init X 1).trace xs (fun _ => 0) i).1.mem T).2.1 := by
+            rw [hsucc]
+            unfold JMach.potV0
+            have es := JMach.step_eq
+              (X₁ := (JMach.act xs ((JMach.init X 1).trace xs (fun _ => 0) i).1.mem T).1)
+              (T₁ := (JMach.act xs ((JMach.init X 1).trace xs (fun _ => 0) i).1.mem T).2.1)
+              (c := (JMach.act xs ((JMach.init X 1).trace xs (fun _ => 0) i).1.mem T).2.2) ht rfl
+            rw [es, h1]
+            rfl
+          have hp0 : JMach.potV0 N' K A ((JMach.init X 1).trace xs (fun _ => 0) i).1 =
+              potV N' K A T := by
+            unfold JMach.potV0
+            rw [ht]
+          rw [hp, hbs, Net.scan_append, hsucc]
+          rw [hp0] at hle
+          dsimp only
+          rw [Nat.add_mul]
+          omega
+  intro i hi
+  -- some action before was at rest, and a thread at rest stays at rest
+  have hrest : ∃ j, j ≤ i ∧ ((JMach.init X 1).trace xs (fun _ => 0) j).1.AtRest 0 := by
+    refine Classical.byContradiction fun hno => ?_
+    obtain ⟨b, -, hle⟩ := key i fun j hj h => hno ⟨j, by omega, h⟩
+    have := hΦ i
+    have := hR i
+    have hc : ((JMach.init X 1).trace xs (fun _ => 0) i).2 * (C + D + 10) ≤ n * (C + D + 10) :=
+      Nat.mul_le_mul_right _ (bound i)
+    omega
+  obtain ⟨j, hj, g, js, wk, hT⟩ := hrest
+  have stay : ∀ k, j ≤ k →
+      ((JMach.init X 1).trace xs (fun _ => 0) k).1.ths[0]? = some ⟨[], .idle, g, js, wk⟩ := by
+    intro k hk
+    induction k with
+    | zero =>
+      obtain rfl : j = 0 := by omega
+      exact hT
+    | succ k ih =>
+      rcases Nat.lt_or_ge j (k + 1) with h | h
+      · exact JMach.step_rest _ 0 (ih (by omega))
+      · obtain rfl : j = k + 1 := by omega
+        exact hT
+  obtain ⟨T, h1⟩ := one i
+  have := stay i hj
+  rw [h1] at this
+  obtain rfl : T = ⟨[], .idle, g, js, wk⟩ := Option.some.inj this
+  unfold JMach.resting
+  rw [h1]
+  rfl
+
+/-- **One thread of arithmetic is at rest after `O(n + K log K)`
+actions**, `K = |wires| + 8 n`. -/
+theorem Arith.rests_log {X : XNet Arith} (hX : X.toNet.WF Arith.xsys.sys.ar)
+    (hnd : (X.agents.map Prod.fst).Nodup) {n : Nat} {N' : Net Arith}
+    (hs : Steps (Step Arith.xsys.sys) n X.toNet N') (hn : Normal (Step Arith.xsys.sys) N') :
+    ∀ i, 7 * X.agents.length + 2 * (X.wires.length + 8 * n) +
+        4 * ((X.wires.length + 8 * n) * Nat.log2 (X.wires.length + 8 * n + 1)) +
+        6 * (X.wires.length + 8 * n) + n * (2 + 8 + 10) + 7 * (2 * n) < i →
+      ((JMach.init X 1).trace Arith.xsys (fun _ => 0) i).1.resting = true :=
+  JMach.rests_log Arith.xsys_oneJoin Arith.xsys_pureJoin hX hnd Arith.xsys_bounded hs hn
+
 end INet
