@@ -3579,15 +3579,16 @@ holds up to equality rather than up to renaming.
   measured with `jCritical` cost exactly what they cost with one thread.
   The measuring runs are tied to the proofs: `JMach.pRun` runs the machine
   with any choice of turn by recursion on the fuel, and returns the first
-  number of actions at which every thread rests and the actions of walks
-  before it, which are `JMach.walked` along the same run
+  number of actions at which every thread rests (or the fuel, if it runs
+  out) and the actions of walks before it, which are `JMach.walked` along the same run
   (`JMach.pRun_spec`).  Its busy-first run `JMach.bfRun` is within the
   bound of `JMach.rests_bfSched` plus one, and its walks within the bound
   of one thread, whatever the fuel (`JMach.bfRun_rests`,
   `JMach.bfRun_walked`); likewise `JMach.csRun` for `JMach.csSched`
-  (`JMach.csRun_rests`, `JMach.csRun_walked`); on the adders this needs
-  only the steps to the normal form (`Arith.bfRun_rests`).  `JMach.bfRun`
-  returns exactly what `jBusyFirst` measured.  `jCritical` is not
+  (`JMach.csRun_rests`, `JMach.csRun_walked`); on the adders, given a well
+  formed net with names apart and its steps to the normal form
+  (`Arith.bfRun_rests`).  On the chains measured, `JMach.bfRun` returned
+  exactly what `jBusyFirst` did (measured, not proved).  `jCritical` is not
   `JMach.csSched`: its turns go round from the last thread that acted, not
   by the number of actions; under `JMach.csSched` itself, 16 threads on
   16 adders in order walk 91 times against 79 for one thread (checked in

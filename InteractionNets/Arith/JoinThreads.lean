@@ -43,7 +43,8 @@ example : JMach.bfRun Arith.xsys (joinChain 4 id) 16 100000 = (703, 79) := by
 
 /-- The measuring run where turns go round (`JMach.csRun`, proved to follow
 `JMach.csSched`): at rest after 1008 actions, 91 of them walks.  More walks
-than one thread here, but within the bound of `JMach.csRun_walked`. -/
+than one thread here; `JMach.csRun_walked` bounds them for any net with a
+normal form. -/
 example : JMach.csRun Arith.xsys (joinChain 4 id) 16 100000 = (1008, 91) := by
   decide +kernel
 

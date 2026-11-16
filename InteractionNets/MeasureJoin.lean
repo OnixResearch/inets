@@ -89,9 +89,11 @@ on chains of 64 to 1,024 adders (20,485 bit-reversed, 5,119 in order, for
 thread.
 
 The schedules of the proofs are run by `JMach.bfRun` and `JMach.csRun`
-(`SchedRun`), proved to stop at the first state at rest and to count the
-walks of `JMach.walked`.  `JMach.bfRun` returns exactly what `jBusyFirst`
-does.  `jCritical` gives turns round from the last thread that acted, so it
+(`SchedRun`), proved to stop at the first state at rest (or when the fuel
+runs out) and to count the walks of `JMach.walked`.  On the runs below
+`JMach.bfRun` returned exactly what `jBusyFirst` did (measured, not
+proved), and the same at 64 and 256 adders.  `jCritical` gives turns
+round from the last thread that acted, so it
 is not `JMach.csSched`, whose turns go by the number of actions; on the
 bit-reversed chain of 1,024 adders the two differ by under 10 percent:
 
@@ -101,10 +103,13 @@ bit-reversed chain of 1,024 adders the two differ by under 10 percent:
          16               60,421        1,185,943     106,165   98,016        18,975,088
          64              158,725        2,463,991     346,309  334,208       157,695,424
 
-with 20,485 actions of walks in every run, against a proved bound of
-722,036 for every run of either schedule.  The bounds are those of
-`JMach.bfRun_rests` and `JMach.csRun_rests` with `n = 1,024` steps; the
-bound of `JMach.csRun` has the factor `nt` twice. -/
+with 20,485 actions of walks in every run, against 722,036 by the bounds
+of `JMach.bfRun_walked` and `JMach.csRun_walked`.  The bounds are those of
+`JMach.bfRun_rests` and `JMach.csRun_rests` evaluated with `n = 1,024`
+steps, 2,048 agents and 4,098 wires; that this chain is well formed and
+reaches its normal form in 1,024 steps is not proved here (well formed
+is checked for `b = 3` in `Arith.JoinChain`).  The bound of `JMach.csRun` has the factor
+`nt` twice. -/
 
 namespace INet
 

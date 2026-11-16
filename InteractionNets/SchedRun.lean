@@ -7,18 +7,19 @@ is at rest, and the actions of walks, under two schedules.  Those programs
 are loops in `Id.run`; nothing proved about them.  Here a run is written
 once more, by recursion on the fuel and for any choice of turn `pk`, and
 proved to count exactly what the bounds are about: it stops at the first
-state at rest (`JMach.pRun_spec`), and the actions of walks it counts are
-`JMach.walked` along the same run.
+state at rest, or when the fuel runs out (`JMach.pRun_spec`), and the
+actions of walks it counts are `JMach.walked` along the same run.
 
 So the counts it returns are bounded by the theorems themselves, with no
-hypothesis on the fuel:
+hypothesis on the fuel (the hypotheses on the net are those of the bounds:
+well formed, names apart, a normal form after `n` steps, and `0 < nt`):
 * `JMach.bfRun_rests`, `JMach.bfRun_walked`: the busy-first schedule
   `JMach.bfSched`, by `JMach.rests_bfSched` and `JMach.walked_cs`;
 * `JMach.csRun_rests`, `JMach.csRun_walked`: the schedule `JMach.csSched`,
   by `JMach.rests_csSched` and `JMach.walked_csSched`;
-* `Arith.bfRun_rests`: the busy-first schedule on any net of the adders.
+* `Arith.bfRun_rests`: the busy-first schedule on the nets of the adders.
 
-The tables of `MeasureJoin` for several threads are taken with these runs.
+`MeasureJoin` compares these runs with its own programs.
 -/
 
 namespace INet
