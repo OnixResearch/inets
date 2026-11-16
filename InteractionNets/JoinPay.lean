@@ -1015,6 +1015,128 @@ theorem JMach.walked_bound (hJ : xs.OneJoin) (hP : xs.PureJoin) {X : XNet S}
     Nat.mul_le_mul_left _ (bound i)
   omega
 
+/-- A list without repeats, with the same members. -/
+def dedupList {α : Type} [DecidableEq α] : List α → List α
+  | [] => []
+  | x :: xs => if x ∈ dedupList xs then dedupList xs else x :: dedupList xs
+
+theorem mem_dedupList {α : Type} [DecidableEq α] {x : α} :
+    ∀ {l : List α}, x ∈ dedupList l ↔ x ∈ l
+  | [] => Iff.rfl
+  | y :: l => by
+    unfold dedupList
+    split
+    · rename_i h
+      rw [mem_dedupList, List.mem_cons]
+      constructor
+      · exact .inr
+      · rintro (rfl | h')
+        · exact mem_dedupList.1 h
+        · exact h'
+    · rw [List.mem_cons, mem_dedupList, List.mem_cons]
+
+theorem dedupList_nodup {α : Type} [DecidableEq α] : ∀ l : List α, (dedupList l).Nodup
+  | [] => List.nodup_nil
+  | y :: l => by
+    unfold dedupList
+    split
+    · exact dedupList_nodup l
+    · rename_i h
+      exact List.nodup_cons.2 ⟨h, dedupList_nodup l⟩
+
+theorem dedupList_length {α : Type} [DecidableEq α] : ∀ l : List α, (dedupList l).length ≤ l.length
+  | [] => Nat.le_refl _
+  | y :: l => by
+    unfold dedupList
+    have := dedupList_length l
+    split <;> simp only [List.length_cons] <;> omega
+
+omit [DecidableEq S] in
+/-- **The measure of a net is at most `4 |W| log (K + 1) + 2 |l| + 4 |W|`**
+when `W` holds its segments, it is a wiring, and `l` names, once each,
+principal ports that lie on one segment at most. -/
+theorem payΦ_le_ends {K : Nat} {W : List (Port × Port)} {l : List Id} {H : Net S}
+    (hs : ∀ {p q}, H.link p q → H.link q p)
+    (hd : ∀ {p x y z}, H.link p x → H.link p y → H.link p z → x = y ∨ x = z ∨ y = z)
+    (hW : ∀ {u v}, H.link u v → (u, v) ∈ W) (hl : l.Nodup)
+    (hend : ∀ k, k ∈ l → ∀ x y, H.link (k, 0) x → H.link (k, 0) y → x = y) :
+    payΦ K W l H ≤ 4 * (W.length * Nat.log2 (K + 1)) + 2 * (l.length + W.length) +
+      2 * W.length := by
+  unfold payΦ
+  have h₁ : (W.map fun e => Nat.log2 (lfar H.link K e.1)).sum ≤ W.length * Nat.log2 (K + 1) := by
+    have := sum_mono W (fun e => Nat.log2 (lfar H.link K e.1)) (fun _ => Nat.log2 (K + 1))
+      fun e _ => log2_mono (lfar_le K e.1)
+    rwa [sum_map_const] at this
+  have h₂ : (l.map fun i => lfar H.link K (i, 0)).sum ≤ l.length + W.length := by
+    have hE : (l.map fun i => ((i, 0) : Port)).Nodup := by
+      unfold List.Nodup
+      rw [List.pairwise_map]
+      exact hl.imp fun hne e => hne (Prod.mk.inj e).1
+    have := sum_lfar_ends hs hd hW K (l.map fun i => ((i, 0) : Port)) hE (fun e he => by
+      obtain ⟨k, hk, rfl⟩ := List.mem_map.1 he
+      exact hend k hk)
+    rw [List.map_map, List.length_map] at this
+    exact this
+  have h₃ : (W.map fun e => cycAt H.link e.1).sum ≤ W.length := by
+    have := sum_mono W (fun e => cycAt H.link e.1) (fun _ => 1) fun e _ => cycAt_le_one _ _
+    rwa [sum_map_const, Nat.mul_one] at this
+  omega
+
+/-- **The walks of one thread, along the whole of a run, cost at most
+`3 n + 4 K log (K + 1) + 6 K`**, where `n` is the number of steps to the
+normal form and `K = |wires| + D n` bounds its segments, for a system whose
+rules join one segment at most and do nothing else when they join. -/
+theorem JMach.walked_log (hJ : xs.OneJoin) (hP : xs.PureJoin) {X : XNet S}
+    (hX : X.toNet.WF xs.sys.ar) {C D : Nat} (hb : xs.Bounded C D) {n : Nat} {N' : Net S}
+    (hs : Steps (Step xs.sys) n X.toNet N') (hn : Normal (Step xs.sys) N') (i : Nat) :
+    JMach.walked xs (fun _ => 0) (JMach.init X 1) i ≤
+      3 * n + 4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
+        6 * (X.wires.length + D * n) := by
+  classical
+  have live := JMach.trace_live (xs := xs) (fun _ => 0) (JMach.init_live hX Nat.one_pos)
+  have run : ∀ i, MRun xs.sys ((JMach.init X 1).trace xs (fun _ => 0) i).2 (Mach.init X.toNet)
+      ((JMach.init X 1).trace xs (fun _ => 0) i).1.toMach := by
+    intro i
+    have h := JMach.trace_run xs (fun _ => 0) (JMach.init X 1) i
+    rw [JMach.init_toMach] at h
+    exact h
+  have bound : ∀ i, ((JMach.init X 1).trace xs (fun _ => 0) i).2 ≤ n :=
+    fun i => (run i).claims_le hX hs hn
+  have ahead : ∀ i, ((JMach.init X 1).trace xs (fun _ => 0) i).1.toW.toX.Ahead N' :=
+    fun i => XMach.ahead_of_run (M := ((JMach.init X 1).trace xs (fun _ => 0) i).1.toW.toX)
+      (live i).inv hX (run i) hs hn
+  have hN' := Steps.wf hX hs
+  have hH := XNet.normal_sized hX hb hs hn
+  generalize X.wires.length + D * n = K at hH ⊢
+  obtain ⟨W, hWK, hWl⟩ := hH.fin
+  let l : List Id := (dedupList (W.map fun e => e.1.1)).filter
+    fun k => decide (∀ x y, N'.link (k, 0) x → N'.link (k, 0) y → x = y)
+  have hlnd : l.Nodup := (dedupList_nodup _).filter _
+  have hllen : l.length ≤ W.length :=
+    Nat.le_trans (List.length_filter_le _ _)
+      (Nat.le_trans (dedupList_length _) (Nat.le_of_eq (List.length_map _)))
+  have hok : ∀ j, j ≤ i → PayOk xs.sys.ar W l
+      ((JMach.init X 1).trace xs (fun _ => 0) j).1.toMach.goal := by
+    intro j _
+    have hG := (live j).inv.wf
+    refine ⟨hG, fun u v h => hWl ((ahead j).link h), fun k γ hk => ?_⟩
+    have hE : ((JMach.init X 1).trace xs (fun _ => 0) j).1.toMach.goal.End xs.sys.ar (k, 0) :=
+      .inr ⟨γ, hk, Nat.zero_le _⟩
+    obtain ⟨q, hq⟩ := hG.end_wired hE
+    refine List.mem_filter.2 ⟨mem_dedupList.2 (List.mem_map.2 ⟨_, hWl ((ahead j).link hq), rfl⟩),
+      decide_eq_true fun x y hx hy => ?_⟩
+    have hu : ((JMach.init X 1).trace xs (fun _ => 0) j).1.toMach.goal.Used k := .inl ⟨γ, hk⟩
+    exact hG.end_unique hE ((ahead j).principal hu hx) ((ahead j).principal hu hy)
+  have h := JMach.walked_payΦ hJ hP hX hWK hok
+  have hmono : payΦ K W l ((JMach.init X 1).trace xs (fun _ => 0) i).1.toMach.goal ≤
+      payΦ K W l N' := payΦ_mono fun h => (ahead i).link h
+  have hle := payΦ_le_ends (K := K) hN'.symm hN'.deg (fun h => hWl h) hlnd (fun k hk x y hx hy =>
+    of_decide_eq_true (List.mem_filter.1 hk).2 x y hx hy)
+  have hmul₁ : W.length * Nat.log2 (K + 1) ≤ K * Nat.log2 (K + 1) := Nat.mul_le_mul_right _ hWK
+  have hmul₃ : 3 * ((JMach.init X 1).trace xs (fun _ => 0) i).2 ≤ 3 * n :=
+    Nat.mul_le_mul_left _ (bound i)
+  omega
+
 end Run
 
 end INet

@@ -3475,13 +3475,18 @@ holds up to equality rather than up to renaming.
   `4 |W| log (K + 1) + 2 |l| (K + 1) + 2 |W|` (`payΦ_le`).  Over a whole
   run to a normal form of `n` steps, with `K = |wires| + D n`, the walks of
   one thread cost at most `3 n + 4 K log (K + 1) + 2 K (K + 1) + 2 K`
-  (`JMach.walked_bound`).  The middle term is not yet `O(K)`, so the bound
-  is not yet `O(K log K)`, which is what was measured.  A system pays only
+  (`JMach.walked_bound`), and in fact at most `3 n + 4 K log (K + 1) + 6 K`
+  (`JMach.walked_log`): the longest trails from different points on one
+  segment at most share no segment, so they add up to at most the points
+  and the segments (`sum_lfar_ends`, `payΦ_le_ends`).  So the walks of one
+  thread cost `O(n + K log K)`, the order measured on `joinChain` (`2 n lg
+  n` actions there; the proved bound is some 33 to 50 times the measured
+  count for 16 to 4096 adders).  A system pays only
   for joins that do nothing else when its joining rules write no agent
   (`XSys.pureJoin_of`), and joins one segment at most if it does on one pair
   of names (`XSys.oneJoin_of`).  `JoinSystems` checks both rule by rule:
   arithmetic, Peano arithmetic, `Extra`, `Window`, `LongRun` and the
-  one-symbol system have both (so `Arith.walked_bound`); the interaction
+  one-symbol system have both (so `Arith.walked_log`); the interaction
   combinators join two segments when they annihilate
   (`Comb.dsystem_not_oneJoin`).
   Both programs run expressions in any system with the core, with a

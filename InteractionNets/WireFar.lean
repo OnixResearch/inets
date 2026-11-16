@@ -581,6 +581,157 @@ theorem cyc_gain {d : Nat → V} {t : Nat} (P : IsPath L d t) (ht : 2 ≤ t)
 
 end Doubling
 
+section Ends
+
+/-- The segments of a trail, each from a point to the next. -/
+def trailSegs : List V → List (V × V)
+  | x :: y :: rest => (y, x) :: trailSegs (y :: rest)
+  | _ => []
+
+theorem trailSegs_length : ∀ vs : List V, (trailSegs vs).length = vs.length - 1
+  | [] => rfl
+  | [_] => rfl
+  | x :: y :: rest => by
+    simp only [trailSegs, List.length_cons, trailSegs_length (y :: rest)]
+    omega
+
+theorem trailSegs_fst {c : V} : ∀ {rest : List V} {u v : V}, (u, v) ∈ trailSegs (c :: rest) →
+    u ∈ rest
+  | [], _, _, h => by simp [trailSegs] at h
+  | y :: rest, u, v, h => by
+    simp only [trailSegs, List.mem_cons, Prod.mk.injEq] at h
+    rcases h with ⟨rfl, -⟩ | h
+    · exact List.mem_cons_self
+    · exact List.mem_cons_of_mem _ (trailSegs_fst h)
+
+theorem trailSegs_nodup : ∀ {vs : List V}, vs.Nodup → (trailSegs vs).Nodup
+  | [], _ => List.nodup_nil
+  | [_], _ => List.nodup_nil
+  | x :: y :: rest, h => by
+    simp only [trailSegs]
+    refine List.nodup_cons.2 ⟨fun hm => ?_, trailSegs_nodup (List.nodup_cons.1 h).2⟩
+    have := trailSegs_fst hm
+    exact (List.nodup_cons.1 (List.nodup_cons.1 h).2).1 this
+
+theorem Trail.link_head {e c d : V} {vs : List V} (t : Trail L e (c :: d :: vs)) : L d c := by
+  cases t with
+  | step _ hl _ => exact hl
+
+theorem Trail.head_eq {e c : V} (t : Trail L e [c]) : c = e := by
+  cases t with
+  | start => rfl
+
+theorem Trail.trailSegs_link {e : V} : ∀ {vs : List V}, Trail L e vs → ∀ {u v},
+    (u, v) ∈ trailSegs vs → L u v := by
+  intro vs t
+  induction t with
+  | start => intro u v h; simp [trailSegs] at h
+  | @step c q vs₀ t' hl _ ih =>
+    intro u v h
+    simp only [trailSegs, List.mem_cons, Prod.mk.injEq] at h
+    rcases h with ⟨rfl, rfl⟩ | h
+    · exact hl
+    · exact ih h
+
+/-- Walking back from `u`, away from `v`, along the only way there is,
+ends at `e`, a point with no other segment. -/
+inductive BackTo (L : V → V → Prop) : V → V → V → Prop
+  | stop {u v : V} : (∀ w, L u w → w = v) → BackTo L u v u
+  | step {u v w e : V} : L u w → w ≠ v → BackTo L w u e → BackTo L u v e
+
+/-- **Walking back is forced** when a point lies on two segments at most. -/
+theorem BackTo.unique (hs : ∀ {p q}, L p q → L q p)
+    (hd : ∀ {p x y z}, L p x → L p y → L p z → x = y ∨ x = z ∨ y = z) {u v e : V}
+    (h : BackTo L u v e) : ∀ {e'}, L u v → BackTo L u v e' → e = e' := by
+  induction h with
+  | stop hu =>
+    intro e' _ h'
+    cases h' with
+    | stop _ => rfl
+    | step hl hne _ => exact absurd (hu _ hl) hne
+  | step hl hne _ ih =>
+    intro e' huv h'
+    cases h' with
+    | stop hu => exact absurd (hu _ hl) hne
+    | step hl' hne' hb' =>
+      rcases hd huv hl hl' with e | e | e
+      · exact absurd e.symm hne
+      · exact absurd e.symm hne'
+      · subst e
+        exact ih (hs hl) hb'
+
+/-- **Every segment of a trail from a point on one segment at most leads
+back to it.** -/
+theorem Trail.backTo (hs : ∀ {p q}, L p q → L q p) {e : V}
+    (he : ∀ x y, L e x → L e y → x = y) : ∀ {vs : List V}, Trail L e vs → ∀ {u v},
+      (u, v) ∈ trailSegs vs → BackTo L u v e := by
+  intro vs t
+  induction t with
+  | start => intro u v h; simp [trailSegs] at h
+  | @step c q vs₀ t' hl hq ih =>
+    intro u v h
+    simp only [trailSegs, List.mem_cons, Prod.mk.injEq] at h
+    rcases h with ⟨rfl, rfl⟩ | h
+    · cases vs₀ with
+      | nil =>
+        obtain rfl := t'.head_eq
+        exact .stop fun w hw => he w _ hw hl
+      | cons d vs₁ =>
+        have hdc := t'.link_head
+        have hb := ih (u := d) (v := u) (by simp [trailSegs])
+        exact .step (hs hdc) (fun e => hq (e ▸ List.mem_cons_of_mem _ List.mem_cons_self)) hb
+    · exact ih h
+
+/-- **The longest trails from different points on one segment at most have
+no segment in common**, so together they are at most as long as the
+points and the segments: `∑ lfar ≤ |E| + |W|`. -/
+theorem sum_lfar_ends [DecidableEq V] (hs : ∀ {p q}, L p q → L q p)
+    (hd : ∀ {p x y z}, L p x → L p y → L p z → x = y ∨ x = z ∨ y = z) {W : List (V × V)}
+    (hW : ∀ {u v}, L u v → (u, v) ∈ W) (K : Nat) (E : List V) (hE : E.Nodup)
+    (hend : ∀ e, e ∈ E → ∀ x y, L e x → L e y → x = y) :
+    (E.map (lfar L K)).sum ≤ E.length + W.length := by
+  have att : ∀ e, ∃ vs, Trail L e vs ∧ vs.length = lfar L K e := by
+    intro e
+    rcases supBelow_spec (fun n => ∃ vs, Trail L e vs ∧ vs.length = n) (K + 1) with h | h
+    · have := one_le_lfar (L := L) K e
+      unfold lfar at this
+      omega
+    · exact h
+  let vsOf : V → List V := fun e => Classical.choose (att e)
+  have hvs : ∀ e, Trail L e (vsOf e) ∧ (vsOf e).length = lfar L K e :=
+    fun e => Classical.choose_spec (att e)
+  let Sg := E.flatMap fun e => trailSegs (vsOf e)
+  have hnd : Sg.Nodup := by
+    unfold List.Nodup
+    rw [List.pairwise_flatMap]
+    refine ⟨fun e _ => trailSegs_nodup (hvs e).1.nodup, ?_⟩
+    exact hE.imp_of_mem fun he he' hne x hx y hy exy => by
+      subst exy
+      obtain ⟨u, v⟩ := x
+      have h₁ := (hvs _).1.backTo hs (hend _ he) hx
+      have h₂ := (hvs _).1.backTo hs (hend _ he') hy
+      exact hne (h₁.unique hs hd ((hvs _).1.trailSegs_link hx) h₂)
+  have hsub : Sg ⊆ W := by
+    intro x hx
+    obtain ⟨e, -, hx⟩ := List.mem_flatMap.1 hx
+    obtain ⟨u, v⟩ := x
+    exact hW ((hvs e).1.trailSegs_link hx)
+  have hlen := hnd.length_le_of_subset hsub
+  have hsum : ∀ E' : List V, (E'.map (lfar L K)).sum ≤
+      E'.length + (E'.flatMap fun e => trailSegs (vsOf e)).length := by
+    intro E'
+    induction E' with
+    | nil => simp
+    | cons e E' ih =>
+      simp only [List.map_cons, List.sum_cons, List.length_cons, List.flatMap_cons,
+        List.length_append, trailSegs_length, (hvs e).2]
+      have := one_le_lfar (L := L) K e
+      omega
+  have h' : (E.map (lfar L K)).sum ≤ E.length + Sg.length := hsum E
+  omega
+
+end Ends
+
 end PathFar
 
 end INet

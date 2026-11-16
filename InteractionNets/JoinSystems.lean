@@ -8,14 +8,14 @@ import InteractionNets.Examples
 
 /-! # Which systems pay for their walks
 
-`JMach.walked_bound` bounds the walks of one thread for a system whose
-rules join one segment at most (`XSys.OneJoin`) and do nothing else when
-they join (`XSys.PureJoin`).  Both are checked here rule by rule for the
-systems of the development: arithmetic, Peano arithmetic, the system of
-`Extra`, the chains of `Window`, the system of `LongRun` and the one-symbol
-system of `Examples` have both.  The interaction combinators have the
-second but not the first: two agents of the same kind annihilate by
-joining two segments.
+`JMach.walked_log` (and the weaker `JMach.walked_bound`) bounds the walks
+of one thread for a system whose rules join one segment at most
+(`XSys.OneJoin`) and do nothing else when they join (`XSys.PureJoin`).
+Both are checked here rule by rule for the systems of the development:
+arithmetic, Peano arithmetic, the system of `Extra`, the chains of
+`Window`, the system of `LongRun` and the one-symbol system of `Examples`
+have both.  The interaction combinators have the second but not the first:
+two agents of the same kind annihilate by joining two segments.
 
 The counter `JMach.walked` of the bound is checked against the count of
 `jStats` on the chain of eight joins of `Arith.JoinChain`.
@@ -79,6 +79,17 @@ theorem Arith.walked_bound {X : XNet Arith} (hX : X.toNet.WF Arith.xsys.sys.ar) 
         2 * ((X.wires.length + D * n) * (X.wires.length + D * n + 1)) +
         2 * (X.wires.length + D * n) :=
   JMach.walked_bound Arith.xsys_oneJoin Arith.xsys_pureJoin hX hb hs hn i
+
+/-- **The walks of one thread of arithmetic cost `O(n + K log K)`**: at
+most `3 n + 4 K log (K + 1) + 6 K`, with `n` the steps to the normal form
+and `K = |wires| + 8 n`. -/
+theorem Arith.walked_log {X : XNet Arith} (hX : X.toNet.WF Arith.xsys.sys.ar) {n : Nat}
+    {N' : Net Arith} (hs : Steps (Step Arith.xsys.sys) n X.toNet N')
+    (hn : Normal (Step Arith.xsys.sys) N') (i : Nat) :
+    JMach.walked Arith.xsys (fun _ => 0) (JMach.init X 1) i ≤
+      3 * n + 4 * ((X.wires.length + 8 * n) * Nat.log2 (X.wires.length + 8 * n + 1)) +
+        6 * (X.wires.length + 8 * n) :=
+  JMach.walked_log Arith.xsys_oneJoin Arith.xsys_pureJoin hX Arith.xsys_bounded hs hn i
 
 set_option maxRecDepth 100000
 
