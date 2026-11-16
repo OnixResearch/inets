@@ -725,6 +725,25 @@ theorem JMach.rests_multi {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins) 
       ((JMach.init X 1).trace xs (fun _ => 0) i).1.resting = true :=
   JMach.rests_multi_sized hJ hP hX hnd hb hs hn (XNet.normal_sized hX hb hs hn)
 
+omit [DecidableEq S] in
+/-- A well formed net held in memory has as many segments, at most, as the
+memory lists. -/
+theorem XNet.sized_of_toNet {Y : XNet S} {ar : S → Nat} (hY : Y.toNet.WF ar) :
+    Y.toNet.Sized Y.wires.length :=
+  ⟨hY.symm, hY.irrefl, hY.deg, ⟨Y.wires, Nat.le_refl _, fun h => h⟩⟩
+
+/-- **The bound in the size of the normal form**: when the normal form is
+held by a memory `Y`, `K` may be the number of segments `Y` lists. -/
+theorem JMach.rests_multi_out {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins)
+    {X : XNet S} (hX : X.toNet.WF xs.sys.ar) (hnd : (X.agents.map Prod.fst).Nodup) {C D : Nat}
+    (hb : xs.Bounded C D) {n : Nat} {Y : XNet S} (hs : Steps (Step xs.sys) n X.toNet Y.toNet)
+    (hn : Normal (Step xs.sys) Y.toNet) :
+    ∀ i, 7 * X.agents.length + 2 * Y.wires.length +
+        J * (4 * (Y.wires.length * Nat.log2 (Y.wires.length + 1)) + 6 * Y.wires.length) +
+        n * (C + D + 1 + 9 * J) + 7 * (C * n) < i →
+      ((JMach.init X 1).trace xs (fun _ => 0) i).1.resting = true :=
+  JMach.rests_multi_sized hJ hP hX hnd hb hs hn (XNet.sized_of_toNet (Steps.wf hX hs))
+
 /-- **At rest, the thread has made all the claims and the memory holds the
 normal form.** -/
 theorem JMach.rests_multi_final {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins)
