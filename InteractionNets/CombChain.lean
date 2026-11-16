@@ -18,8 +18,12 @@ Measured with one thread (bit-reversed order), against the bound of
 | 1024  | 52233   | 40969  | 2921976    | 56    |
 | 4096  | 241673  | 196617 | 13128248   | 54    |
 
-In order, the actions are 20 per pair (81919 for 4096 pairs).  The table
-is measured, not proved; the run for `b = 3` is checked in the kernel. -/
+In order, the actions are 20 per pair (81919 for 4096 pairs).  The bound
+charges every claim the 16 segments of a commutation, while an annihilation
+writes 4: with `K` the segments of the normal form (`10 n + 4` here,
+measured), `JMach.rests_multi_sized` gives a bound 24 to 29 times the
+actions.  The tables are measured, not proved; the run for `b = 3` is
+checked in the kernel. -/
 
 namespace INet
 

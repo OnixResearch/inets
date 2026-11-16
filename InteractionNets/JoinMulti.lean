@@ -513,18 +513,19 @@ theorem JMach.total_step_multi {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJo
         cases this
 
 /-- **One thread is at rest after `O(n + J K log K)` actions when rules
-may join up to `J` segments**: at most
+may join up to `J` segments**, `K` being any bound on the segments of the
+normal form: at most
 `7 |agents| + 2 K + J (4 K log (K + 1) + 6 K) + n (C + D + 1 + 9 J) + 7 C n`,
-where `n` is the number of steps to the normal form and `K = |wires| + D n`,
+where `n` is the number of steps to the normal form,
 for a system whose rules write at most `C` agents and `D` segments and join
 at most `J` segments, doing nothing else when they join. -/
-theorem JMach.rests_multi {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins) {X : XNet S}
+theorem JMach.rests_multi_sized {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins) {X : XNet S}
     (hX : X.toNet.WF xs.sys.ar) (hnd : (X.agents.map Prod.fst).Nodup) {C D : Nat}
     (hb : xs.Bounded C D) {n : Nat} {N' : Net S} (hs : Steps (Step xs.sys) n X.toNet N')
-    (hn : Normal (Step xs.sys) N') :
-    ∀ i, 7 * X.agents.length + 2 * (X.wires.length + D * n) +
-        J * (4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
-          6 * (X.wires.length + D * n)) + n * (C + D + 1 + 9 * J) + 7 * (C * n) < i →
+    (hn : Normal (Step xs.sys) N') {K : Nat} (hH : N'.Sized K) :
+    ∀ i, 7 * X.agents.length + 2 * K +
+        J * (4 * (K * Nat.log2 (K + 1)) +
+          6 * K) + n * (C + D + 1 + 9 * J) + 7 * (C * n) < i →
       ((JMach.init X 1).trace xs (fun _ => 0) i).1.resting = true := by
   classical
   have live := JMach.trace_live (xs := xs) (fun _ => 0) (JMach.init_live hX Nat.one_pos)
@@ -557,8 +558,6 @@ theorem JMach.rests_multi {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins) 
       (live i).inv hX (run i) hs hn
   have born := JMach.born_inv hb live ahead
   have hN' := Steps.wf hX hs
-  have hH := XNet.normal_sized hX hb hs hn
-  generalize hK : X.wires.length + D * n = K at hH
   generalize hAA : X.agents.length + (C - 2) * n = A at hA
   have hR : ∀ i, N'.scan K (JMach.born xs (fun _ => 0) (JMach.init X 1) i) ≤ 7 * (C * n) + K := by
     intro i
@@ -709,6 +708,22 @@ theorem JMach.rests_multi {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins) 
   unfold JMach.resting
   rw [h1]
   rfl
+
+/-- **One thread is at rest after `O(n + J K log K)` actions when rules
+may join up to `J` segments**: at most
+`7 |agents| + 2 K + J (4 K log (K + 1) + 6 K) + n (C + D + 1 + 9 J) + 7 C n`,
+where `n` is the number of steps to the normal form and `K = |wires| + D n`,
+for a system whose rules write at most `C` agents and `D` segments and join
+at most `J` segments, doing nothing else when they join. -/
+theorem JMach.rests_multi {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins) {X : XNet S}
+    (hX : X.toNet.WF xs.sys.ar) (hnd : (X.agents.map Prod.fst).Nodup) {C D : Nat}
+    (hb : xs.Bounded C D) {n : Nat} {N' : Net S} (hs : Steps (Step xs.sys) n X.toNet N')
+    (hn : Normal (Step xs.sys) N') :
+    ∀ i, 7 * X.agents.length + 2 * (X.wires.length + D * n) +
+        J * (4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
+          6 * (X.wires.length + D * n)) + n * (C + D + 1 + 9 * J) + 7 * (C * n) < i →
+      ((JMach.init X 1).trace xs (fun _ => 0) i).1.resting = true :=
+  JMach.rests_multi_sized hJ hP hX hnd hb hs hn (XNet.normal_sized hX hb hs hn)
 
 /-- **At rest, the thread has made all the claims and the memory holds the
 normal form.** -/

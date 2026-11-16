@@ -3521,7 +3521,8 @@ holds up to equality rather than up to renaming.
   each walk is that of one segment added to the net with the others
   (`joined_of_pure`), and one thread reaches the normal form after
   `7 |agents| + 2 K + J (4 K log (K + 1) + 6 K) + n (C + D + 1 + 9 J) + 7 C n`
-  actions (`JMach.rests_multi`, `JMach.rests_multi_final`).  The
+  actions (`JMach.rests_multi`, `JMach.rests_multi_final`; with any `K`
+  bounding the segments of the normal form, `JMach.rests_multi_sized`).  The
   interaction combinators have `J = 2` (`Comb.rests_multi`); on chains of
   annihilating pairs (`CombChain`) the bound is 54 to 66 times the actions
   measured.
