@@ -98,6 +98,7 @@ import InteractionNets.CombChain
 import InteractionNets.Arith.JoinThreads
 import InteractionNets.JoinWrite
 import InteractionNets.JoinCrit
+import InteractionNets.JoinCritWork
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
 
