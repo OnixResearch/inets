@@ -20,8 +20,8 @@ of walks (starting one or advancing one, as `jStats` counts them) are at
 most `c₀` per claim plus the growth of the measure from the first goal
 (`JMach.walked_le`).
 
-What remains to prove an `n log n` bound is the payment itself for a
-measure such as the sum of the logarithms of the longest trails.
+The payment itself, for the measure `payΦ` built from the longest trails,
+is proved in `JoinPay` (`XSys.walkPaid_payΦ`, `JMach.walked_log`).
 -/
 
 namespace INet

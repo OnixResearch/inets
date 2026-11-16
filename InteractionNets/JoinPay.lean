@@ -1084,14 +1084,14 @@ theorem payΦ_le_ends {K : Nat} {W : List (Port × Port)} {l : List Id} {H : Net
 
 /-- **The walks of one thread, along the whole of a run, cost at most
 `3 n + 4 K log (K + 1) + 6 K`**, where `n` is the number of steps to the
-normal form and `K = |wires| + D n` bounds its segments, for a system whose
-rules join one segment at most and do nothing else when they join. -/
-theorem JMach.walked_log (hJ : xs.OneJoin) (hP : xs.PureJoin) {X : XNet S}
-    (hX : X.toNet.WF xs.sys.ar) {C D : Nat} (hb : xs.Bounded C D) {n : Nat} {N' : Net S}
-    (hs : Steps (Step xs.sys) n X.toNet N') (hn : Normal (Step xs.sys) N') (i : Nat) :
+normal form `N'` and `K` bounds its segments, for a system whose rules join
+one segment at most and do nothing else when they join. -/
+theorem JMach.walked_sized (hJ : xs.OneJoin) (hP : xs.PureJoin) {X : XNet S}
+    (hX : X.toNet.WF xs.sys.ar) {n : Nat} {N' : Net S}
+    (hs : Steps (Step xs.sys) n X.toNet N') (hn : Normal (Step xs.sys) N') {K : Nat}
+    (hH : N'.Sized K) (i : Nat) :
     JMach.walked xs (fun _ => 0) (JMach.init X 1) i ≤
-      3 * n + 4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
-        6 * (X.wires.length + D * n) := by
+      3 * n + 4 * (K * Nat.log2 (K + 1)) + 6 * K := by
   classical
   have live := JMach.trace_live (xs := xs) (fun _ => 0) (JMach.init_live hX Nat.one_pos)
   have run : ∀ i, MRun xs.sys ((JMach.init X 1).trace xs (fun _ => 0) i).2 (Mach.init X.toNet)
@@ -1106,8 +1106,6 @@ theorem JMach.walked_log (hJ : xs.OneJoin) (hP : xs.PureJoin) {X : XNet S}
     fun i => XMach.ahead_of_run (M := ((JMach.init X 1).trace xs (fun _ => 0) i).1.toW.toX)
       (live i).inv hX (run i) hs hn
   have hN' := Steps.wf hX hs
-  have hH := XNet.normal_sized hX hb hs hn
-  generalize X.wires.length + D * n = K at hH ⊢
   obtain ⟨W, hWK, hWl⟩ := hH.fin
   let l : List Id := (dedupList (W.map fun e => e.1.1)).filter
     fun k => decide (∀ x y, N'.link (k, 0) x → N'.link (k, 0) y → x = y)
@@ -1136,6 +1134,20 @@ theorem JMach.walked_log (hJ : xs.OneJoin) (hP : xs.PureJoin) {X : XNet S}
   have hmul₃ : 3 * ((JMach.init X 1).trace xs (fun _ => 0) i).2 ≤ 3 * n :=
     Nat.mul_le_mul_left _ (bound i)
   omega
+
+/-- **The walks of one thread, along the whole of a run, cost at most
+`3 n + 4 K log (K + 1) + 6 K`**, where `n` is the number of steps to the
+normal form and `K = |wires| + D n` bounds its segments, for a system whose
+rules join one segment at most and do nothing else when they join.  As
+`K ≥ n`, this is `O((w + n) log (w + n))` for `w` wires; it counts the
+actions of walks only, of one thread, on a run that reaches a normal form. -/
+theorem JMach.walked_log (hJ : xs.OneJoin) (hP : xs.PureJoin) {X : XNet S}
+    (hX : X.toNet.WF xs.sys.ar) {C D : Nat} (hb : xs.Bounded C D) {n : Nat} {N' : Net S}
+    (hs : Steps (Step xs.sys) n X.toNet N') (hn : Normal (Step xs.sys) N') (i : Nat) :
+    JMach.walked xs (fun _ => 0) (JMach.init X 1) i ≤
+      3 * n + 4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
+        6 * (X.wires.length + D * n) :=
+  JMach.walked_sized hJ hP hX hs hn (XNet.normal_sized hX hb hs hn) i
 
 end Run
 

@@ -3476,10 +3476,13 @@ holds up to equality rather than up to renaming.
   run to a normal form of `n` steps, with `K = |wires| + D n`, the walks of
   one thread cost at most `3 n + 4 K log (K + 1) + 2 K (K + 1) + 2 K`
   (`JMach.walked_bound`), and in fact at most `3 n + 4 K log (K + 1) + 6 K`
-  (`JMach.walked_log`): the longest trails from different points on one
+  (`JMach.walked_log`; `JMach.walked_sized` takes any `K` bounding the
+  segments of the normal form): the longest trails from different points on one
   segment at most share no segment, so they add up to at most the points
   and the segments (`sum_lfar_ends`, `payΦ_le_ends`).  So the walks of one
-  thread cost `O(n + K log K)`, the order measured on `joinChain` (`2 n lg
+  thread cost `O((w + n) log (w + n))` for `w` wires, as `K ≥ n`; this
+  counts the actions of walks only, of one thread, on a run that reaches a
+  normal form.  It is the order measured on `joinChain` (`2 n lg
   n` actions there; the proved bound is some 33 to 50 times the measured
   count for 16 to 4096 adders).  A system pays only
   for joins that do nothing else when its joining rules write no agent
@@ -3488,7 +3491,7 @@ holds up to equality rather than up to renaming.
   arithmetic, Peano arithmetic, `Extra`, `Window`, `LongRun` and the
   one-symbol system have both (so `Arith.walked_log`); the interaction
   combinators join two segments when they annihilate
-  (`Comb.dsystem_not_oneJoin`).
+  (`Comb.dsystem_not_oneJoin`), so they are not covered.
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,

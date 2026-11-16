@@ -14,8 +14,9 @@ of one thread for a system whose rules join one segment at most
 Both are checked here rule by rule for the systems of the development:
 arithmetic, Peano arithmetic, the system of `Extra`, the chains of
 `Window`, the system of `LongRun` and the one-symbol system of `Examples`
-have both.  The interaction combinators have the second but not the first:
-two agents of the same kind annihilate by joining two segments.
+have both.  The interaction combinators do not have the first: two agents
+of the same kind annihilate by joining two segments (the second holds of
+them, but says nothing of such a rule).
 
 The counter `JMach.walked` of the bound is checked against the count of
 `jStats` on the chain of eight joins of `Arith.JoinChain`.
