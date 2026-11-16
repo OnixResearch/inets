@@ -3571,7 +3571,9 @@ holds up to equality rather than up to renaming.
   each thread scans every agent once, then claims and walks cost what they
   cost with one thread.  On that schedule a window of `nt` turns with no
   action at work leaves every thread at rest, so all are at rest after `nt`
-  times that bound, plus `nt` (`JMach.rests_csSched`).  On
+  times that bound, plus `nt` (`JMach.rests_csSched`); if no thread at
+  rest gets a turn while another is at work, after that bound itself
+  (`JMach.rests_bfSched`), `O(nt (|agents| + K) + n + J K log K)`.  On
   `joinChain` (in order and bit-reversed, 1 to 256 threads) the walks
   measured cost exactly what they cost with one thread.
   Both programs run expressions in any system with the core, with a

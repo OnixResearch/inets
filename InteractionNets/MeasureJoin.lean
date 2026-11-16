@@ -276,6 +276,41 @@ def jCritical (xs : XSys S) (M : JMach S) (nt : Nat) (fuel : Nat) : Nat × Nat :
     cur := (cur.step xs pick).1
   return (fuel, w)
 
+/-- The actions until rest and the actions of walks of `JMach` when a
+thread in a claim keeps the turn and otherwise the first thread at work
+gets it: the schedule `JMach.bfSched` of `JMach.rests_bfSched`. -/
+def jBusyFirst (xs : XSys S) (M : JMach S) (nt : Nat) (fuel : Nat) : Nat × Nat := Id.run do
+  let mut cur := M
+  let mut w := 0
+  for i in [0:fuel] do
+    if cur.resting then return (i, w)
+    let mut pick := none
+    for k in [0:nt] do
+      match cur.ths[k]? with
+      | some T =>
+        let crit := match T.st with
+          | .half _ _ _ _ => true
+          | .write _ _ => true
+          | _ => false
+        if crit && pick.isNone then pick := some k
+      | none => pure ()
+    if pick.isNone then
+      for k in [0:nt] do
+        match cur.ths[k]? with
+        | some T =>
+          if !(T.todo.isEmpty && T.st.isIdle) && pick.isNone then pick := some k
+        | none => pure ()
+    let t := pick.getD 0
+    match cur.ths[t]? with
+    | some T =>
+      if T.walk.isSome then w := w + 1
+      match T.st, T.walk, T.joins with
+      | .write [] [], none, _ :: _ => if T.again then w := w + 1
+      | _, _, _ => pure ()
+    | none => pure ()
+    cur := (cur.step xs t).1
+  return (fuel, w)
+
 /-- The runs of `joinChain`, in order and with the bits of the positions
 reversed: claims, actions and actions of walks of one thread. -/
 def chainTable : IO Unit := do

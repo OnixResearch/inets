@@ -711,4 +711,231 @@ theorem JMach.rests_csSched {J : Nat} (hJ : xs.JoinsAtMost J) {X : XNet S}
   rw [Option.some.inj h']
   rfl
 
+/-! ## No turn to a thread at rest -/
+
+/-- The turn: the first thread in a claim, if any; otherwise the first
+thread at work, if any. -/
+def JMach.bfPick (M : JMach S) (_nt _i : Nat) : Nat :=
+  ((List.range M.ths.length).find? M.critAt).getD
+    (((List.range M.ths.length).find? fun u => M.busyAct u == 1).getD 0)
+
+/-- The states of the run where a thread in a claim keeps the turn, and
+threads at rest get none while another is at work. -/
+def JMach.bfState (xs : XSys S) (M : JMach S) (nt : Nat) : Nat → JMach S
+  | 0 => M
+  | i + 1 => ((JMach.bfState xs M nt i).step xs ((JMach.bfState xs M nt i).bfPick nt i)).1
+
+/-- **The schedule where a thread in a claim keeps the turn, and threads at
+rest get no turn while another is at work.** -/
+def JMach.bfSched (xs : XSys S) (M : JMach S) (nt : Nat) (i : Nat) : Nat :=
+  (JMach.bfState xs M nt i).bfPick nt i
+
+theorem JMach.bfState_trace (xs : XSys S) (M : JMach S) (nt : Nat) :
+    ∀ i, (M.trace xs (JMach.bfSched xs M nt) i).1 = JMach.bfState xs M nt i
+  | 0 => rfl
+  | i + 1 => by
+    show ((M.trace xs (JMach.bfSched xs M nt) i).1.step xs (JMach.bfSched xs M nt i)).1 = _
+    rw [JMach.bfState_trace xs M nt i]
+    rfl
+
+/-- **Along that schedule too at most one thread is in a claim, and it has
+the turn.** -/
+theorem JMach.bfSched_hcs (xs : XSys S) {X : XNet S} {nt : Nat}
+    (h0 : ∀ (u : Nat) (U : JThread S), (JMach.init X nt).ths[u]? = some U →
+      U.critical = false) :
+    ∀ i u U, ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt) i).1.ths[u]? =
+      some U → U.critical = true → JMach.bfSched xs (JMach.init X nt) nt i = u := by
+  -- at most one thread is in a claim at a time
+  have one : ∀ i u v, (JMach.bfState xs (JMach.init X nt) nt i).critAt u = true →
+      (JMach.bfState xs (JMach.init X nt) nt i).critAt v = true → u = v := by
+    intro i
+    induction i with
+    | zero =>
+      intro u v hu
+      obtain ⟨U, hU, hc⟩ := JMach.critAt_iff.1 hu
+      rw [h0 u U hU] at hc
+      cases hc
+    | succ i ih =>
+      -- every thread in a claim after the step is the one that acted
+      have only : ∀ w, (JMach.bfState xs (JMach.init X nt) nt (i + 1)).critAt w = true →
+          w = (JMach.bfState xs (JMach.init X nt) nt i).bfPick nt i := by
+        intro w hw
+        refine Classical.byContradiction fun hne => ?_
+        have hsame : (JMach.bfState xs (JMach.init X nt) nt (i + 1)).ths[w]? =
+            (JMach.bfState xs (JMach.init X nt) nt i).ths[w]? := by
+          show (((JMach.bfState xs (JMach.init X nt) nt i).step xs
+            ((JMach.bfState xs (JMach.init X nt) nt i).bfPick nt i)).1).ths[w]? = _
+          unfold JMach.step
+          split
+          · exact List.getElem?_set_ne (Ne.symm hne)
+          · rfl
+        have hw' : (JMach.bfState xs (JMach.init X nt) nt i).critAt w = true := by
+          unfold JMach.critAt at hw ⊢
+          rw [← hsame]
+          exact hw
+        apply hne
+        -- the pick is the first thread in a claim, which is `w`
+        unfold JMach.bfPick
+        cases hf : (List.range (JMach.bfState xs (JMach.init X nt) nt i).ths.length).find?
+            (JMach.bfState xs (JMach.init X nt) nt i).critAt with
+        | none =>
+          exfalso
+          have hlt : w < (JMach.bfState xs (JMach.init X nt) nt i).ths.length := by
+            obtain ⟨U, hU, -⟩ := JMach.critAt_iff.1 hw'
+            exact (List.getElem?_eq_some_iff.1 hU).1
+          exact (List.find?_eq_none.1 hf) w (List.mem_range.2 hlt) hw'
+        | some u₀ =>
+          exact ih w u₀ hw' (List.find?_some hf)
+      intro u v hu hv
+      rw [only u hu, only v hv]
+  intro i u U hU hc
+  rw [JMach.bfState_trace] at hU
+  have hu : (JMach.bfState xs (JMach.init X nt) nt i).critAt u = true :=
+    JMach.critAt_iff.2 ⟨U, hU, hc⟩
+  unfold JMach.bfSched JMach.bfPick
+  cases hf : (List.range (JMach.bfState xs (JMach.init X nt) nt i).ths.length).find?
+      (JMach.bfState xs (JMach.init X nt) nt i).critAt with
+  | none =>
+    exfalso
+    have hlt : u < (JMach.bfState xs (JMach.init X nt) nt i).ths.length :=
+      (List.getElem?_eq_some_iff.1 hU).1
+    exact (List.find?_eq_none.1 hf) u (List.mem_range.2 hlt) hu
+  | some u₀ => exact one i u₀ u (List.find?_some hf) hu
+
+omit [DecidableEq S] in
+theorem JMach.resting_iff {M : JMach S} :
+    M.resting = true ↔ ∀ (u : Nat) (U : JThread S), M.ths[u]? = some U →
+      U.todo = [] ∧ U.st = .idle := by
+  unfold JMach.resting
+  rw [List.all_eq_true]
+  constructor
+  · intro h u U hU
+    have := h U (List.mem_of_getElem? hU)
+    simp only [Bool.and_eq_true, List.isEmpty_iff] at this
+    refine ⟨this.1, ?_⟩
+    obtain ⟨-, h2⟩ := this
+    revert h2
+    cases U.st <;> simp [TState.isIdle]
+  · intro h T hT
+    obtain ⟨u, hu⟩ := List.getElem?_of_mem hT
+    obtain ⟨h1, h2⟩ := h u T hu
+    rw [h1, h2]
+    rfl
+
+theorem JMach.resting_step {M : JMach S} (h : M.resting = true) (s : Nat) :
+    (M.step xs s).1.resting = true := by
+  rw [JMach.resting_iff] at h ⊢
+  intro u U hU
+  have hlen : u < M.ths.length := by
+    rw [← JMach.step_length xs M s]
+    exact (List.getElem?_eq_some_iff.1 hU).1
+  obtain ⟨T, hT⟩ : ∃ T, M.ths[u]? = some T := ⟨_, List.getElem?_eq_getElem hlen⟩
+  obtain ⟨h1, h2⟩ := h u T hT
+  obtain ⟨todo, st, g, js, wk⟩ := T
+  dsimp only at h1 h2
+  subst h1 h2
+  rw [JMach.step_rest M s hT] at hU
+  cases hU
+  exact ⟨rfl, rfl⟩
+
+omit [DecidableEq S] in
+/-- Away from rest, the turn of `bfPick` goes to a thread at work. -/
+theorem JMach.bfPick_busy {M : JMach S} (h : M.resting = false) (nt i : Nat) :
+    M.busyAct (M.bfPick nt i) = 1 := by
+  unfold JMach.bfPick
+  cases hf : (List.range M.ths.length).find? M.critAt with
+  | some u₀ =>
+    obtain ⟨U, hU, hc⟩ := JMach.critAt_iff.1 (List.find?_some hf)
+    exact JMach.busyAct_critical hU hc
+  | none =>
+    dsimp only [Option.getD]
+    cases hg : (List.range M.ths.length).find? fun u => M.busyAct u == 1 with
+    | some u₁ =>
+      have := List.find?_some hg
+      simpa using this
+    | none =>
+      exfalso
+      have hr : M.resting = true := by
+        rw [JMach.resting_iff]
+        intro u U hU
+        have hlt := (List.getElem?_eq_some_iff.1 hU).1
+        have hn := (List.find?_eq_none.1 hg) u (List.mem_range.2 hlt)
+        have h0 : M.busyAct u = 0 := by
+          unfold JMach.busyAct at hn ⊢
+          rw [hU] at hn ⊢
+          dsimp only at hn ⊢
+          split at hn <;> simp_all
+        obtain ⟨g, js, wk, h'⟩ := JMach.busyAct_zero hU h0
+        rw [hU] at h'
+        cases h'
+        exact ⟨rfl, rfl⟩
+      rw [hr] at h
+      cases h
+
+/-- **With any number of threads, on the schedule where a thread in a claim
+keeps the turn and no thread at rest gets one while another is at work,
+the work is bounded as for `csSched`, and every action before rest is at
+work: all threads are at rest after
+`nt (7 |agents| + K) + n (C + D + 1 + 9 J) + 7 C n + K + J (4 K log (K + 1) + 6 K)`
+actions**, `K = |wires| + D n`, with no factor `nt` for turns at rest. -/
+theorem JMach.rests_bfSched {J : Nat} (hJ : xs.JoinsAtMost J) {X : XNet S}
+    (hX : X.toNet.WF xs.sys.ar) (hnd : (X.agents.map Prod.fst).Nodup) {nt : Nat} (hnt : 0 < nt)
+    {C D : Nat} (hb : xs.Bounded C D) {n : Nat} {N' : Net S}
+    (hs : Steps (Step xs.sys) n X.toNet N') (hn : Normal (Step xs.sys) N') (i : Nat)
+    (hi : nt * (7 * X.agents.length + (X.wires.length + D * n)) + n * (C + D + 1 + 9 * J) +
+        7 * (C * n) + (X.wires.length + D * n) +
+        J * (4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
+          6 * (X.wires.length + D * n)) < i) :
+    ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt) i).1.resting = true := by
+  have hwork := JMach.worked_cs hJ hX hnd hnt hb hs hn (JMach.bfSched xs (JMach.init X nt) nt)
+    (JMach.bfSched_hcs xs fun u U hU => by
+      unfold JMach.init at hU
+      rw [List.getElem?_map] at hU
+      cases hr : (List.range nt)[u]? with
+      | none => rw [hr] at hU; cases hU
+      | some t =>
+        rw [hr] at hU
+        cases hU
+        rfl) i
+  refine Classical.byContradiction fun hno => ?_
+  have hno' : ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt) i).1.resting =
+      false := by
+    cases h : ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt) i).1.resting
+    · rfl
+    · exact absurd h hno
+  -- before `i` the machine was never at rest, and every action was at work
+  have away : ∀ m, m ≤ i →
+      ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt) m).1.resting = false := by
+    intro m hm
+    cases h : ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt) m).1.resting
+    · rfl
+    · exfalso
+      have stay : ∀ d, ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt)
+          (m + d)).1.resting = true := by
+        intro d
+        induction d with
+        | zero => exact h
+        | succ d ih => exact JMach.resting_step ih _
+      have := stay (i - m)
+      rw [show m + (i - m) = i by omega, hno'] at this
+      cases this
+  have all : ∀ m, m ≤ i → JMach.worked xs (JMach.bfSched xs (JMach.init X nt) nt)
+      (JMach.init X nt) m = m := by
+    intro m
+    induction m with
+    | zero => intro _; rfl
+    | succ m ih =>
+      intro hm
+      show JMach.worked xs (JMach.bfSched xs (JMach.init X nt) nt) (JMach.init X nt) m +
+        JMach.busyAct ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt) m).1
+          (JMach.bfSched xs (JMach.init X nt) nt m) = m + 1
+      rw [ih (by omega)]
+      have hb1 := JMach.bfPick_busy (away m (by omega)) nt m
+      have e : JMach.bfSched xs (JMach.init X nt) nt m =
+          ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt) m).1.bfPick nt m := by
+        exact (congrArg (fun M => M.bfPick nt m) (JMach.bfState_trace xs _ nt m)).symm
+      rw [e, hb1]
+  rw [all i (Nat.le_refl _)] at hwork
+  omega
+
 end INet
