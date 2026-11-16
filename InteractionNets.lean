@@ -3504,7 +3504,10 @@ holds up to equality rather than up to renaming.
   rest after `O(n + K log K)` actions** in all, walks included,
   `K = |wires| + D n`: at most
   `7 |agents| + 2 K + 4 K log (K + 1) + 6 K + n (C + D + 10) + 7 C n`
-  (`JMach.rests_log`, `Arith.rests_log`), for a system whose rules join one
+  (`JMach.rests_log`, `Arith.rests_log`); then it has made every claim and
+  the memory holds the normal form (`JMach.rests_log_final`), so that many
+  actions suffice to read the numeral of the result
+  (`XNet.jrunRead_log`), for a system whose rules join one
   segment at most and do nothing else when they join.  On the bit-reversed
   chains of `MeasureJoin` the bound is some 26 to 28 times the actions
   measured, against 300 to 39000 times for the bound of `JoinBound`, which

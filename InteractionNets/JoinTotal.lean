@@ -900,6 +900,55 @@ theorem JMach.rests_log (hJ : xs.OneJoin) (hP : xs.PureJoin) {X : XNet S}
   rw [h1]
   rfl
 
+/-- **At rest, after `O(n + K log K)` actions, the thread has made all the
+claims and the memory holds the normal form.** -/
+theorem JMach.rests_log_final (hJ : xs.OneJoin) (hP : xs.PureJoin) {X : XNet S}
+    (hX : X.toNet.WF xs.sys.ar) (hnd : (X.agents.map Prod.fst).Nodup) {C D : Nat}
+    (hb : xs.Bounded C D) {n : Nat} {N' : Net S} (hs : Steps (Step xs.sys) n X.toNet N')
+    (hn : Normal (Step xs.sys) N') (i : Nat)
+    (hi : 7 * X.agents.length + 2 * (X.wires.length + D * n) +
+        4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
+        6 * (X.wires.length + D * n) + n * (C + D + 10) + 7 * (C * n) < i) :
+    ((JMach.init X 1).trace xs (fun _ => 0) i).1.resting = true ∧
+      ((JMach.init X 1).trace xs (fun _ => 0) i).2 = n ∧
+      ((JMach.init X 1).trace xs (fun _ => 0) i).1.mem.toNet = N' := by
+  have hrest := JMach.rests_log hJ hP hX hnd hb hs hn i hi
+  have live := JMach.trace_live (xs := xs) (fun _ => 0) (JMach.init_live hX Nat.one_pos)
+  have run := JMach.trace_run xs (fun _ => 0) (JMach.init X 1) i
+  rw [JMach.init_toMach] at run
+  obtain ⟨hq, hnorm⟩ := (live i).rest hrest
+  obtain ⟨-, hu⟩ := run.final hX hq hnorm
+  obtain ⟨e₁, e₂⟩ := (hu hs).2 hn
+  exact ⟨hrest, e₂.symm, e₁.symm⟩
+
+/-- **One thread returns the numeral of the normal form after
+`O(n + K log K)` actions**: given more actions than the bound of
+`JMach.rests_log`, and at least the value plus one. -/
+theorem XNet.jrunRead_log (hJ : xs.OneJoin) (hP : xs.PureJoin) {zero succ : S}
+    (hzs : zero ≠ succ) {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
+    (hnd : (X.agents.map Prod.fst).Nodup) {C D : Nat} (hb : xs.Bounded C D) {n : Nat}
+    {N' : Net S} (hs : Steps (Step xs.sys) n X.toNet N') (hn : Normal (Step xs.sys) N')
+    {p : Port} {v₀ : Nat} (hnum : Addition.IsNum xs.sys.ar zero succ N' p v₀) (s : Nat)
+    (h₁ : 7 * X.agents.length + 2 * (X.wires.length + D * n) +
+        4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
+        6 * (X.wires.length + D * n) + n * (C + D + 10) + 7 * (C * n) < s)
+    (h₃ : v₀ + 1 ≤ s) :
+    XNet.jrunRead xs zero succ X p 1 s = some v₀ := by
+  have hσ : (fun j => j % 1) = fun _ => 0 := funext fun j => Nat.mod_one j
+  obtain ⟨hr, -, e⟩ := JMach.rests_log_final hJ hP hX hnd hb hs hn s h₁
+  have hW : ((JMach.init X 1).trace xs (fun _ => 0) s).1.mem.toNet.WF xs.sys.ar := by
+    rw [e]
+    exact Steps.wf hX hs
+  have hnum' : Addition.IsNum xs.sys.ar zero succ
+      ((JMach.init X 1).trace xs (fun _ => 0) s).1.mem.toNet p v₀ := by
+    rw [e]
+    exact hnum
+  have hread := XNet.readNum_bounded hzs hW v₀ p hnum'
+  have hwl := JMach.trace_wires_le hX hb hs hn 1 (fun _ => 0) s
+  unfold XNet.jrunRead
+  rw [hσ, ite_pos' hr]
+  exact XNet.readNum_mono (by omega) hread h₃
+
 /-- **One thread of arithmetic is at rest after `O(n + K log K)`
 actions**, `K = |wires| + 8 n`. -/
 theorem Arith.rests_log {X : XNet Arith} (hX : X.toNet.WF Arith.xsys.sys.ar)
