@@ -58,7 +58,27 @@ takes five actions.  Listed in the order of the reversed bits of their
 positions, the walks join wires of equal length, both sides go to the end,
 and the walks take 133, 773, 4,101, 20,485, 45,061 and 98,309 actions for
 `n` = 16, 64, 256, 1,024, 2,048 and 4,096: almost exactly `2 * n * lg n`.
-So the best bound to hope for on walks is of the order `n * lg n`. -/
+So the best bound to hope for on walks is of the order `n * lg n`.
+
+With several threads it is not reached in general.  A schedule that gives
+the turn to a thread that is not walking whenever there is one
+(`jAdversary`), so that claims run ahead of walks and wires grow under the
+walks, makes the walks cost about `n` for each thread, up to `n` threads:
+
+    chain (order)        n   threads   walks, claims first   walks first
+    bit-reversed        64        16                 1,320           773
+    bit-reversed        64        64                 4,256           773
+    bit-reversed       256        64                17,568         4,101
+    bit-reversed       256       256                66,176         4,101
+    bit-reversed     1,024       256               266,880        20,485
+    in order         1,024        16                61,323
+    in order         1,024        64               208,646
+    in order         1,024       256               657,180
+
+With `n` threads that is of the order `n * n`.  So for several threads a
+bound on walks has to grow with the number of threads: the proved bounds
+of one thread (`JMach.walked_log`, `JMach.rests_log`) do not carry over,
+and `JMach.fair_bound` remains the bound for several threads. -/
 
 namespace INet
 
@@ -167,6 +187,52 @@ def joinChain (b : Nat) (order : Nat → Nat) : XNet Arith :=
       [(([2 * i + 1], 2), ([2 * (i + 1) + 1], 1)), (([2 * (i + 1) + 1], 1), ([2 * i + 1], 2))]) ++
     [(([0], 0), ([1], 1)), (([1], 1), ([0], 0)),
       (([2 * (n - 1) + 1], 2), ([0], 1)), (([0], 1), ([2 * (n - 1) + 1], 2))]⟩
+
+/-- The actions until rest and the actions of walks of `JMach` when the
+turn goes to a busy thread that is not walking whenever there is one
+(`walkFirst = false`), or to one that is walking (`walkFirst = true`),
+threads otherwise taking turns. -/
+def jAdversary (xs : XSys S) (M : JMach S) (nt : Nat) (fuel : Nat) (walkFirst : Bool) :
+    Nat × Nat := Id.run do
+  let mut cur := M
+  let mut w := 0
+  let mut rr := 0
+  for i in [0:fuel] do
+    if cur.resting then return (i, w)
+    let mut pick := rr % nt
+    let mut found := false
+    for k in [0:nt] do
+      let t := (rr + k) % nt
+      if !found then
+        match cur.ths[t]? with
+        | some T =>
+          let walking := T.walk.isSome ||
+            (match T.st with | .write [] [] => T.again | _ => false)
+          let busy := !(T.todo.isEmpty && T.st.isIdle)
+          if busy && (walking == walkFirst) then
+            pick := t
+            found := true
+        | none => pure ()
+    if !found then
+      for k in [0:nt] do
+        let t := (rr + k) % nt
+        if !found then
+          match cur.ths[t]? with
+          | some T =>
+            if !(T.todo.isEmpty && T.st.isIdle) then
+              pick := t
+              found := true
+          | none => pure ()
+    rr := pick + 1
+    match cur.ths[pick]? with
+    | some T =>
+      if T.walk.isSome then w := w + 1
+      match T.st, T.walk, T.joins with
+      | .write [] [], none, _ :: _ => if T.again then w := w + 1
+      | _, _, _ => pure ()
+    | none => pure ()
+    cur := (cur.step xs pick).1
+  return (fuel, w)
 
 /-- The runs of `joinChain`, in order and with the bits of the positions
 reversed: claims, actions and actions of walks of one thread. -/

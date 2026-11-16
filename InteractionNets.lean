@@ -95,6 +95,7 @@ import InteractionNets.JoinSystems
 import InteractionNets.JoinTotal
 import InteractionNets.JoinMulti
 import InteractionNets.CombChain
+import InteractionNets.Arith.JoinThreads
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
 
@@ -3534,6 +3535,12 @@ holds up to equality rather than up to renaming.
   combinators have `J = 2` (`Comb.rests_multi`); on chains of annihilating
   pairs (`CombChain`) the bound is 54 to 66 times the actions measured, 24
   to 29 with `K` the size of the normal form.
+  These bounds are for one thread, and they do not carry over to several:
+  with `n` threads and a schedule that lets claims run ahead of walks
+  (`jAdversary`), the walks on the chain of `n` adders cost more than
+  `n * n` (checked in the kernel for 16 adders, `Arith.JoinThreads`;
+  measured up to 1,024 in `MeasureJoin`).  For several threads
+  `JMach.fair_bound` remains the bound.
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
