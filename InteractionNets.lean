@@ -97,6 +97,7 @@ import InteractionNets.JoinMulti
 import InteractionNets.CombChain
 import InteractionNets.Arith.JoinThreads
 import InteractionNets.JoinWrite
+import InteractionNets.JoinCrit
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
 
@@ -3549,7 +3550,13 @@ holds up to equality rather than up to renaming.
   the kernel for 16, evaluated for 32, `Arith.JoinThreads`; measured with
   up to 256 threads in `MeasureJoin`).  So a bound for several threads has
   to grow with their number; `JMach.fair_bound`, which needs every thread
-  scheduled in every window, remains the bound for several threads.
+  scheduled in every window, remains the bound for every schedule.  When a
+  thread that has claimed keeps the turn until it has written and walked
+  (`JThread.critical`), a walk runs on a memory that holds the goal
+  (`JMach.like_goal_cs`) and the charge of one thread goes through
+  (`JMach.cs_step`): with any number of threads the walks cost at most
+  `9 J n + J (4 K log (K + 1) + 6 K)` (`JMach.walked_cs`), and measured
+  they cost exactly what they cost with one thread.
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,

@@ -81,7 +81,12 @@ grow about linearly with `n`, and giving the turn to walking threads first
 keeps the cost of one thread.  So a bound on walks for several threads has
 to grow with the number of threads: the proved bounds of one thread
 (`JMach.walked_log`, `JMach.rests_log`) do not carry over, and
-`JMach.fair_bound` remains the bound for several threads. -/
+`JMach.fair_bound` remains the bound for several threads, for every
+schedule.  When a thread in a claim keeps the turn (`jCritical`), the
+walks cost exactly what they cost with one thread, with 1 to 256 threads
+on chains of 64 to 1,024 adders (20,485 bit-reversed, 5,119 in order, for
+1,024); `JMach.walked_cs` proves they cost no more than the bound of one
+thread. -/
 
 namespace INet
 
@@ -234,6 +239,40 @@ def jAdversary (xs : XSys S) (M : JMach S) (nt : Nat) (fuel : Nat) (walkFirst : 
       | .write [] [], none, _ :: _ => if T.again then w := w + 1
       | _, _, _ => pure ()
     | none => pure ()
+    cur := (cur.step xs pick).1
+  return (fuel, w)
+
+/-- The actions until rest and the actions of walks of `JMach` when a
+thread in a claim (`half`, writing or walking) keeps the turn, threads
+otherwise taking turns: the schedules of `JMach.walked_cs`. -/
+def jCritical (xs : XSys S) (M : JMach S) (nt : Nat) (fuel : Nat) : Nat × Nat := Id.run do
+  let mut cur := M
+  let mut w := 0
+  let mut rr := 0
+  for i in [0:fuel] do
+    if cur.resting then return (i, w)
+    let mut pick := rr % nt
+    for k in [0:nt] do
+      match cur.ths[k]? with
+      | some T =>
+        let crit := match T.st with
+          | .half _ _ _ _ => true
+          | .write _ _ => true
+          | _ => false
+        if crit then pick := k
+      | none => pure ()
+    match cur.ths[pick]? with
+    | some T =>
+      let crit := match T.st with
+        | .half _ _ _ _ => true
+        | .write _ _ => true
+        | _ => false
+      if !crit then rr := pick + 1
+      if T.walk.isSome then w := w + 1
+      match T.st, T.walk, T.joins with
+      | .write [] [], none, _ :: _ => if T.again then w := w + 1
+      | _, _, _ => pure ()
+    | none => rr := pick + 1
     cur := (cur.step xs pick).1
   return (fuel, w)
 

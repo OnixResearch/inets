@@ -10,7 +10,9 @@ gives the turn to a thread that is not walking whenever there is one
 them, and the walks take more than `n * n` actions.  Checked here in the
 kernel for 16 adders: 296 actions of walks, against 79 with one thread
 (for 32 adders, 1104 against 159, evaluated).  Measured up to 1,024 adders
-in `MeasureJoin`. -/
+in `MeasureJoin`.  When a thread that has claimed keeps the turn until it
+has written and walked, the walks cost what they cost with one thread
+(proved: `JMach.walked_cs`; checked here for the same net). -/
 
 namespace INet
 
@@ -24,6 +26,12 @@ example :
 
 /-- One thread on the same net: 79 actions of walks. -/
 example : jStats Arith.xsys 1 (JMach.init (joinChain 4 id) 1) 100000 = (223, 16, 0, 79) := by
+  decide +kernel
+
+/-- The same net and threads, when a thread in a claim keeps the turn
+(`jCritical`, the schedules of `JMach.walked_cs`): 79 actions of walks,
+as with one thread. -/
+example : jCritical Arith.xsys (JMach.init (joinChain 4 id) 16) 16 100000 = (1087, 79) := by
   decide +kernel
 
 end INet
