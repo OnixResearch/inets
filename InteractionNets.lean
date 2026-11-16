@@ -3457,6 +3457,11 @@ holds up to equality rather than up to renaming.
   `JWalk.found_stop₂`); a side goes along a path of different points, as
   far as the segments allow (`side_go`, `side_len`), and ends at a loop,
   where no segment goes on, or at a principal port (`side_end`).
+  What a join gains, in measures of longest trails (`WireFar`): joining a
+  path at its start to one at least as long doubles the longest trail from
+  each point of its far half (`log_gain`), lengthens the longest trail
+  from its end by the other path (`end_gain`), and closing a path into a
+  ring puts each of its points on a cycle (`cyc_gain`, `IsPath.cycAt`).
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,

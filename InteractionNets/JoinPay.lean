@@ -427,6 +427,74 @@ theorem side_end (hN : N.WF ar) (hX : X.Like N) (hpo : N.link p o) {r : Nat} (hr
           exact .inr ⟨γ, hs, h0, (hX.1 _ _).1 (assoc_mem hag)⟩
       · exact .inl hs
 
+/-- The point a side came from before its `i`-th point. -/
+def sidePrev (X : XNet S) (o p : Port) (i : Nat) : Port :=
+  if i = 0 then o else sidePt X o p (i - 1)
+
+/-- **A side that ends without a loop is all its points can reach**: every
+point linked to one of them is the one before or the one after. -/
+theorem side_nb (hN : N.WF ar) (hX : X.Like N) (hpo : N.link p o) {r : Nat} (hr : 1 ≤ r)
+    (h : ∀ i, (JCur.iter X o i (.go o p)).going = true ↔ i < r)
+    (hend : ∀ n, N.link (sidePt X o p (r - 1)) n → n = sidePrev X o p (r - 1)) :
+    ∀ i n, i ≤ r - 1 → N.link (sidePt X o p i) n →
+      n = sidePrev X o p i ∨ (i < r - 1 ∧ n = sidePt X o p (i + 1)) := by
+  obtain ⟨-, hl, hi, ho⟩ := side_go hN hX hpo (r - 1) ((h _).2 (by omega))
+  intro i n hir hn
+  rcases Nat.lt_or_ge i (r - 1) with hlt | hge
+  · have hA : N.link (sidePt X o p i) (sidePrev X o p i) := by
+      unfold sidePrev
+      split
+      · rename_i h0
+        subst h0
+        exact hpo
+      · have := hl (i - 1) (by omega)
+        rw [Nat.sub_add_cancel (by omega)] at this
+        exact hN.symm this
+    have hB := hl i hlt
+    rcases hN.deg hA hB hn with e | e | e
+    · exfalso
+      unfold sidePrev at e
+      split at e
+      · exact ho (i + 1) (by omega) e.symm
+      · exact absurd (hi _ _ (by omega) (by omega) e) (by omega)
+    · exact .inl e.symm
+    · exact .inr ⟨hlt, e.symm⟩
+  · obtain rfl : i = r - 1 := by omega
+    exact .inl (hend n hn)
+
+/-- **Two sides that start at the two ends of a segment, one of which ends
+without a loop, meet no point in common.** -/
+theorem sides_apart (hN : N.WF ar) (hX : X.Like N) (hpo : N.link p o) {r r' : Nat}
+    (hr : 1 ≤ r) (h : ∀ i, (JCur.iter X o i (.go o p)).going = true ↔ i < r)
+    (h' : ∀ i, (JCur.iter X p i (.go p o)).going = true ↔ i < r')
+    (hend : ∀ n, N.link (sidePt X o p (r - 1)) n → n = sidePrev X o p (r - 1)) :
+    ∀ l, l < r' → ∀ k, k ≤ r - 1 → sidePt X p o l ≠ sidePt X o p k := by
+  have hop : N.link o p := hN.symm hpo
+  obtain ⟨-, hl, hi, ho⟩ := side_go hN hX hpo (r - 1) ((h _).2 (by omega))
+  have nb := side_nb hN hX hpo hr h hend
+  intro l
+  induction l with
+  | zero =>
+    intro _ k _ e
+    exact ho k (by omega) e.symm
+  | succ l ih =>
+    intro hl' k hk e
+    obtain ⟨-, hl₂, hi₂, ho₂⟩ := side_go hN hX hop (l + 1) ((h' _).2 hl')
+    have hlink : N.link (sidePt X o p k) (sidePt X p o l) := e ▸ hN.symm (hl₂ l (by omega))
+    rcases nb k _ hk hlink with e' | ⟨hk', e'⟩
+    · unfold sidePrev at e'
+      split at e'
+      · rename_i h0
+        subst h0
+        cases l with
+        | zero => exact ho₂ 1 (Nat.le_refl _) e
+        | succ l =>
+          -- the other side came back to its start
+          have : sidePt X p o (l + 1) = sidePt X p o 0 := e'
+          exact absurd (hi₂ _ _ (by omega) (by omega) this) (by omega)
+      · exact ih (by omega) (k - 1) (by omega) e'
+    · exact ih (by omega) (k + 1) (by omega) e'
+
 end Side
 
 end INet
