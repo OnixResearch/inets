@@ -86,7 +86,25 @@ schedule.  When a thread in a claim keeps the turn (`jCritical`), the
 walks cost exactly what they cost with one thread, with 1 to 256 threads
 on chains of 64 to 1,024 adders (20,485 bit-reversed, 5,119 in order, for
 1,024); `JMach.walked_cs` proves they cost no more than the bound of one
-thread. -/
+thread.
+
+The schedules of the proofs are run by `JMach.bfRun` and `JMach.csRun`
+(`SchedRun`), proved to stop at the first state at rest and to count the
+walks of `JMach.walked`.  `JMach.bfRun` returns exactly what `jBusyFirst`
+does.  `jCritical` gives turns round from the last thread that acted, so it
+is not `JMach.csSched`, whose turns go by the number of actions; on the
+bit-reversed chain of 1,024 adders the two differ by under 10 percent:
+
+    threads   jBusyFirst = bfRun   bound of bfRun   jCritical   csRun     bound of csRun
+          1               29,701          786,553      29,701   29,701           786,553
+          4               35,845          866,431      45,049   45,048         3,465,724
+         16               60,421        1,185,943     106,165   98,016        18,975,088
+         64              158,725        2,463,991     346,309  334,208       157,695,424
+
+with 20,485 actions of walks in every run, against a proved bound of
+722,036 for every run of either schedule.  The bounds are those of
+`JMach.bfRun_rests` and `JMach.csRun_rests` with `n = 1,024` steps; the
+bound of `JMach.csRun` has the factor `nt` twice. -/
 
 namespace INet
 

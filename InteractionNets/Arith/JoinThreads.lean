@@ -1,4 +1,5 @@
 import InteractionNets.MeasureJoin
+import InteractionNets.SchedRun
 
 /-! # Several threads: walks can cost the square
 
@@ -32,6 +33,18 @@ example : jStats Arith.xsys 1 (JMach.init (joinChain 4 id) 1) 100000 = (223, 16,
 (`jCritical`, the schedules of `JMach.walked_cs`): 79 actions of walks,
 as with one thread. -/
 example : jCritical Arith.xsys (JMach.init (joinChain 4 id) 16) 16 100000 = (1087, 79) := by
+  decide +kernel
+
+/-- The busy-first measuring run (`JMach.bfRun`, proved to follow the
+schedule of `JMach.rests_bfSched`) on the same net and threads: at rest
+after 703 actions, 79 of them walks. -/
+example : JMach.bfRun Arith.xsys (joinChain 4 id) 16 100000 = (703, 79) := by
+  decide +kernel
+
+/-- The measuring run where turns go round (`JMach.csRun`, proved to follow
+`JMach.csSched`): at rest after 1008 actions, 91 of them walks.  More walks
+than one thread here, but within the bound of `JMach.csRun_walked`. -/
+example : JMach.csRun Arith.xsys (joinChain 4 id) 16 100000 = (1008, 91) := by
   decide +kernel
 
 end INet
