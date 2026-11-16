@@ -1,17 +1,22 @@
 import InteractionNets.JoinTotal
+import InteractionNets.Peano.Bound
 
-/-! # Rules that join several segments
+/-! # Rules that join several segments, and rules that join and write
 
-`JMach.rests_log` covers systems whose rules join one segment at most.  The
-interaction combinators annihilate by joining two.  Here a rule may join up
-to `J` segments, as long as joining is all it does, each interface port on
-one joined segment (`XSys.PureJoins`).  The thread walks the joined
-segments one after the other, on the net with all of them written; each
-walk is a walk of one segment added to the net with the others
-(`joined_of_pure`), so `walk_pays_found` pays it with the growth of the
-measure from the net before the claim.  The claim pays for its walks with
-`J` times that growth, and one thread is at rest after
-`O(n + J K log K)` actions (`JMach.rests_multi`).
+`JMach.rests_log` covers systems whose rules join one segment at most and
+do nothing else when they join.  Neither restriction is needed.  For any
+rule, the net after firing is the net after firing without one joined
+segment, with that segment added (`Net.fireBut`, `joined_fire`): the two
+ends of the segment are interface ports, which lie on one segment of the
+net and one of the right-hand side.  So `walk_pays_found` pays each walk
+with the growth of the measure from the net before the claim, whatever
+else the rule writes.  A claim of a rule that joins at most `J` segments
+pays for its walks with `J` times that growth, and one thread is at rest
+after `O(n + J K log K)` actions (`JMach.rests_multi`), for every system.
+
+`XSys.PureJoins` (a rule that joins writes nothing else) and
+`joined_of_pure` were the first step; they are no longer used by the
+bound.
 -/
 
 namespace INet
@@ -258,6 +263,83 @@ theorem XSys.joinsAtMost_of {J : Nat}
   rw [XRhs.joinPairs_length R xs.sys.ar a b [] [] α β]
   exact h α β R hR
 
+/-- The net after firing, without one of the segments the rule writes. -/
+def Net.fireBut (G : Net S) (a b : Id) (R : Rhs S) (pq : Port × Port) : Net S where
+  agent := (G.fire a b R).agent
+  link u v := G.link u v ∨ ∃ x y, R.link x y ∧ u = emb a b x ∧ v = emb a b y ∧
+    ¬ ((u = pq.1 ∧ v = pq.2) ∨ (u = pq.2 ∧ v = pq.1))
+  free := G.free
+
+omit [DecidableEq S] in
+/-- **Any rule's walk is the walk of one segment added to the net**: the
+net after firing is the net after firing without the joined segment, with
+that segment added, and the two ends of the segment lie on one segment of
+the latter at most, since every port of the right-hand side lies on one of
+its segments.  The rule may write agents and join any number of
+segments. -/
+theorem joined_fire {G : Net S} (hG : G.WF xs.sys.ar) {a b : Id} {α β : S} {R : XRhs S}
+    (hR : xs.rule α β = some R) (rg : Redex xs.sys G a b α β R.toRhs) {pq : Port × Port}
+    (hm : pq ∈ R.joinPairs xs.sys.ar a b α β) :
+    Joined (G.fireBut a b R.toRhs pq) (G.fire a b R.toRhs) pq.1 pq.2 := by
+  have hwf : R.toRhs.WF xs.sys.ar α β := xs.sys.rule_wf (by rw [xs.rule_spec, hR]; rfl)
+  have site := rg.site hG
+  obtain ⟨s, k, s', k', hw, hx, e₁, e₂⟩ := XRhs.mem_joinPairs hm
+  have hk : k < xs.sys.ar (sel α β s) := hwf.valid (x := .ifc s k) (y := .ifc s' k') hw
+  have hk' : k' < xs.sys.ar (sel α β s') :=
+    hwf.valid (x := .ifc s' k') (y := .ifc s k) (hwf.symm (x := .ifc s k) (y := .ifc s' k') hw)
+  have hagent : ∀ s, G.agent (sel a b s) (sel α β s) := by
+    intro s
+    cases s
+    · exact rg.ha
+    · exact rg.hb
+  have hend : ∀ s k, k < xs.sys.ar (sel α β s) → ∀ y z, G.link (emb a b (.ifc s k)) y →
+      G.link (emb a b (.ifc s k)) z → y = z := fun s k hk y z hy hz =>
+    hG.end_unique (.inr ⟨sel α β s, hagent s, by simp only [emb]; omega⟩) hy hz
+  -- the only segment of the right-hand side at an end of the pair is the pair
+  have only : ∀ (x : LPort) (y : LPort), R.toRhs.link x y →
+      (emb a b x = pq.1 → emb a b y = pq.2) ∧ (emb a b x = pq.2 → emb a b y = pq.1) := by
+    intro x y hxy
+    refine ⟨fun ex => ?_, fun ex => ?_⟩
+    · rw [e₁] at ex
+      obtain rfl := site.emb_inj ex
+      have : y = .ifc s' k' := hwf.unique hxy hw
+      rw [this, e₂]
+    · rw [e₂] at ex
+      obtain rfl := site.emb_inj ex
+      have : y = .ifc s k := hwf.unique hxy (hwf.symm (x := .ifc s k) (y := .ifc s' k') hw)
+      rw [this, e₁]
+  have endBut : ∀ (z : Port), (z = pq.1 ∨ z = pq.2) → ∀ y w,
+      (G.fireBut a b R.toRhs pq).link z y → (G.fireBut a b R.toRhs pq).link z w → y = w := by
+    intro z hz y w hy hw'
+    have gl : ∀ t, (G.fireBut a b R.toRhs pq).link z t → G.link z t := by
+      rintro t (ht | ⟨x, y', hxy, ex, ey, hne⟩)
+      · exact ht
+      · exfalso
+        apply hne
+        rcases hz with rfl | rfl
+        · exact .inl ⟨rfl, ey ▸ (only x y' hxy).1 ex.symm⟩
+        · exact .inr ⟨rfl, ey ▸ (only x y' hxy).2 ex.symm⟩
+    have hy' := gl y hy
+    have hw'' := gl w hw'
+    rcases hz with rfl | rfl
+    · rw [e₁] at hy' hw''
+      exact hend s k hk y w hy' hw''
+    · rw [e₂] at hy' hw''
+      exact hend s' k' hk' y w hy' hw''
+  refine ⟨fun u v => ⟨fun h => ?_, fun h => ?_⟩, endBut _ (.inl rfl), endBut _ (.inr rfl),
+    by rw [e₁]; simp [emb], by rw [e₂]; simp [emb]⟩
+  · rcases h with h | ⟨x, y, hxy, rfl, rfl⟩
+    · exact .inl (.inl h)
+    · by_cases hp : (emb a b x = pq.1 ∧ emb a b y = pq.2) ∨ (emb a b x = pq.2 ∧ emb a b y = pq.1)
+      · exact .inr hp
+      · exact .inl (.inr ⟨x, y, hxy, rfl, rfl, hp⟩)
+  · rcases h with (h | ⟨x, y, hxy, hu, hv, -⟩) | h
+    · exact .inl h
+    · exact .inr ⟨x, y, hxy, hu, hv⟩
+    · rcases h with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+      · exact .inr ⟨_, _, hw, e₁, e₂⟩
+      · exact .inr ⟨_, _, hwf.symm (x := .ifc s k) (y := .ifc s' k') hw, e₂, e₁⟩
+
 /-- What the walks of a list of joined segments cost on a memory holding
 `G`, one after the other, within `b` actions. -/
 def JoinsOwe (H : Net S) (K : Nat) (G : Net S) : List (Port × Port) → Nat → Prop
@@ -294,11 +376,12 @@ def JMach.OwesM (H : Net S) (K : Nat) (M : JMach S) (b : Nat) : Prop :=
       JoinsOwe H K M.toMach.goal T.joins (b - c)) ∧
     (T.walk = none → JoinsOwe H K M.toMach.goal T.joins b)
 
-/-- **One action of the only thread, when a rule may join `J` segments**:
+/-- **One action of the only thread, when a rule may join `J` segments**
+(and write anything else):
 at rest it does nothing; otherwise it lowers the measure of the thread plus
 what it owes to walks by one at least, after adding at a claim what the
 claim writes, `C + D + 1 + 9 J`, and `J` times the growth of `payΦ`. -/
-theorem JMach.total_step_multi {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins)
+theorem JMach.total_step_multi {J : Nat} (hJ : xs.JoinsAtMost J)
     {M : JMach S} (hL : M.Live xs)
     {T : JThread S} (h1 : M.ths = [T]) (hnd : (M.mem.agents.map Prod.fst).Nodup)
     {C D : Nat} (hb : xs.Bounded C D) {H : Net S} {K A : Nat} (hH : H.Sized K)
@@ -476,13 +559,10 @@ theorem JMach.total_step_multi {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJo
       · rw [hact, eg]
         show JoinsOwe H K _ (R.joinPairs xs.sys.ar a b₀ α β) _
         refine JoinsOwe.mono (JoinsOwe.of_each fun pq hm X hX => ?_) (Nat.mul_le_mul_right _ hjl)
-        have hne : R.joinPairs xs.sys.ar a b₀ α β ≠ [] := fun e => by rw [e] at hm; cases hm
-        obtain ⟨hl', he, hnd'⟩ := hP _ a b₀ α β R hok.1 hR rg hne
-        have hJn := joined_of_pure hl' he hnd' hm
+        have hJn := joined_fire hok.1 hR rg hm
         obtain ⟨n, v, hn1, hfn, hle'⟩ := walk_pays_found hok'.1 hJn hX
           (fun h => hok'.2.1 _ _ h) hWK hok'.2.2 hH.deg hHG hpr
-        have hm2 : payΦ K W l M.toMach.goal ≤
-            payΦ K W l (M.toMach.goal.addSegs ((R.joinPairs xs.sys.ar a b₀ α β).filter (· ≠ pq))) :=
+        have hm2 : payΦ K W l M.toMach.goal ≤ payΦ K W l (M.toMach.goal.fireBut a b₀ R.toRhs pq) :=
           payΦ_mono fun h => .inl h
         exact ⟨n, v, hn1, hfn, by omega⟩
       · rw [hk]
@@ -518,8 +598,8 @@ normal form: at most
 `7 |agents| + 2 K + J (4 K log (K + 1) + 6 K) + n (C + D + 1 + 9 J) + 7 C n`,
 where `n` is the number of steps to the normal form,
 for a system whose rules write at most `C` agents and `D` segments and join
-at most `J` segments, doing nothing else when they join. -/
-theorem JMach.rests_multi_sized {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins) {X : XNet S}
+at most `J` segments. -/
+theorem JMach.rests_multi_sized {J : Nat} (hJ : xs.JoinsAtMost J) {X : XNet S}
     (hX : X.toNet.WF xs.sys.ar) (hnd : (X.agents.map Prod.fst).Nodup) {C D : Nat}
     (hb : xs.Bounded C D) {n : Nat} {N' : Net S} (hs : Steps (Step xs.sys) n X.toNet N')
     (hn : Normal (Step xs.sys) N') {K : Nat} (hH : N'.Sized K) :
@@ -647,7 +727,7 @@ theorem JMach.rests_multi_sized {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJ
       have hok' := hok (i + 1)
       have hM' := ahead (i + 1)
       rw [hsucc] at hok' hM'
-      rcases JMach.total_step_multi hJ hP (live i) h1 (nd i) hb hH (ahead i) hM' (hA i) hWK
+      rcases JMach.total_step_multi hJ (live i) h1 (nd i) hb hH (ahead i) hM' (hA i) hWK
           (hok i) hok' hb' with ⟨hto, hst⟩ | ⟨b', hb'', hstep⟩
       · exfalso
         obtain ⟨todo, st, g, js, wk⟩ := T
@@ -714,8 +794,8 @@ may join up to `J` segments**: at most
 `7 |agents| + 2 K + J (4 K log (K + 1) + 6 K) + n (C + D + 1 + 9 J) + 7 C n`,
 where `n` is the number of steps to the normal form and `K = |wires| + D n`,
 for a system whose rules write at most `C` agents and `D` segments and join
-at most `J` segments, doing nothing else when they join. -/
-theorem JMach.rests_multi {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins) {X : XNet S}
+at most `J` segments. -/
+theorem JMach.rests_multi {J : Nat} (hJ : xs.JoinsAtMost J) {X : XNet S}
     (hX : X.toNet.WF xs.sys.ar) (hnd : (X.agents.map Prod.fst).Nodup) {C D : Nat}
     (hb : xs.Bounded C D) {n : Nat} {N' : Net S} (hs : Steps (Step xs.sys) n X.toNet N')
     (hn : Normal (Step xs.sys) N') :
@@ -723,7 +803,7 @@ theorem JMach.rests_multi {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins) 
         J * (4 * ((X.wires.length + D * n) * Nat.log2 (X.wires.length + D * n + 1)) +
           6 * (X.wires.length + D * n)) + n * (C + D + 1 + 9 * J) + 7 * (C * n) < i →
       ((JMach.init X 1).trace xs (fun _ => 0) i).1.resting = true :=
-  JMach.rests_multi_sized hJ hP hX hnd hb hs hn (XNet.normal_sized hX hb hs hn)
+  JMach.rests_multi_sized hJ hX hnd hb hs hn (XNet.normal_sized hX hb hs hn)
 
 omit [DecidableEq S] in
 /-- **A walk cannot be over while both sides go**: after `m` advances with
@@ -751,7 +831,7 @@ theorem XNet.sized_of_toNet {Y : XNet S} {ar : S → Nat} (hY : Y.toNet.WF ar) :
 
 /-- **The bound in the size of the normal form**: when the normal form is
 held by a memory `Y`, `K` may be the number of segments `Y` lists. -/
-theorem JMach.rests_multi_out {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins)
+theorem JMach.rests_multi_out {J : Nat} (hJ : xs.JoinsAtMost J)
     {X : XNet S} (hX : X.toNet.WF xs.sys.ar) (hnd : (X.agents.map Prod.fst).Nodup) {C D : Nat}
     (hb : xs.Bounded C D) {n : Nat} {Y : XNet S} (hs : Steps (Step xs.sys) n X.toNet Y.toNet)
     (hn : Normal (Step xs.sys) Y.toNet) :
@@ -759,11 +839,11 @@ theorem JMach.rests_multi_out {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoi
         J * (4 * (Y.wires.length * Nat.log2 (Y.wires.length + 1)) + 6 * Y.wires.length) +
         n * (C + D + 1 + 9 * J) + 7 * (C * n) < i →
       ((JMach.init X 1).trace xs (fun _ => 0) i).1.resting = true :=
-  JMach.rests_multi_sized hJ hP hX hnd hb hs hn (XNet.sized_of_toNet (Steps.wf hX hs))
+  JMach.rests_multi_sized hJ hX hnd hb hs hn (XNet.sized_of_toNet (Steps.wf hX hs))
 
 /-- **At rest, the thread has made all the claims and the memory holds the
 normal form.** -/
-theorem JMach.rests_multi_final {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJoins)
+theorem JMach.rests_multi_final {J : Nat} (hJ : xs.JoinsAtMost J)
     {X : XNet S} (hX : X.toNet.WF xs.sys.ar) (hnd : (X.agents.map Prod.fst).Nodup) {C D : Nat}
     (hb : xs.Bounded C D) {n : Nat} {N' : Net S} (hs : Steps (Step xs.sys) n X.toNet N')
     (hn : Normal (Step xs.sys) N') (i : Nat)
@@ -773,7 +853,7 @@ theorem JMach.rests_multi_final {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJ
     ((JMach.init X 1).trace xs (fun _ => 0) i).1.resting = true ∧
       ((JMach.init X 1).trace xs (fun _ => 0) i).2 = n ∧
       ((JMach.init X 1).trace xs (fun _ => 0) i).1.mem.toNet = N' := by
-  have hrest := JMach.rests_multi hJ hP hX hnd hb hs hn i hi
+  have hrest := JMach.rests_multi hJ hX hnd hb hs hn i hi
   have live := JMach.trace_live (xs := xs) (fun _ => 0) (JMach.init_live hX Nat.one_pos)
   have run := JMach.trace_run xs (fun _ => 0) (JMach.init X 1) i
   rw [JMach.init_toMach] at run
@@ -781,6 +861,31 @@ theorem JMach.rests_multi_final {J : Nat} (hJ : xs.JoinsAtMost J) (hP : xs.PureJ
   obtain ⟨-, hu⟩ := run.final hX hq hnorm
   obtain ⟨e₁, e₂⟩ := (hu hs).2 hn
   exact ⟨hrest, e₂.symm, e₁.symm⟩
+
+omit [DecidableEq S] in
+/-- **Every system joins a bounded number of segments**: no more than the
+interface ports of a pair. -/
+theorem XSys.joinsAtMost_of_ar {J : Nat} (h : ∀ α β, xs.sys.ar α + xs.sys.ar β ≤ J) :
+    xs.JoinsAtMost J := fun α β R a b _ => by
+  unfold XRhs.joinPairs
+  refine Nat.le_trans (List.length_filterMap_le _ _) ?_
+  unfold ifcPorts
+  simp only [List.length_append, List.length_map, List.length_range]
+  exact h α β
+
+/-- **One thread of Peano arithmetic, with multiplication and powers, is at
+rest after `O(n + K log K)` actions**, `K = |wires| + 12 n`. -/
+theorem Peano.rests_multi {X : XNet Peano} (hX : X.toNet.WF Peano.xsys.sys.ar)
+    (hnd : (X.agents.map Prod.fst).Nodup) {n : Nat} {N' : Net Peano}
+    (hs : Steps (Step Peano.xsys.sys) n X.toNet N') (hn : Normal (Step Peano.xsys.sys) N')
+    (i : Nat)
+    (hi : 7 * X.agents.length + 2 * (X.wires.length + 12 * n) +
+        1 * (4 * ((X.wires.length + 12 * n) * Nat.log2 (X.wires.length + 12 * n + 1)) +
+          6 * (X.wires.length + 12 * n)) + n * (4 + 12 + 1 + 9 * 1) + 7 * (4 * n) < i) :
+    ((JMach.init X 1).trace Peano.xsys (fun _ => 0) i).1.resting = true ∧
+      ((JMach.init X 1).trace Peano.xsys (fun _ => 0) i).2 = n ∧
+      ((JMach.init X 1).trace Peano.xsys (fun _ => 0) i).1.mem.toNet = N' :=
+  JMach.rests_multi_final Peano.xsys_oneJoin hX hnd Peano.xsys_bounded hs hn i hi
 
 theorem Comb.dsystem_joinsAtMost : Comb.dsystem.JoinsAtMost 2 :=
   XSys.joinsAtMost_of fun α β R h => by
@@ -806,7 +911,7 @@ theorem Comb.rests_multi {X : XNet Comb} (hX : X.toNet.WF Comb.dsystem.sys.ar)
     ((JMach.init X 1).trace Comb.dsystem (fun _ => 0) i).1.resting = true ∧
       ((JMach.init X 1).trace Comb.dsystem (fun _ => 0) i).2 = n ∧
       ((JMach.init X 1).trace Comb.dsystem (fun _ => 0) i).1.mem.toNet = N' :=
-  JMach.rests_multi_final Comb.dsystem_joinsAtMost Comb.dsystem_pureJoins hX hnd
+  JMach.rests_multi_final Comb.dsystem_joinsAtMost hX hnd
     Comb.dsystem_bounded hs hn i hi
 
 end INet

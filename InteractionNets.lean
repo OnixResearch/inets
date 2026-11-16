@@ -3515,21 +3515,25 @@ holds up to equality rather than up to renaming.
   measured, against 300 to 39000 times for the bound of `JoinBound`, which
   charges each joining claim a scan of the memory and a walk of the
   longest wire.
-  Rules that join several segments (`JoinMulti`): if every rule joins at
-  most `J` segments and joining is all it does, each interface port on one
-  of them (`XSys.PureJoins`, checked rule by rule by `XSys.pureJoins_of`),
-  each walk is that of one segment added to the net with the others
-  (`joined_of_pure`), and one thread reaches the normal form after
+  Every system (`JoinMulti`): for any rule, the net after firing is the net
+  after firing without one joined segment, with that segment added
+  (`Net.fireBut`, `joined_fire`), so each walk is paid as above whatever
+  else the rule writes.  If every rule joins at most `J` segments (always
+  true with `J` the most interface ports of a pair, `XSys.joinsAtMost_of_ar`),
+  one thread reaches the normal form after
   `7 |agents| + 2 K + J (4 K log (K + 1) + 6 K) + n (C + D + 1 + 9 J) + 7 C n`
   actions (`JMach.rests_multi`, `JMach.rests_multi_final`; with any `K`
-  bounding the segments of the normal form, `JMach.rests_multi_sized`).  The
-  The charge of twice the shorter side cannot be lowered: a walk has found
-  nothing while both its sides go (`JWalk.found_none_before`); and the walks
-  on bit-reversed `joinChain` cost `2 n b + 5` for `n = 2 ^ b`, checked in
-  the kernel up to `b = 5`, so the order `n log n` is reached there.  The
-  interaction combinators have `J = 2` (`Comb.rests_multi`); on chains of
-  annihilating pairs (`CombChain`) the bound is 54 to 66 times the actions
-  measured.
+  bounding the segments of the normal form, `JMach.rests_multi_sized`; with
+  `K` the size of a memory holding it, `JMach.rests_multi_out`).  So Peano
+  arithmetic with multiplication and powers (`Peano.rests_multi`), whose
+  rules join and write agents, is covered too.  The charge of twice the
+  shorter side cannot be lowered: a walk has found nothing while both its
+  sides go (`JWalk.found_none_before`); and the walks on bit-reversed
+  `joinChain` cost `2 n b + 5` for `n = 2 ^ b`, checked in the kernel up to
+  `b = 5`, so the order `n log n` is reached there.  The interaction
+  combinators have `J = 2` (`Comb.rests_multi`); on chains of annihilating
+  pairs (`CombChain`) the bound is 54 to 66 times the actions measured, 24
+  to 29 with `K` the size of the normal form.
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
