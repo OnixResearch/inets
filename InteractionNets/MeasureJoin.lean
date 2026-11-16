@@ -75,10 +75,13 @@ walks, makes the walks cost about `n` for each thread, up to `n` threads:
     in order         1,024        64               208,646
     in order         1,024       256               657,180
 
-With `n` threads that is of the order `n * n`.  So for several threads a
-bound on walks has to grow with the number of threads: the proved bounds
-of one thread (`JMach.walked_log`, `JMach.rests_log`) do not carry over,
-and `JMach.fair_bound` remains the bound for several threads. -/
+Under this one schedule, with as many threads as adders (64 and 256 here),
+the walks cost of the order `n * n`; with a fixed number of threads they
+grow about linearly with `n`, and giving the turn to walking threads first
+keeps the cost of one thread.  So a bound on walks for several threads has
+to grow with the number of threads: the proved bounds of one thread
+(`JMach.walked_log`, `JMach.rests_log`) do not carry over, and
+`JMach.fair_bound` remains the bound for several threads. -/
 
 namespace INet
 

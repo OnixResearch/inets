@@ -3495,7 +3495,8 @@ holds up to equality rather than up to renaming.
   arithmetic, Peano arithmetic, `Extra`, `Window`, `LongRun` and the
   one-symbol system have both (so `Arith.walked_log`); the interaction
   combinators join two segments when they annihilate
-  (`Comb.dsystem_not_oneJoin`), so they are not covered.
+  (`Comb.dsystem_not_oneJoin`), so they are not covered by these first
+  bounds (they are by `Comb.rests_multi` below).
   Towards all the actions of one thread (`JoinTotal`): a measure of the
   thread that does not count walks and drops the charge for scanning the
   memory again (`potV`) goes down at every action outside a walk but a
@@ -3516,31 +3517,37 @@ holds up to equality rather than up to renaming.
   measured, against 300 to 39000 times for the bound of `JoinBound`, which
   charges each joining claim a scan of the memory and a walk of the
   longest wire.
-  Every system (`JoinMulti`): for any rule, the net after firing is the net
-  after firing without one joined segment, with that segment added
-  (`Net.fireBut`, `joined_fire`), so each walk is paid as above whatever
-  else the rule writes.  If every rule joins at most `J` segments (always
-  true with `J` the most interface ports of a pair, `XSys.joinsAtMost_of_ar`),
-  one thread reaches the normal form after
+  Any rule (`JoinMulti`): the net after firing is the net after firing
+  without one joined segment, with that segment added (`Net.fireBut`,
+  `joined_fire`), so each walk is paid as above whatever else the rule
+  writes.  For a system whose rules write at most `C` agents and `D`
+  segments and join at most `J` segments (`J` can be the most interface
+  ports of a pair, `XSys.joinsAtMost_of_ar`), one thread reaches the
+  normal form after
   `7 |agents| + 2 K + J (4 K log (K + 1) + 6 K) + n (C + D + 1 + 9 J) + 7 C n`
   actions (`JMach.rests_multi`, `JMach.rests_multi_final`; with any `K`
   bounding the segments of the normal form, `JMach.rests_multi_sized`; with
-  `K` the size of a memory holding it, `JMach.rests_multi_out`).  So Peano
-  arithmetic with multiplication and powers (`Peano.rests_multi`), whose
-  rules join and write agents, is covered too.  The charge of twice the
+  `K` the size of a memory holding it, `JMach.rests_multi_out`); so Peano
+  arithmetic with multiplication and powers (`Peano.rests_multi`).  No
+  system of the development has a rule that both joins and writes agents,
+  so that case of the bound is not exercised by an example.  The charge of
+  twice the
   shorter side cannot be lowered: a walk has found nothing while both its
-  sides go (`JWalk.found_none_before`); and the walks on bit-reversed
-  `joinChain` cost `2 n b + 5` for `n = 2 ^ b`, checked in the kernel up to
-  `b = 5`, so the order `n log n` is reached there.  The interaction
+  sides go (`JWalk.found_none_before`, for the walk of `JMach`); and the
+  walks on bit-reversed `joinChain` cost `2 n b + 5` for `n = 2 ^ b`,
+  checked in the kernel for `b` up to 5 and measured up to 12: the order
+  `n log n` is reached there as far as checked, not proved for every `b`.  The interaction
   combinators have `J = 2` (`Comb.rests_multi`); on chains of annihilating
   pairs (`CombChain`) the bound is 54 to 66 times the actions measured, 24
   to 29 with `K` the size of the normal form.
   These bounds are for one thread, and they do not carry over to several:
-  with `n` threads and a schedule that lets claims run ahead of walks
-  (`jAdversary`), the walks on the chain of `n` adders cost more than
-  `n * n` (checked in the kernel for 16 adders, `Arith.JoinThreads`;
-  measured up to 1,024 in `MeasureJoin`).  For several threads
-  `JMach.fair_bound` remains the bound.
+  under one schedule that lets claims run ahead of walks (`jAdversary`, a
+  measuring program), the walks grow with the number of threads, more than
+  `n * n` with `n` threads on the chain of `n` adders in order (checked in
+  the kernel for 16, evaluated for 32, `Arith.JoinThreads`; measured with
+  up to 256 threads in `MeasureJoin`).  So a bound for several threads has
+  to grow with their number; `JMach.fair_bound`, which needs every thread
+  scheduled in every window, remains the bound for several threads.
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
