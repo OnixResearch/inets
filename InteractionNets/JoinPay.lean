@@ -495,6 +495,393 @@ theorem sides_apart (hN : N.WF ar) (hX : X.Like N) (hpo : N.link p o) {r r' : Na
       · exact ih (by omega) (k - 1) (by omega) e'
     · exact ih (by omega) (k + 1) (by omega) e'
 
+/-- Before its last point, a side meets only the point before and the
+point after. -/
+theorem side_mid (hN : N.WF ar) (hX : X.Like N) (hpo : N.link p o) {r : Nat}
+    (h : ∀ i, (JCur.iter X o i (.go o p)).going = true ↔ i < r) {i : Nat} (hi : i < r - 1)
+    {n : Port} (hn : N.link (sidePt X o p i) n) :
+    n = sidePrev X o p i ∨ n = sidePt X o p (i + 1) := by
+  obtain ⟨-, hl, hin, ho⟩ := side_go hN hX hpo (r - 1) ((h _).2 (by omega))
+  have hA : N.link (sidePt X o p i) (sidePrev X o p i) := by
+    unfold sidePrev
+    split
+    · rename_i h0
+      subst h0
+      exact hpo
+    · have := hl (i - 1) (by omega)
+      rw [Nat.sub_add_cancel (by omega)] at this
+      exact hN.symm this
+  rcases hN.deg hA (hl i hi) hn with e | e | e
+  · exfalso
+    unfold sidePrev at e
+    split at e
+    · exact ho (i + 1) (by omega) e.symm
+    · exact absurd (hin _ _ (by omega) (by omega) e) (by omega)
+  · exact .inl e.symm
+  · exact .inr e.symm
+
 end Side
+
+section Pay
+
+variable {ar : S → Nat} {G N : Net S} {X : XNet S} {p o : Port}
+
+/-- The net `N` is `G` with a segment added between `p` and `o`, two
+points that lie on one segment of `G` at most, neither of them a principal
+port. -/
+structure Joined (G N : Net S) (p o : Port) : Prop where
+  link : ∀ u v, N.link u v ↔ G.link u v ∨ (u = p ∧ v = o) ∨ (u = o ∧ v = p)
+  endp : ∀ x y, G.link p x → G.link p y → x = y
+  endo : ∀ x y, G.link o x → G.link o y → x = y
+  p0 : p.2 ≠ 0
+  o0 : o.2 ≠ 0
+
+theorem Joined.swap (hJ : Joined G N p o) : Joined G N o p :=
+  ⟨fun u v => by
+    rw [hJ.link]
+    constructor
+    · rintro (h | h | h)
+      · exact .inl h
+      · exact .inr (.inr h)
+      · exact .inr (.inl h)
+    · rintro (h | h | h)
+      · exact .inl h
+      · exact .inr (.inr h)
+      · exact .inr (.inl h), hJ.endo, hJ.endp, hJ.o0, hJ.p0⟩
+
+theorem Joined.le (hJ : Joined G N p o) {u v : Port} (h : G.link u v) : N.link u v :=
+  (hJ.link u v).2 (.inl h)
+
+theorem Joined.pair (hJ : Joined G N p o) : N.link p o :=
+  (hJ.link p o).2 (.inr (.inl ⟨rfl, rfl⟩))
+
+/-- A segment of `N` between two points other than `o` is a segment of `G`. -/
+theorem Joined.old (hJ : Joined G N p o) {u v : Port} (h : N.link u v) (hu : u ≠ o)
+    (hv : v ≠ o) : G.link u v := by
+  rcases (hJ.link u v).1 h with h | ⟨-, e⟩ | ⟨e, -⟩
+  · exact h
+  · exact absurd e hv
+  · exact absurd e hu
+
+theorem Joined.old' (hJ : Joined G N p o) {u v : Port} (h : N.link u v)
+    (h₁ : ¬ (u = p ∧ v = o)) (h₂ : ¬ (u = o ∧ v = p)) : G.link u v := by
+  rcases (hJ.link u v).1 h with h | h | h
+  · exact h
+  · exact absurd h h₁
+  · exact absurd h h₂
+
+/-- **A side that ends without a loop, after two points at least, runs
+along a path of `G` that a trail cannot leave.** -/
+theorem side_isPath (hN : N.WF ar) (hJ : Joined G N p o) (hX : X.Like N) {r : Nat}
+    (hr : 2 ≤ r) (h : ∀ i, (JCur.iter X o i (.go o p)).going = true ↔ i < r)
+    (hend : ∀ n, N.link (sidePt X o p (r - 1)) n → n = sidePrev X o p (r - 1)) :
+    IsPath G.link (sidePt X o p) (r - 1) := by
+  obtain ⟨-, hl, hi, ho⟩ := side_go hN hX hJ.pair (r - 1) ((h _).2 (by omega))
+  have nb := side_nb hN hX hJ.pair (by omega) h hend
+  have gl : ∀ i, i < r - 1 → G.link (sidePt X o p i) (sidePt X o p (i + 1)) :=
+    fun i hi' => hJ.old (hl i hi') (ho i (by omega)) (ho (i + 1) (by omega))
+  refine ⟨gl, hi, fun i n hir hn => ?_⟩
+  rcases nb i n hir (hJ.le hn) with e | ⟨hlt, e⟩
+  · unfold sidePrev at e
+    split at e
+    · rename_i h0
+      subst h0 e
+      exfalso
+      have := hJ.endp _ _ hn (gl 0 (by omega))
+      exact ho 1 (by omega) this.symm
+    · exact .inl ⟨by omega, e⟩
+  · exact .inr ⟨hlt, e⟩
+
+/-- **A side that meets the other start runs, with that start, along a
+path of `G` that a trail cannot leave**, of two points at least before it. -/
+theorem loop_isPath (hN : N.WF ar) (hJ : Joined G N p o) (hX : X.Like N) {r : Nat}
+    (hr : 1 ≤ r) (h : ∀ i, (JCur.iter X o i (.go o p)).going = true ↔ i < r)
+    (hlo : N.link (sidePt X o p (r - 1)) o) (hpr : o ≠ sidePrev X o p (r - 1)) :
+    2 ≤ r ∧ IsPath G.link (fun i => if i ≤ r - 1 then sidePt X o p i else o) r := by
+  have hr2 : 2 ≤ r := by
+    rcases Nat.lt_or_ge r 2 with h' | h'
+    · obtain rfl : r = 1 := by omega
+      exfalso
+      simp [sidePrev] at hpr
+    · exact h'
+  obtain ⟨-, hl, hi, ho⟩ := side_go hN hX hJ.pair (r - 1) ((h _).2 (by omega))
+  have gl : ∀ i, i < r - 1 → G.link (sidePt X o p i) (sidePt X o p (i + 1)) :=
+    fun i hi' => hJ.old (hl i hi') (ho i (by omega)) (ho (i + 1) (by omega))
+  have glast : G.link (sidePt X o p (r - 1)) o := by
+    rcases (hJ.link _ _).1 hlo with h' | ⟨e, -⟩ | ⟨e, -⟩
+    · exact h'
+    · exact absurd (hi _ 0 (Nat.le_refl _) (by omega) e) (by omega)
+    · exact absurd e (ho _ (Nat.le_refl _))
+  refine ⟨hr2, fun i hi' => ?_, fun a b ha hb e => ?_, fun i n hir hn => ?_⟩
+  · rcases Nat.lt_or_ge i (r - 1) with h₁ | h₁
+    · rw [ite_pos' (by omega), ite_pos' (by omega)]
+      exact gl i h₁
+    · obtain rfl : i = r - 1 := by omega
+      rw [ite_pos' (Nat.le_refl _), ite_neg' (by omega)]
+      exact glast
+  · split at e <;> split at e
+    · exact hi a b (by omega) (by omega) e
+    · exact absurd e (ho a (by omega))
+    · exact absurd e.symm (ho b (by omega))
+    · omega
+  · split at hn
+    · rename_i hir'
+      have hN' := hJ.le hn
+      have first : i = 0 → n ≠ o := by
+        rintro rfl rfl
+        have := hJ.endp _ _ hn (gl 0 (by omega))
+        exact ho 1 (by omega) this.symm
+      rcases Nat.lt_or_ge i (r - 1) with h₁ | h₁
+      · rcases side_mid hN hX hJ.pair h h₁ hN' with e | e
+        · unfold sidePrev at e
+          split at e
+          · rename_i h0
+            exact absurd e (first h0)
+          · refine .inl ⟨by omega, ?_⟩
+            rw [ite_pos' (by omega)]
+            exact e
+        · refine .inr ⟨by omega, ?_⟩
+          rw [ite_pos' (by omega)]
+          exact e
+      · obtain rfl : i = r - 1 := by omega
+        have hA : N.link (sidePt X o p (r - 1)) (sidePrev X o p (r - 1)) := by
+          unfold sidePrev
+          rw [ite_neg' (by omega)]
+          have := hl (r - 1 - 1) (by omega)
+          rw [Nat.sub_add_cancel (by omega)] at this
+          exact hN.symm this
+        rcases hN.deg hA hlo hN' with e | e | e
+        · exact absurd e.symm hpr
+        · refine .inl ⟨by omega, ?_⟩
+          rw [ite_pos' (by omega), ← e]
+          unfold sidePrev
+          rw [ite_neg' (by omega)]
+        · refine .inr ⟨by omega, ?_⟩
+          rw [ite_neg' (by omega)]
+          exact e.symm
+    · obtain rfl : i = r := by omega
+      have hfp : sidePt X o p (i - 1) ≠ p := fun e =>
+        absurd (hi _ 0 (Nat.le_refl _) (by omega) e) (by omega)
+      have g' : G.link o (sidePt X o p (i - 1)) :=
+        hJ.old' (hN.symm hlo) (fun ⟨_, e⟩ => ho _ (Nat.le_refl _) e) (fun ⟨_, e⟩ => hfp e)
+      refine .inl ⟨by omega, ?_⟩
+      rw [ite_pos' (Nat.le_refl _)]
+      exact hJ.endo _ _ hn g'
+
+/-- **The measure that pays for the walks**: four times the sum of the
+logarithms of the longest trails from the first points of the entries of
+`W`, twice the sum of the longest trails from the principal ports of the
+names of `l`, and twice the number of entries of `W` whose first point
+lies on a cycle. -/
+noncomputable def payΦ (K : Nat) (W : List (Port × Port)) (l : List Id) (G : Net S) : Nat :=
+  4 * (W.map fun e => Nat.log2 (lfar G.link K e.1)).sum +
+    2 * (l.map fun i => lfar G.link K (i, 0)).sum +
+    2 * (W.map fun e => cycAt G.link e.1).sum
+
+theorem payΦ_mono {K : Nat} {W : List (Port × Port)} {l : List Id} {G N : Net S}
+    (h : ∀ {u v}, G.link u v → N.link u v) : payΦ K W l G ≤ payΦ K W l N := by
+  unfold payΦ
+  have h₁ := sum_mono W _ _ fun e _ => log2_mono (lfar_mono (L := G.link) (L' := N.link) h K e.1)
+  have h₂ := sum_mono l _ _ fun i _ => lfar_mono (L := G.link) (L' := N.link) h K (i, 0)
+  have h₃ := sum_mono W _ _ fun e _ => cycAt_mono (L := G.link) (L' := N.link) h e.1
+  omega
+
+theorem JCur.rest_cases {c : JCur S} (h : c.going = false) :
+    c = .stop ∨ ∃ i γ, c = .prin i γ := by
+  cases c with
+  | go _ _ => cases h
+  | prin i γ => exact .inr ⟨i, γ, rfl⟩
+  | stop => exact .inl rfl
+
+/-- **What one side of a walk gains**, when it goes for `r` segments, no
+more than the other side: if it stops, the measure grows by `2 r` (less
+two); if it reaches a principal port, by `2 r` and twice the length of the
+other side (less two). -/
+theorem side_gain (hN : N.WF ar) (hJ : Joined G N p o) (hX : X.Like N) {K : Nat}
+    {W : List (Port × Port)} {l : List Id} (hW : ∀ {u v}, N.link u v → (u, v) ∈ W)
+    (hWK : W.length ≤ K) (hl : ∀ i γ, N.agent i γ → i ∈ l) {r r' : Nat} (hr : 1 ≤ r)
+    (h : ∀ i, (JCur.iter X o i (.go o p)).going = true ↔ i < r)
+    (h' : ∀ i, (JCur.iter X p i (.go p o)).going = true ↔ i < r') (hrr : r ≤ r') :
+    (JCur.iter X o r (.go o p) = .stop → 2 * r + payΦ K W l G ≤ 2 + payΦ K W l N) ∧
+      (∀ i γ, JCur.iter X o r (.go o p) = .prin i γ →
+        2 * r + 2 * r' + payΦ K W l G ≤ 2 + payΦ K W l N) := by
+  have hmono := payΦ_mono (K := K) (W := W) (l := l) (fun {u v} h => hJ.le (u := u) (v := v) h)
+  have hkey : ∀ {x y}, N.link x y → ∃ e, e ∈ W ∧ e.1 = x := fun hxy => ⟨_, hW hxy, rfl⟩
+  have hA := sum_mono W (fun e => Nat.log2 (lfar G.link K e.1))
+    (fun e => Nat.log2 (lfar N.link K e.1))
+    fun e _ => log2_mono (lfar_mono (L := G.link) (L' := N.link) hJ.le K e.1)
+  have hB := sum_mono l (fun i => lfar G.link K (i, 0)) (fun i => lfar N.link K (i, 0))
+    fun i _ => lfar_mono (L := G.link) (L' := N.link) hJ.le K (i, 0)
+  have hC := sum_mono W (fun e => cycAt G.link e.1) (fun e => cycAt N.link e.1)
+    fun e _ => cycAt_mono (L := G.link) (L' := N.link) hJ.le e.1
+  rcases side_end hN hX hJ.pair hr h with ⟨hlo, hpr, hst⟩ | ⟨hend, hfin⟩
+  · -- a loop: its points come to lie on a cycle
+    obtain ⟨hr2, P⟩ := loop_isPath hN hJ hX hr h hlo hpr
+    have hw : N.link ((fun i => if i ≤ r - 1 then sidePt X o p i else o) r)
+        ((fun i => if i ≤ r - 1 then sidePt X o p i else o) 0) := by
+      simp only
+      rw [ite_neg' (by omega), ite_pos' (Nat.zero_le _)]
+      exact hN.symm hJ.pair
+    have hk : ∀ i, i ≤ r → ∃ e, e ∈ W ∧
+        e.1 = (fun i => if i ≤ r - 1 then sidePt X o p i else o) i := by
+      intro i hi
+      rcases Nat.lt_or_ge i r with h₁ | h₁
+      · exact hkey (hJ.le (P.link i h₁))
+      · obtain rfl : i = r := by omega
+        have := P.link (i - 1) (by omega)
+        rw [Nat.sub_add_cancel (by omega)] at this
+        exact hkey (hN.symm (hJ.le this))
+    have := cyc_gain P hr2 hJ.le hw hk
+    refine ⟨fun _ => ?_, fun i γ hp => by rw [hst] at hp; cases hp⟩
+    unfold payΦ
+    omega
+  · rcases Nat.lt_or_ge r 2 with hr1 | hr2
+    · -- one point: the side stops at once
+      obtain rfl : r = 1 := by omega
+      have hst : JCur.iter X o 1 (.go o p) = .stop := by
+        rcases hfin with e | ⟨γ, -, h0, -⟩
+        · exact e
+        · exact absurd h0 hJ.p0
+      refine ⟨fun _ => by omega, fun i γ hp => by rw [hst] at hp; cases hp⟩
+    · have P := side_isPath hN hJ hX hr2 h hend
+      have hr' : 1 ≤ r' := by omega
+      obtain ⟨-, hgl, hgi, -⟩ := side_go hN hX (hN.symm hJ.pair) (r' - 1) ((h' _).2 (by omega))
+      have hap : ∀ i j, i ≤ r - 1 → j ≤ r' - 1 → sidePt X o p i ≠ sidePt X p o j :=
+        fun i j hi hj e => sides_apart hN hX hJ.pair hr h h' hend j (by omega) i hi e.symm
+      have hfg : N.link (sidePt X o p 0) (sidePt X p o 0) := hJ.pair
+      have hk : ∀ i, i ≤ r - 1 → ∃ e, e ∈ W ∧ e.1 = sidePt X o p i := by
+        intro i hi
+        rcases Nat.lt_or_ge i (r - 1) with h₁ | h₁
+        · exact hkey (hJ.le (P.link i h₁))
+        · obtain rfl : i = r - 1 := by omega
+          have := P.link (r - 1 - 1) (by omega)
+          rw [Nat.sub_add_cancel (by omega)] at this
+          exact hkey (hN.symm (hJ.le this))
+      have hlog := log_gain P hJ.le hN.symm hfg hgl hgi hap (by omega) hW hWK hk
+      refine ⟨fun _ => ?_, fun i γ hp => ?_⟩
+      · unfold payΦ
+        omega
+      · rcases hfin with e | ⟨γ', e, h0, hag⟩
+        · rw [e] at hp
+          cases hp
+        · rw [e] at hp
+          cases hp
+          have hend' := end_gain P hN.symm hJ.le hfg hgl hgi hap hW hWK
+          have ept : sidePt X o p (r - 1) = ((sidePt X o p (r - 1)).1, 0) := Prod.ext rfl h0
+          rw [ept] at hend'
+          have hB' := sum_gain_one l (fun i => lfar G.link K (i, 0)) (fun i => lfar N.link K (i, 0))
+            (hl _ _ hag) (fun i _ => lfar_mono (L := G.link) (L' := N.link) hJ.le K (i, 0)) hend'
+          unfold payΦ
+          omega
+
+/-- **The walk of a joined segment is paid for by the growth of the
+measure**, with three to spare: on a memory holding `N`, which is `G` with
+the segment added, the walk finds what it finds within `n` advances, where
+`n + 1` is at most three and the growth of `payΦ` from `G` to `N`. -/
+theorem walk_pays (hN : N.WF ar) (hJ : Joined G N p o) (hX : X.Like N) {K : Nat}
+    {W : List (Port × Port)} {l : List Id} (hW : ∀ {u v}, N.link u v → (u, v) ∈ W)
+    (hWK : W.length ≤ K) (hl : ∀ i γ, N.agent i γ → i ∈ l) :
+    ∃ n, 1 ≤ n ∧ n + 1 + payΦ K W l G ≤ 3 + payΦ K W l N ∧
+      (JWalk.iter X n (JWalk.start p o)).found ≠ none := by
+  obtain ⟨r₁, hr₁, -, h₁⟩ := side_len hN hX hJ.pair hW
+  obtain ⟨r₂, hr₂, -, h₂⟩ := side_len hN hX (hN.symm hJ.pair) hW
+  have hJ' := hJ.swap
+  rcases Nat.lt_or_ge r₂ r₁ with hlt | hle
+  · obtain ⟨gs, gp⟩ := side_gain hN hJ' hX hW hWK hl hr₂ h₂ h₁ (by omega)
+    have hng : (JCur.iter X p r₂ (.go p o)).going = false := by
+      cases hg : (JCur.iter X p r₂ (.go p o)).going
+      · rfl
+      · exact absurd ((h₂ _).1 hg) (Nat.lt_irrefl _)
+    rcases JCur.rest_cases hng with hs | ⟨i, γ, hp⟩
+    · have := gs hs
+      exact ⟨2 * r₂, by omega, by omega,
+        JWalk.found_stop₂ X (JWalk.start p o) rfl h₁ h₂ hlt hs⟩
+    · have := gp i γ hp
+      exact ⟨r₁ + r₂, by omega, by omega, JWalk.found_by X (JWalk.start p o) h₁ h₂⟩
+  · obtain ⟨gs, gp⟩ := side_gain hN hJ hX hW hWK hl hr₁ h₁ h₂ hle
+    have hng : (JCur.iter X o r₁ (.go o p)).going = false := by
+      cases hg : (JCur.iter X o r₁ (.go o p)).going
+      · rfl
+      · exact absurd ((h₁ _).1 hg) (Nat.lt_irrefl _)
+    rcases JCur.rest_cases hng with hs | ⟨i, γ, hp⟩
+    · have := gs hs
+      exact ⟨2 * r₁ - 1, by omega, by omega,
+        JWalk.found_stop₁ X (JWalk.start p o) rfl h₁ h₂ hle hr₁ hs⟩
+    · have := gp i γ hp
+      exact ⟨r₁ + r₂, by omega, by omega, JWalk.found_by X (JWalk.start p o) h₁ h₂⟩
+
+end Pay
+
+section Run
+
+variable [DecidableEq S] {xs : XSys S}
+
+/-- **Every rule that joins a segment does nothing else**: firing it adds
+the joined segment to the net and nothing more, between two points that lie
+on one segment at most and are not principal ports. -/
+def XSys.PureJoin (xs : XSys S) : Prop :=
+  ∀ (G : Net S) (a b : Id) (α β : S) (R : XRhs S) (p q : Port), G.WF xs.sys.ar →
+    xs.rule α β = some R → Redex xs.sys G a b α β R.toRhs →
+    R.joinPairs xs.sys.ar a b α β = [(p, q)] → Joined G (G.fire a b R.toRhs) p q
+
+/-- What the measure needs of a goal: it is well formed, `W` holds its
+segments, and `l` the names of its agents. -/
+def PayOk (ar : S → Nat) (W : List (Port × Port)) (l : List Id) (G : Net S) : Prop :=
+  G.WF ar ∧ (∀ u v, G.link u v → (u, v) ∈ W) ∧ ∀ i γ, G.agent i γ → i ∈ l
+
+omit [DecidableEq S] in
+/-- **A system whose joining rules join and do nothing else pays its walks
+with `payΦ`, three per claim.** -/
+theorem XSys.walkPaid_payΦ (hP : xs.PureJoin) {K : Nat} {W : List (Port × Port)}
+    {l : List Id} (hWK : W.length ≤ K) :
+    xs.WalkPaid (payΦ K W l) 3 (PayOk xs.sys.ar W l) := by
+  intro G a b α β R hG hG' hR rg
+  have hle : ∀ {u v}, G.link u v → (G.fire a b R.toRhs).link u v := fun h => .inl h
+  refine ⟨Nat.le_trans (payΦ_mono hle) (Nat.le_add_left _ _), fun p q hj X hX => ?_⟩
+  exact walk_pays hG'.1 (hP G a b α β R p q hG.1 hR rg hj) hX (fun h => hG'.2.1 _ _ h) hWK
+    hG'.2.2
+
+/-- **The walks of one thread cost three per claim and the growth of
+`payΦ`**, along a run of a system whose rules join one segment at most and
+do nothing else when they join, while `W` holds the segments and `l` the
+names of the agents of every goal. -/
+theorem JMach.walked_payΦ (hJ : xs.OneJoin) (hP : xs.PureJoin) {X : XNet S}
+    (hX : X.toNet.WF xs.sys.ar) {K : Nat} {W : List (Port × Port)} {l : List Id}
+    (hWK : W.length ≤ K) {i : Nat}
+    (hok : ∀ j, j ≤ i → PayOk xs.sys.ar W l
+      ((JMach.init X 1).trace xs (fun _ => 0) j).1.toMach.goal) :
+    JMach.walked xs (fun _ => 0) (JMach.init X 1) i + payΦ K W l X.toNet ≤
+      3 * ((JMach.init X 1).trace xs (fun _ => 0) i).2 +
+        payΦ K W l ((JMach.init X 1).trace xs (fun _ => 0) i).1.toMach.goal :=
+  JMach.walked_le hJ (XSys.walkPaid_payΦ hP hWK) hX hok
+
+theorem sum_map_const {α : Type} (W : List α) (c : Nat) :
+    (W.map fun _ => c).sum = W.length * c := by
+  induction W with
+  | nil => simp
+  | cons e W ih =>
+    simp only [List.map_cons, List.sum_cons, List.length_cons, ih, Nat.succ_mul]
+    omega
+
+omit [DecidableEq S] in
+/-- **The measure is at most `4 |W| log (K + 1) + 2 |l| (K + 1) + 2 |W|`.** -/
+theorem payΦ_le (K : Nat) (W : List (Port × Port)) (l : List Id) (G : Net S) :
+    payΦ K W l G ≤ 4 * (W.length * Nat.log2 (K + 1)) + 2 * (l.length * (K + 1)) +
+      2 * W.length := by
+  unfold payΦ
+  have h₁ : (W.map fun e => Nat.log2 (lfar G.link K e.1)).sum ≤ W.length * Nat.log2 (K + 1) := by
+    have := sum_mono W (fun e => Nat.log2 (lfar G.link K e.1)) (fun _ => Nat.log2 (K + 1))
+      fun e _ => log2_mono (lfar_le K e.1)
+    rwa [sum_map_const] at this
+  have h₂ : (l.map fun i => lfar G.link K (i, 0)).sum ≤ l.length * (K + 1) := by
+    have := sum_mono l (fun i => lfar G.link K (i, 0)) (fun _ => K + 1)
+      fun i _ => lfar_le K (i, 0)
+    rwa [sum_map_const] at this
+  have h₃ : (W.map fun e => cycAt G.link e.1).sum ≤ W.length := by
+    have := sum_mono W (fun e => cycAt G.link e.1) (fun _ => 1) fun e _ => cycAt_le_one _ _
+    rwa [sum_map_const, Nat.mul_one] at this
+  omega
+
+end Run
 
 end INet

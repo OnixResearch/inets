@@ -3462,6 +3462,17 @@ holds up to equality rather than up to renaming.
   each point of its far half (`log_gain`), lengthens the longest trail
   from its end by the other path (`end_gain`), and closing a path into a
   ring puts each of its points on a cycle (`cyc_gain`, `IsPath.cycAt`).
+  Together: on a memory holding `G` with one segment added between two
+  points on one segment of `G` at most (`Joined`), the walk of that segment
+  is over within `n` advances, `n + 1` at most three and the growth of
+  `payΦ`: four times the logarithms of the longest trails, twice the
+  longest trails from principal ports, twice the points on cycles
+  (`walk_pays`).  So a system whose joining rules join one segment and do
+  nothing else (`XSys.PureJoin`) pays its walks (`XSys.walkPaid_payΦ`), and
+  along a run of one thread the actions of walks are at most three per
+  claim and the growth of `payΦ` (`JMach.walked_payΦ`), which is at most
+  `4 |W| log (K + 1) + 2 |l| (K + 1) + 2 |W|` (`payΦ_le`).  The middle term
+  is not yet `O(|W|)`, so the bound is not yet `O(S log S)`.
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
