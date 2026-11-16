@@ -96,6 +96,7 @@ import InteractionNets.JoinTotal
 import InteractionNets.JoinMulti
 import InteractionNets.CombChain
 import InteractionNets.Arith.JoinThreads
+import InteractionNets.JoinWrite
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
 
@@ -3528,9 +3529,10 @@ holds up to equality rather than up to renaming.
   actions (`JMach.rests_multi`, `JMach.rests_multi_final`; with any `K`
   bounding the segments of the normal form, `JMach.rests_multi_sized`; with
   `K` the size of a memory holding it, `JMach.rests_multi_out`); so Peano
-  arithmetic with multiplication and powers (`Peano.rests_multi`).  No
-  system of the development has a rule that both joins and writes agents,
-  so that case of the bound is not exercised by an example.  The charge of
+  arithmetic with multiplication and powers (`Peano.rests_multi`).  None of
+  the earlier systems has a rule that both joins and writes agents; `Mix`
+  (`JoinWrite`) has one, and the bound applies to it (`Mix.rests`), its run
+  on a chain checked in the kernel for eight pairs.  The charge of
   twice the
   shorter side cannot be lowered: a walk has found nothing while both its
   sides go (`JWalk.found_none_before`, for the walk of `JMach`); and the
