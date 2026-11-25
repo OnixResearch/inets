@@ -3624,8 +3624,13 @@ holds up to equality rather than up to renaming.
   kernel along the run of `JMach` (`IJMach.time_shadow`; 444 and 981 for
   8 and 16 adders, `Arith.chain3_itime`, `Arith.chain4_itime`), and
   measured as a program at about 3.5 operations an action up to 4,096
-  adders, 39 ms against 11.6 s on lists for 2,048 (`MeasureJoin`, one
-  thread; several threads not measured).  The caveats of `IMach` stand:
+  adders, 39 ms against 11.6 s on lists for 2,048 (`MeasureJoin`).  With
+  several threads, `IJMach.bfRun` runs the busy-first schedule picking
+  from the threads alone, and is proved to stop after the actions of
+  `JMach.bfRun` and to return the time of `IJMach` over them
+  (`IJMach.bfRun_eq`); measured, 64 threads on 1,024 adders take 362,523
+  operations, but the pick, which reads the list of threads at every
+  action and is not counted, makes the milliseconds grow faster.  The caveats of `IMach` stand:
   a hash-map operation counts one and takes constant time only in
   expectation; hashing or comparing a name costs its length and is not
   counted (`OMach` and `ZMach` count it for the program that rescans).

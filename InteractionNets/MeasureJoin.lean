@@ -131,7 +131,23 @@ sums they do not: the net of `((5 + 0) + 0) + …` (`Arith.lnest`) names its
 agents by their depth, and there the time measured for one counted
 operation grows with the size, from 386 ns for 64 additions to 14,801 ns
 for 1,024, whose longest name has 1,035 cells; on `lit k + lit k + lit k`
-names stay at seven cells and it stays near 180 ns.  A measuring loop must not compute the lists the
+names stay at seven cells and it stays near 180 ns.  With several threads
+under the busy-first schedule, run by `IJMach.bfRun` (proved to stop after
+the actions of `JMach.bfRun` and to return the time of `IJMach` over them,
+`IJMach.bfRun_eq`):
+
+    adders  threads   actions      time   ms
+     1,024        1    29,701   104,475   16
+     1,024        4    35,845   116,763   19
+     1,024       16    60,421   165,915   58
+     1,024       64   158,725   362,523  886
+     4,096        1   135,173   475,165   91
+     4,096       64   651,269 1,507,357 3,795
+
+The time per action falls with more threads (turns of the scan are cheap),
+but the milliseconds grow faster than the time: the pick of the next thread
+reads the list of threads, with a lookup by position for each, at every
+action, and that is not counted.  A measuring loop must not compute the lists the
 maps stand for (`IMem.toX`) at each action: that is a pass over the log. -/
 
 namespace INet

@@ -740,4 +740,115 @@ theorem Arith.Expr.bfRun_rests (e : Arith.Expr) {nt : Nat} (hnt : 0 < nt) (fuel 
   obtain ⟨hX, -, N', hs, -, hno⟩ := Arith.Expr.good e
   exact Arith.bfRun_rests hX (Arith.Expr.net_nodup e) hnt hs (Arith.normal_of_no_add hno) fuel
 
+/-! ## Several threads, run as a program
+
+The busy-first schedule picks its thread from the threads alone, so the
+indexed program can pick it without the lists the maps stand for.
+`IJMach.bfRun` runs it and is proved to return the actions of the measuring
+run `JMach.bfRun` and the time of the indexed program over them
+(`IJMach.bfRun_eq`).  The pick reads the threads once at each action; that
+is not counted in the time. -/
+
+omit [DecidableEq S] in
+/-- The busy-first pick reads the threads only. -/
+theorem JMach.bfPick_ths {M M' : JMach S} (h : M.ths = M'.ths) (nt i : Nat) :
+    M.bfPick nt i = M'.bfPick nt i := by
+  obtain ⟨X, ths⟩ := M
+  obtain ⟨X', ths'⟩ := M'
+  cases h
+  rfl
+
+/-- The busy-first pick on the indexed program. -/
+def IJMach.bfPick (M : IJMach S) (nt i : Nat) : Nat :=
+  (⟨⟨[], [], []⟩, M.ths⟩ : JMach S).bfPick nt i
+
+theorem IJMach.bfPick_eq (M : IJMach S) (nt i : Nat) : M.bfPick nt i = M.toJ.bfPick nt i :=
+  JMach.bfPick_ths rfl nt i
+
+/-- The busy-first run of the indexed program: from the state after `i`
+actions and `t` of time, stop when every thread is at rest or the fuel is
+out, and return the actions and the time. -/
+def IJMach.bfLoop (xs : XSys S) (nt : Nat) : Nat → Nat → Nat → IJMach S → Nat × Nat
+  | 0, i, t, _ => (i, t)
+  | f + 1, i, t, M =>
+    if M.ths.all (fun T => T.todo.isEmpty && T.st.isIdle) then (i, t)
+    else IJMach.bfLoop xs nt f (i + 1) (t + M.stepCost xs (M.bfPick nt i))
+      (M.step xs (M.bfPick nt i)).1
+
+/-- **The busy-first run of the indexed program, from a net with `nt`
+threads**: the actions until rest and the time. -/
+def IJMach.bfRun (xs : XSys S) (X : XNet S) (nt fuel : Nat) : Nat × Nat :=
+  IJMach.bfLoop xs nt fuel 0 0 (IJMach.init X nt)
+
+theorem JMach.pLoop_fst (xs : XSys S) (pk : JMach S → Nat → Nat) :
+    ∀ f i w w' (M : JMach S), (JMach.pLoop xs pk f i w M).1 = (JMach.pLoop xs pk f i w' M).1
+  | 0, _, _, _, _ => rfl
+  | f + 1, i, w, w', M => by
+    show (if M.resting then (i, w) else _).1 = (if M.resting then (i, w') else _).1
+    split
+    · rfl
+    · exact JMach.pLoop_fst xs pk f (i + 1) _ _ _
+
+/-- **The program run is the measuring run**: `IJMach.bfRun` stops after the
+actions of `JMach.bfRun`, and returns the time of the indexed program over
+them under the busy-first schedule. -/
+theorem IJMach.bfRun_eq {X : XNet S} (hX : X.toNet.WF xs.sys.ar)
+    (hnd : (X.agents.map Prod.fst).Nodup) {nt : Nat} (hnt : 0 < nt) (fuel : Nat) :
+    IJMach.bfRun xs X nt fuel = ((JMach.bfRun xs X nt fuel).1,
+      (IJMach.init X nt).time xs (JMach.bfSched xs (JMach.init X nt) nt)
+        (JMach.bfRun xs X nt fuel).1) := by
+  have key : ∀ f i, IJMach.bfLoop xs nt f i
+      ((IJMach.init X nt).time xs (JMach.bfSched xs (JMach.init X nt) nt) i)
+      ((IJMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt) i).1 =
+      ((JMach.pLoop xs (fun M i => M.bfPick nt i) f i 0
+          (JMach.pState xs (fun M i => M.bfPick nt i) (JMach.init X nt) i)).1,
+        (IJMach.init X nt).time xs (JMach.bfSched xs (JMach.init X nt) nt)
+          (JMach.pLoop xs (fun M i => M.bfPick nt i) f i 0
+            (JMach.pState xs (fun M i => M.bfPick nt i) (JMach.init X nt) i)).1) := by
+    intro f
+    induction f with
+    | zero => intro i; rfl
+    | succ f ih =>
+      intro i
+      obtain ⟨a, -, -⟩ := IJMach.init_sim hX hnd hnt (JMach.bfSched xs (JMach.init X nt) nt) i
+      have es : ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt) i).1 =
+          JMach.pState xs (fun M i => M.bfPick nt i) (JMach.init X nt) i := by
+        rw [JMach.bfSched_eq]
+        exact JMach.pState_trace xs _ _ i
+      have eP : ((IJMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt) i).1.toJ =
+          JMach.pState xs (fun M i => M.bfPick nt i) (JMach.init X nt) i := by
+        rw [a, es]
+      have er : ((IJMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt) i).1.ths.all
+          (fun T => T.todo.isEmpty && T.st.isIdle) =
+          (JMach.pState xs (fun M i => M.bfPick nt i) (JMach.init X nt) i).resting := by
+        rw [← eP]
+        rfl
+      have ep : ((IJMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt) i).1.bfPick
+          nt i = JMach.bfSched xs (JMach.init X nt) nt i := by
+        rw [IJMach.bfPick_eq, eP, JMach.bfSched_eq]
+        rfl
+      by_cases hr : (JMach.pState xs (fun M i => M.bfPick nt i) (JMach.init X nt) i).resting = true
+      · have hp : JMach.pLoop xs (fun M i => M.bfPick nt i) (f + 1) i 0
+            (JMach.pState xs (fun M i => M.bfPick nt i) (JMach.init X nt) i) = (i, 0) := by
+          show (if _ then _ else _) = _
+          rw [ite_pos' hr]
+        rw [hp]
+        show (if _ then _ else _) = _
+        rw [er, ite_pos' hr]
+      · have hp : JMach.pLoop xs (fun M i => M.bfPick nt i) (f + 1) i 0
+            (JMach.pState xs (fun M i => M.bfPick nt i) (JMach.init X nt) i) =
+            JMach.pLoop xs (fun M i => M.bfPick nt i) f (i + 1)
+              (0 + (JMach.pState xs (fun M i => M.bfPick nt i) (JMach.init X nt) i).walkAct
+                ((JMach.pState xs (fun M i => M.bfPick nt i) (JMach.init X nt) i).bfPick nt i))
+              (JMach.pState xs (fun M i => M.bfPick nt i) (JMach.init X nt) (i + 1)) := by
+          show (if _ then _ else _) = _
+          rw [ite_neg' hr]
+          rfl
+        rw [hp, JMach.pLoop_fst xs _ f (i + 1) _ 0]
+        show (if _ then _ else _) = _
+        rw [er, ite_neg' hr, ep]
+        exact ih (i + 1)
+  have k := key fuel 0
+  exact k
+
 end INet
