@@ -126,7 +126,12 @@ run on one machine, and the program on lists is `JMach` itself:
 
 The walks alone read 6.0 `n^2 lg n` cells of the lists of segments (62.6
 million for 1,024 adders), which the indexed memory replaces by at most
-four operations a step.  A measuring loop must not compute the lists the
+four operations a step.  The names of `joinChain` stay short.  On nested
+sums they do not: the net of `((5 + 0) + 0) + …` (`Arith.lnest`) names its
+agents by their depth, and there the time measured for one counted
+operation grows with the size, from 386 ns for 64 additions to 14,801 ns
+for 1,024, whose longest name has 1,035 cells; on `lit k + lit k + lit k`
+names stay at seven cells and it stays near 180 ns.  A measuring loop must not compute the lists the
 maps stand for (`IMem.toX`) at each action: that is a pass over the log. -/
 
 namespace INet

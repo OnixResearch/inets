@@ -15,7 +15,7 @@ port in a hash map from ports.  It is proved to do, action by action, what
 every theorem about the runs of `JMach` holds of it.
 
 Unlike `IMach`, it never takes the list of agents afresh, so every action
-costs a constant: at most `2 C + 3 D + 7`, and nothing for a thread at rest
+costs a constant: at most `2 C + 3 D + 6`, and nothing for a thread at rest
 (`IJMach.cost_le`).  The running time of a run is therefore at most that
 constant times the actions of threads at work (`IJMach.time_le_worked`),
 and the bounds on those carry over (`IJMach.time_cs`,
@@ -24,13 +24,19 @@ and the bounds on those carry over (`IJMach.time_cs`,
 
 What one unit is: one operation on a hash map, one cell of a list read or
 built, as for `IMach.cost`.  A hash-map operation takes constant time only
-in expectation, and hashing a name, which is a list of numbers that can
-gain a cell at each interaction, takes time with its length; neither is
-counted here (`OMach` and `ZMach` count them, for the program that
-rescans).  The rule is computed at the cost of the cells it produces and
+in expectation, and hashing or comparing a name, which is a list of
+numbers, takes time with its length; neither is counted here (`OMach` and
+`ZMach` count them, for the program that rescans).  Names are long on
+some nets: the net of a nested sum names its agents by their depth, so
+on `((5 + 0) + 0) + …` with 1,024 additions the longest name has 1,025
+cells at the start, and the time measured for a counted operation grows
+with the size there, where on `joinChain` it does not (`MeasureJoin`).
+So the bound is on counted operations; with names, each costs up to the
+length of the longest name.  The rule is computed at the cost of the cells it produces and
 of its interface ports.  Not counted: building the indexed memory and the
 lists of the threads at the start, the turns of a thread at rest, and the
-table of threads.  The log of the memory is never packed, so the memory
+table of threads, and the choice of the next thread by a schedule.  The
+log of the memory is never packed, so the memory
 grows by one cell for each agent written.  The hash-map reducer
 (`HNet.runC_cost`) is linear in the steps; this program, which follows
 wires that keep the ports of the agents fired, is `O(n log n)` on the

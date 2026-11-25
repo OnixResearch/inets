@@ -3606,21 +3606,27 @@ holds up to equality rather than up to renaming.
   so an action costs at most `2 C + 3 D + 6` operations on the maps and
   cells, and a thread at rest nothing (`IJMach.cost_le`); the time is at
   most that times the actions at work (`IJMach.time_le_worked`), and so
-  **the running time is `O(n + K log K)`** for a fixed system and number
-  of threads: one thread (`IJMach.time_one`), any schedule where a claim
+  **the running time is `O(n + K log K)` operations on the maps and
+  cells** for a fixed system and number of threads: one thread
+  (`IJMach.time_one`), any schedule where a claim
   keeps the turn (`IJMach.time_cs`), the busy-first schedule
   (`IJMach.time_bfSched`), and every expression of additions with no
   hypothesis (`Arith.Expr.itime_bfSched`).  The time is evaluated in the
   kernel along the run of `JMach` (`IJMach.time_shadow`; 444 and 981 for
-  8 and 16 adders, `Arith.JoinIndexed`), and measured as a program at
-  about 3.5 operations an action up to 4,096 adders, 39 ms against
-  11.6 s on lists for 2,048 (`MeasureJoin`).  The caveats of `IMach`
-  stand: a hash-map operation counts one and takes constant time only in
-  expectation; hashing a name, which can gain a cell at each interaction,
-  is not counted (`OMach` and `ZMach` count it for the program that
-  rescans); building the memory and the lists of the threads, the turns
-  of a thread at rest and the table of threads are not counted; the log
-  is never packed.  The hash-map reducer is linear (`HNet.runC_cost`);
+  8 and 16 adders, `Arith.chain3_itime`, `Arith.chain4_itime`), and
+  measured as a program at about 3.5 operations an action up to 4,096
+  adders, 39 ms against 11.6 s on lists for 2,048 (`MeasureJoin`, one
+  thread; several threads not measured).  The caveats of `IMach` stand:
+  a hash-map operation counts one and takes constant time only in
+  expectation; hashing or comparing a name costs its length and is not
+  counted (`OMach` and `ZMach` count it for the program that rescans).
+  That is not slack on every net: the net of a nested sum names its
+  agents by their depth, so on `((5 + 0) + 0) + …` with 1,024 additions
+  names have up to 1,025 cells and the time measured for one counted
+  operation grows with the size, where on `joinChain` it stays flat.
+  Building the memory and the lists of the threads, the turns of a thread
+  at rest, the table of threads and the choice of the next thread are not
+  counted; the log is never packed.  The hash-map reducer is linear (`HNet.runC_cost`);
   this program pays `log K` for following wires that keep the ports of
   the agents fired.
   Both programs run expressions in any system with the core, with a
