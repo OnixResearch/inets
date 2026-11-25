@@ -109,7 +109,25 @@ of `JMach.bfRun_walked` and `JMach.csRun_walked`.  The bounds are those of
 steps, 2,048 agents and 4,098 wires; that this chain is well formed and
 reaches its normal form in 1,024 steps is not proved here (well formed
 is checked for `b = 3` in `Arith.JoinChain`).  The bound of `JMach.csRun` has the factor
-`nt` twice. -/
+`nt` twice.
+
+On the indexed memory (`IJMach`, `IndexedJoin`), run as programs with the
+hash maps compiled, one thread on the bit-reversed chain rests after the
+same actions as on lists, and its time in operations on the maps and cells
+(`IJMach.time`) is about 3.5 for each action.  The milliseconds are of one
+run on one machine, and the program on lists is `JMach` itself:
+
+    adders   actions   time (IJMach.time)   ms indexed   ms on lists
+        64     1,349                4,759            1            10
+       256     6,405               22,553            4           132
+     1,024    29,701              104,475           15         2,799
+     2,048    63,493              223,260           39        11,605
+     4,096   135,173              475,165           87              -
+
+The walks alone read 6.0 `n^2 lg n` cells of the lists of segments (62.6
+million for 1,024 adders), which the indexed memory replaces by at most
+four operations a step.  A measuring loop must not compute the lists the
+maps stand for (`IMem.toX`) at each action: that is a pass over the log. -/
 
 namespace INet
 

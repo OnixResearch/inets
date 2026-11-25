@@ -100,6 +100,8 @@ import InteractionNets.JoinWrite
 import InteractionNets.JoinCrit
 import InteractionNets.JoinCritWork
 import InteractionNets.SchedRun
+import InteractionNets.IndexedJoin
+import InteractionNets.Arith.JoinIndexed
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
 
@@ -3593,6 +3595,34 @@ holds up to equality rather than up to renaming.
   by the number of actions; under `JMach.csSched` itself, 16 threads on
   16 adders in order walk 91 times against 79 for one thread (checked in
   the kernel, `Arith.JoinThreads`), within the bound.
+  All the bounds on `JMach` above count actions, and on lists an action is
+  not a constant: a step of a walk searches the list of segments, a look
+  at an agent the list of agents.  Measured, the walks of one thread on
+  the bit-reversed chain read about `6 n^2 lg n` cells of the list of
+  segments.  `IJMach` (`IndexedJoin`) is the same program on the indexed
+  memory of `IMach`, proved to do, action by action, what `JMach` does
+  (`IJMach.act_sim`, `IJMach.init_sim`), so every theorem above about the
+  runs of `JMach` holds of it.  It never takes the list of agents afresh,
+  so an action costs at most `2 C + 3 D + 6` operations on the maps and
+  cells, and a thread at rest nothing (`IJMach.cost_le`); the time is at
+  most that times the actions at work (`IJMach.time_le_worked`), and so
+  **the running time is `O(n + K log K)`** for a fixed system and number
+  of threads: one thread (`IJMach.time_one`), any schedule where a claim
+  keeps the turn (`IJMach.time_cs`), the busy-first schedule
+  (`IJMach.time_bfSched`), and every expression of additions with no
+  hypothesis (`Arith.Expr.itime_bfSched`).  The time is evaluated in the
+  kernel along the run of `JMach` (`IJMach.time_shadow`; 444 and 981 for
+  8 and 16 adders, `Arith.JoinIndexed`), and measured as a program at
+  about 3.5 operations an action up to 4,096 adders, 39 ms against
+  11.6 s on lists for 2,048 (`MeasureJoin`).  The caveats of `IMach`
+  stand: a hash-map operation counts one and takes constant time only in
+  expectation; hashing a name, which can gain a cell at each interaction,
+  is not counted (`OMach` and `ZMach` count it for the program that
+  rescans); building the memory and the lists of the threads, the turns
+  of a thread at rest and the table of threads are not counted; the log
+  is never packed.  The hash-map reducer is linear (`HNet.runC_cost`);
+  this program pays `log K` for following wires that keep the ports of
+  the agents fired.
   Both programs run expressions in any system with the core, with a
   bound stated before the run, at most every claim joining
   (`Core.GExpr.wrun_by`, `Core.GExpr.jrun_by`, `Core.GExpr.wrun_sound`,
