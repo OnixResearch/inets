@@ -3426,10 +3426,13 @@ holds up to equality rather than up to renaming.
   of `WMach` is 6,662 and 92,612, while the runs take 163 and 643
   against 443 and 5,363 (`Peano.inertThenJoins_bounds`).  A walk is
   charged every segment of the normal
-  form, where it covers a few; a bound that shows the gain would charge
-  the walks over the whole run, and is not attempted here.  It would not
-  be twice the shorter side of each: a side that reaches a principal port
-  waits for the other side to end.
+  form, where it covers a few.  A bound that shows the gain charges the
+  walks over the whole run.  For every fair schedule none is proved; for
+  one thread and for the schedules where a claim keeps the turn it is,
+  below (`JMach.walked_log`, `JMach.walked_cs`), and a schedule that lets
+  claims run ahead of walks makes them grow as the square (`jAdversary`,
+  below).  It is not twice the shorter side of each walk: a side that
+  reaches a principal port waits for the other side to end.
   Run as programs at sizes the kernel does not reach, which is measured
   and not proved (`MeasureJoin.lean`): one thread takes `16 * k + 3`
   actions on `k` such pairs, 5,123 for `k = 320` where `WMach` takes
@@ -3449,15 +3452,16 @@ holds up to equality rather than up to renaming.
   trail from one of its points can reach, so the longest trail from its
   `j`-th point has at most `max (j + 1) (t - j + 1)` points
   (`IsPath.trail_le`, `IsPath.lfar_le`, `IsPath.of_ends`), and adding
-  segments only lengthens the longest trail (`lfar_mono`).  The plan is to
-  charge a walk to the growth of the logarithms of the longest trails: the
-  side whose walk stops first should see the longest trail from the far
-  half of its points at least double.  That charge is not yet proved; it
-  has only been measured to hold on the nets of `MeasureJoin`, on rings of
-  adders and on Peano expressions.
+  segments only lengthens the longest trail (`lfar_mono`).  A walk is
+  charged to the growth of the logarithms of the longest trails: the side
+  whose walk stops first sees the longest trail from the far half of its
+  points at least double (`log_gain`, `walk_pays`, below).
   For one thread the bound over a run reduces to that charge, one claim at
-  a time: if every rule joins one segment at most (`XSys.OneJoin`, true of
-  every shipped system, whose only joining rule is adding zero) and each
+  a time: if every rule joins one segment at most (`XSys.OneJoin`, checked
+  rule by rule in `JoinSystems` for arithmetic, Peano arithmetic, `Extra`,
+  `Chain`, `Eps` and the one-symbol system; `Mix` joins one at most,
+  `Mix.xsys_joinsAtMost`; the interaction combinators join two,
+  `Comb.dsystem_not_oneJoin`) and each
   claim pays for its walk with `c₀` and the growth of a measure `Φ`
   (`XSys.WalkPaid`), then the actions of walks along the run are at most
   `c₀` per claim plus the growth of `Φ` from the first goal
@@ -3494,7 +3498,9 @@ holds up to equality rather than up to renaming.
   counts the actions of walks only, of one thread, on a run that reaches a
   normal form.  It is the order measured on `joinChain` (`2 n lg
   n` actions there; the proved bound is some 33 to 50 times the measured
-  count for 16 to 4096 adders).  A system pays only
+  count for 16 to 4096 adders, taking the steps of the chain to its normal
+  form to be its adders, which the runs reach and which is not proved for
+  every size).  A system pays only
   for joins that do nothing else when its joining rules write no agent
   (`XSys.pureJoin_of`), and joins one segment at most if it does on one pair
   of names (`XSys.oneJoin_of`).  `JoinSystems` checks both rule by rule:
@@ -3520,7 +3526,8 @@ holds up to equality rather than up to renaming.
   (`XNet.jrunRead_log`), for a system whose rules join one
   segment at most and do nothing else when they join.  On the bit-reversed
   chains of `MeasureJoin` the bound is some 26 to 28 times the actions
-  measured, against 300 to 39000 times for the bound of `JoinBound`, which
+  measured (the steps taken to be the adders, as above), against 300 to
+  39000 times for the bound of `JoinBound`, which
   charges each joining claim a scan of the memory and a walk of the
   longest wire.
   Any rule (`JoinMulti`): the net after firing is the net after firing
@@ -3547,7 +3554,8 @@ holds up to equality rather than up to renaming.
   `n log n` is reached there as far as checked, not proved for every `b`.  The interaction
   combinators have `J = 2` (`Comb.rests_multi`); on chains of annihilating
   pairs (`CombChain`) the bound is 54 to 66 times the actions measured, 24
-  to 29 with `K` the size of the normal form.
+  to 29 with `K` the size of the normal form (the steps taken to be the
+  pairs, which the runs reach and which is not proved for every size).
   The `n log n` comes from the representation, not from interaction nets:
   firing leaves the ports of the agents fired as points of the wires, and a
   walk crosses them, as a union by size would.  The reducer on hash maps,
@@ -3611,7 +3619,8 @@ holds up to equality rather than up to renaming.
   (`IJMach.time_one`), any schedule where a claim
   keeps the turn (`IJMach.time_cs`), the busy-first schedule
   (`IJMach.time_bfSched`), and every expression of additions with no
-  hypothesis (`Arith.Expr.itime_bfSched`).  The time is evaluated in the
+  hypothesis (`Arith.Expr.itime_bfSched`; in actions,
+  `Arith.Expr.bfRun_rests`).  The time is evaluated in the
   kernel along the run of `JMach` (`IJMach.time_shadow`; 444 and 981 for
   8 and 16 adders, `Arith.chain3_itime`, `Arith.chain4_itime`), and
   measured as a program at about 3.5 operations an action up to 4,096
@@ -3885,6 +3894,37 @@ holds up to equality rather than up to renaming.
   weak memory; a bound on the actions of `JMach` that charges its walks
   by what they cover over a run, which is what would show the gain that
   is measured.
+
+## Corrections
+
+Claims this text once made that were wrong or wider than the proofs, and
+what replaced them, with the commit that changed them.
+
+* That the walks of `JMach` under turns that go round cost what one
+  thread costs: measured with `jCritical`, which is not `JMach.csSched`;
+  under `JMach.csSched` 16 threads on 16 adders walk 91 times against 79
+  (3927eaa).
+* That the measuring runs stop at the first state at rest, and that
+  `JMach.bfRun` returns what `jBusyFirst` does: the first holds unless the
+  fuel runs out, the second is measured, and the bounds set against the
+  tables take the steps of the chain to be its adders, which is not proved
+  for every size (eaddcc1).
+* That the bounds on `JMach` bound its running time: they count actions,
+  and on lists an action reads the memory; the time is bounded on the
+  indexed memory, in operations that do not count the length of names
+  (0333453, ea78707).
+* That the doubling charge of a walk was a plan, measured only, that a
+  bound charging the walks over the whole run was not attempted, and that
+  every system joins one segment at most: all three were left in this
+  text after `walk_pays`, `JMach.walked_log` and the interaction
+  combinators showed otherwise, and are corrected in the commit that adds
+  this list.
+* Earlier, before the bounds of several threads: that the any-rule bound
+  covered Peano arithmetic because its rules join and write (they do not
+  write when they join), that `2 n b + 5` held for every `b` (checked to
+  5, measured to 12), and that the square of several threads was
+  measured to 1,024 adders (a63fc75); that `XNet.jrunRead_bound` charged
+  the walks in place of the pass of a joining claim (7611225).
 
 ## Checking
 

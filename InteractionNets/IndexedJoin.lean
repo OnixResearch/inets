@@ -727,4 +727,17 @@ theorem Arith.Expr.itime_bfSched (e : Arith.Expr) {nt : Nat} (hnt : 0 < nt) (i :
   exact IJMach.time_bfSched Arith.xsys_joinsAtMost hX (Arith.Expr.net_nodup e) hnt
     Arith.xsys_bounded hs (Arith.normal_of_no_add hno) i
 
+/-- **Every expression of additions, in actions**: the busy-first run of
+`JMach` with any number of threads is at rest within the bound of
+`JMach.rests_bfSched` and one, whatever the fuel, with no hypothesis. -/
+theorem Arith.Expr.bfRun_rests (e : Arith.Expr) {nt : Nat} (hnt : 0 < nt) (fuel : Nat) :
+    (JMach.bfRun Arith.xsys e.net nt fuel).1 ≤
+      nt * (7 * e.net.agents.length + (e.net.wires.length + 8 * e.cost)) +
+        e.cost * (2 + 8 + 1 + 9 * 1) + 7 * (2 * e.cost) + (e.net.wires.length + 8 * e.cost) +
+        1 * (4 * ((e.net.wires.length + 8 * e.cost) *
+          Nat.log2 (e.net.wires.length + 8 * e.cost + 1)) +
+          6 * (e.net.wires.length + 8 * e.cost)) + 1 := by
+  obtain ⟨hX, -, N', hs, -, hno⟩ := Arith.Expr.good e
+  exact Arith.bfRun_rests hX (Arith.Expr.net_nodup e) hnt hs (Arith.normal_of_no_add hno) fuel
+
 end INet
