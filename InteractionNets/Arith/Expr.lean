@@ -478,7 +478,7 @@ theorem Expr.assoc_rest (e₁ e₂ e₃ : Expr) {nt nt' : Nat} (hnt : 0 < nt) (h
 /-- `(2 + 3) + (1 + 4)`, with any number of threads and any schedule: a
 run that ends at rest has made eleven claims, and the memory has `10` on
 the free port. -/
-theorem Checks.Arith.Expr.c1 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+theorem _root_.INet.Checks.Arith.Expr.c1 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (Expr.add (.add (.lit 2) (.lit 3)) (.add (.lit 1) (.lit 4))).net
       nt).trace xsys σ i).1.resting = true) :
     ((XMach.init (Expr.add (.add (.lit 2) (.lit 3)) (.add (.lit 1) (.lit 4))).net

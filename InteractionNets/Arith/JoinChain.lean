@@ -11,15 +11,16 @@ namespace INet
 
 set_option maxRecDepth 100000
 
-theorem Checks.Arith.JoinChain.c1 : (joinChain 3 id).Ok Arith.xsys.sys.ar := by decide +kernel
-theorem Checks.Arith.JoinChain.c2
+theorem _root_.INet.Checks.Arith.JoinChain.c1
+    : (joinChain 3 id).Ok Arith.xsys.sys.ar := by decide +kernel
+theorem _root_.INet.Checks.Arith.JoinChain.c2
     : (joinChain 3 (bitRev 3)).Ok Arith.xsys.sys.ar := by decide +kernel
 
 /-- In order, eight joins: 39 walk actions; bits reversed: 53. -/
-theorem Checks.Arith.JoinChain.c3
+theorem _root_.INet.Checks.Arith.JoinChain.c3
     : jStats Arith.xsys 1 (JMach.init (joinChain 3 id) 1) 10000 = (111, 8, 0, 39) := by
   decide +kernel
-theorem Checks.Arith.JoinChain.c4
+theorem _root_.INet.Checks.Arith.JoinChain.c4
     : jStats Arith.xsys 1 (JMach.init (joinChain 3 (bitRev 3)) 1) 10000 =
     (125, 8, 0, 53) := by
   decide +kernel

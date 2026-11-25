@@ -759,7 +759,7 @@ theorem head_start (m n : Nat) : turnRest m n 0 + 3 + (18 * m + 20) ≤ 22 * m +
 
 /-- `6 + 10` twice: the second thread claims the first pair of the second
 addition in round 57, and one thread alone with its action 179. -/
-theorem Checks.Arith.TwoSums.c1
+theorem _root_.INet.Checks.Arith.TwoSums.c1
     : ∃ Y P l, ((XMach.init (twoSums 6 10 6 10) 2).trace xsys (fun i => i % 2)
       (2 * 57 + 1)).1.step xsys 1 =
     (⟨Y, [P, ⟨l, .write ((addSucc.swap.toX.newAgents [19] [1]).map (tagA 1))
@@ -771,7 +771,7 @@ theorem Checks.Arith.TwoSums.c1
   subst e
   exact ⟨Y, P, l, h⟩
 
-theorem Checks.Arith.TwoSums.c2
+theorem _root_.INet.Checks.Arith.TwoSums.c2
     : ∃ Y l, ((XMach.init (twoSums 6 10 6 10) 1).trace xsys (fun _ => 0) 179).1.step
       xsys 0 =
     (⟨Y, [⟨l, .write ((addSucc.swap.toX.newAgents [19] [1]).map (tagA 1))
@@ -1575,17 +1575,17 @@ theorem sum_rounds_ge (m n : Nat) {c R : Nat} (hc : 0 < c)
 
 /-- `6 + 10` twice: one thread takes 415 rounds, and two threads cannot
 take fewer than 104. -/
-theorem Checks.Arith.TwoSums.c3
+theorem _root_.INet.Checks.Arith.TwoSums.c3
     {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 10 6 10) 2) R) : 104 ≤ R :=
   two_threads_two_sums_ge 5 10 5 10 h
 
 /-- `20 + 30` beside `12 + 40`: one thread takes 1,135 rounds, two threads
 at least 264, and four at least 132. -/
-theorem Checks.Arith.TwoSums.c4
+theorem _root_.INet.Checks.Arith.TwoSums.c4
     {R : Nat} (h : Rounds 2 (XMach.init (twoSums 20 30 12 40) 2) R) : 264 ≤ R :=
   two_threads_two_sums_ge 19 30 11 40 h
 
-theorem Checks.Arith.TwoSums.c5
+theorem _root_.INet.Checks.Arith.TwoSums.c5
     {R : Nat} (h : Rounds 4 (XMach.init (twoSums 20 30 12 40) 4) R) : 132 ≤ R := by
   have h' := two_sums_rounds_ge 19 30 11 40 (by decide) h
   omega

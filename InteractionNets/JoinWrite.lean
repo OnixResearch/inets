@@ -44,7 +44,7 @@ def data : SysData Mix :=
 def xsys : XSys Mix := data.toXSys (by decide)
 
 /-- The rule joins two interface ports and writes an agent. -/
-theorem Checks.JoinWrite.c1
+theorem _root_.INet.Checks.JoinWrite.c1
     : ∃ R, xsys.rule m e = some R ∧ R.joins xsys.sys.ar m e = true ∧ R.slots ≠ [] :=
   ⟨_, rfl, by decide, by decide⟩
 
@@ -88,19 +88,20 @@ def mixChain (b : Nat) (order : Nat → Nat) : XNet Mix :=
 
 set_option maxRecDepth 100000
 
-theorem Checks.JoinWrite.c2 : (mixChain 3 (bitRev 3)).Ok Mix.xsys.sys.ar := by decide +kernel
+theorem _root_.INet.Checks.JoinWrite.c2
+    : (mixChain 3 (bitRev 3)).Ok Mix.xsys.sys.ar := by decide +kernel
 
 /-- Eight pairs, bits reversed: at rest after 197 actions and not before,
 eight claims, 53 actions of walks, as for `joinChain`: the agents the rule
 writes do not lengthen the walks. -/
-theorem Checks.JoinWrite.c3 :
+theorem _root_.INet.Checks.JoinWrite.c3 :
     ((JMach.init (mixChain 3 (bitRev 3)) 1).trace Mix.xsys (fun _ => 0) 197).1.resting = true ∧
       ((JMach.init (mixChain 3 (bitRev 3)) 1).trace Mix.xsys (fun _ => 0) 197).2 = 8 := by
   decide +kernel
-theorem Checks.JoinWrite.c4 :
+theorem _root_.INet.Checks.JoinWrite.c4 :
     ((JMach.init (mixChain 3 (bitRev 3)) 1).trace Mix.xsys (fun _ => 0) 196).1.resting = false := by
   decide +kernel
-theorem Checks.JoinWrite.c5 :
+theorem _root_.INet.Checks.JoinWrite.c5 :
     JMach.walked Mix.xsys (fun _ => 0) (JMach.init (mixChain 3 (bitRev 3)) 1) 197 = 53 := by
   decide +kernel
 

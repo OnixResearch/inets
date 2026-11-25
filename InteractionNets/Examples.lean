@@ -841,7 +841,7 @@ theorem xgd_normal_form :
 
 /-- The invariant of `xgg`, proved by hand above, also follows by
 evaluation. -/
-theorem Checks.Examples.c1 : xgg.Ok ar := by
+theorem _root_.INet.Checks.Examples.c1 : xgg.Ok ar := by
   decide
 
 /-- Two copies of `gg` side by side: two active pairs. -/
@@ -853,7 +853,7 @@ def xgg2 : XNet Comb :=
       (([7], 1), ([10], 0)), (([7], 2), ([11], 0))]
 
 /-- The parallel reducer fires both pairs in one round and is then done. -/
-theorem Checks.Examples.c2 :
+theorem _root_.INet.Checks.Examples.c2 :
     xgg2.Ok ar ∧ (xgg2.parStep xsystem).2 = 2 ∧
       (xgg2.parStep xsystem).1.step xsystem = none := by
   decide
@@ -863,12 +863,13 @@ def sw (n : Nat) : Nat := if n = 0 then 1 else if n = 1 then 0 else n
 
 /-- The commutation example with its two agents renamed into each other
 still normalizes in one step ... -/
-theorem Checks.Examples.c3 : ((xgd.map (List.map sw)).normalize xsystem 10).map (·.2) = some 1 := by
+theorem _root_.INet.Checks.Examples.c3
+    : ((xgd.map (List.map sw)).normalize xsystem 10).map (·.2) = some 1 := by
   decide
 
 /-- ... but not to the relabelled result: the new agents are named after
 the slots of the rule, which the relabelling does not respect. -/
-theorem Checks.Examples.c4
+theorem _root_.INet.Checks.Examples.c4
     : (xgd.map (List.map sw)).normalize xsystem 10 ≠ some (xgdOut.map (List.map sw), 1) := by
   decide
 
@@ -994,7 +995,7 @@ theorem xloop_runLoops : xloop.runLoops xsystem 10 = some (⟨[], [], []⟩, 1, 
   decide
 
 /-- No loop is closed in the other examples. -/
-theorem Checks.Examples.c5 : (xgg.runLoops xsystem 10).map (·.2) = some (1, 0) ∧
+theorem _root_.INet.Checks.Examples.c5 : (xgg.runLoops xsystem 10).map (·.2) = some (1, 0) ∧
     (xgd.runLoops xsystem 10).map (·.2) = some (1, 0) := by
   decide
 
@@ -1029,19 +1030,20 @@ def data : SysData Comb :=
 def dsystem : XSys Comb := data.toXSys (by decide)
 
 /-- It reduces the two example nets exactly as the hand-proved system does. -/
-theorem Checks.Examples.c6 : xgg.normalize dsystem 10 = xgg.normalize xsystem 10 := by
+theorem _root_.INet.Checks.Examples.c6 : xgg.normalize dsystem 10 = xgg.normalize xsystem 10 := by
   decide
 
-theorem Checks.Examples.c7 : xgd.normalize dsystem 10 = xgd.normalize xsystem 10 := by
+theorem _root_.INet.Checks.Examples.c7 : xgd.normalize dsystem 10 = xgd.normalize xsystem 10 := by
   decide
 
 /-- The check rejects a net with a port left unwired ... -/
-theorem Checks.Examples.c8 : ¬ ({ xgg with free := ([6], 0) :: xgg.free } : XNet Comb).Ok ar := by
+theorem _root_.INet.Checks.Examples.c8
+    : ¬ ({ xgg with free := ([6], 0) :: xgg.free } : XNet Comb).Ok ar := by
   decide
 
 /-- ... and a net that uses a name reserved for a descendant of a live
 agent: here `[9, 0]`, which extends the name `[0]` of the first `γ`. -/
-theorem Checks.Examples.c9 :
+theorem _root_.INet.Checks.Examples.c9 :
     ¬ ({ xgg with
           free := xgg.free ++ [([8], 0), ([9, 0], 0)]
           wires := xgg.wires ++ [(([8], 0), ([9, 0], 0)), (([9, 0], 0), ([8], 0))] } :
@@ -1060,13 +1062,13 @@ theorem xgg2_exec :
   XMach.exec_agrees (f := 10) (by decide) (by decide) (by decide +kernel) (by decide +kernel)
 
 /-- In that run each thread makes one of the two claims. -/
-theorem Checks.Examples.c10
+theorem _root_.INet.Checks.Examples.c10
     : (XMach.init xgg2 2).claimers xsystem ((List.range 60).map (· % 2)) = [1, 0] := by
   decide +kernel
 
 /-- The same run without counting the claims: every thread is at rest, and
 that is enough. -/
-theorem Checks.Examples.c11 :
+theorem _root_.INet.Checks.Examples.c11 :
     ((XMach.init xgg2 2).exec xsystem ((List.range 60).map (· % 2))).2 =
         (xgg2.run xsystem 10).2 ∧
       ((XMach.init xgg2 2).exec xsystem ((List.range 60).map (· % 2))).1.mem.toNet.compact
@@ -1075,7 +1077,7 @@ theorem Checks.Examples.c11 :
 
 /-- The same with another schedule: each thread runs four actions at a
 time. -/
-theorem Checks.Examples.c12 :
+theorem _root_.INet.Checks.Examples.c12 :
     ((XMach.init xgg2 2).exec xsystem ((List.range 80).map fun i => i / 4 % 2)).1.mem.toNet.compact
         xsystem.sys.ar = (xgg2.run xsystem 10).1.toNet :=
   (XMach.exec_agrees (f := 10) (by decide) (by decide) (by decide +kernel) (by decide +kernel)).2

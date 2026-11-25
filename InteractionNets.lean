@@ -3504,8 +3504,8 @@ holds up to equality rather than up to renaming.
   for joins that do nothing else when its joining rules write no agent
   (`XSys.pureJoin_of`), and joins one segment at most if it does on one pair
   of names (`XSys.oneJoin_of`).  `JoinSystems` checks both rule by rule:
-  arithmetic, Peano arithmetic, `Extra`, `Window`, `LongRun` and the
-  one-symbol system have both (so `Arith.walked_log`); the interaction
+  arithmetic, Peano arithmetic, `Extra`, `Chain` (of `Window`), `Eps` (of
+  `LongRun`) and the one-symbol system have both (so `Arith.walked_log`); the interaction
   combinators join two segments when they annihilate
   (`Comb.dsystem_not_oneJoin`), so they are not covered by these first
   bounds (they are by `Comb.rests_multi` below).
@@ -3629,8 +3629,9 @@ holds up to equality rather than up to renaming.
   from the threads alone, and is proved to stop after the actions of
   `JMach.bfRun` and to return the time of `IJMach` over them
   (`IJMach.bfRun_eq`); measured, 64 threads on 1,024 adders take 362,523
-  operations, but the pick, which reads the list of threads at every
-  action and is not counted, makes the milliseconds grow faster.  The caveats of `IMach` stand:
+  operations, and the milliseconds grow faster, most likely from the
+  pick, which reads the list of threads at every action and is not
+  counted.  The caveats of `IMach` stand:
   a hash-map operation counts one and takes constant time only in
   expectation; hashing or comparing a name costs its length and is not
   counted (`OMach` and `ZMach` count it for the program that rescans).
@@ -3638,6 +3639,10 @@ holds up to equality rather than up to renaming.
   agents by their depth, so on `((5 + 0) + 0) + …` with 1,024 additions
   names have up to 1,025 cells and the time measured for one counted
   operation grows with the size, where on `joinChain` it stays flat.
+  Measured, renaming the input to one-cell names first keeps it flat
+  there too, and the growth of names during a run (to 258 cells in
+  Peano's `256 * 3`) costs little; renaming the input is not yet part of
+  the program.
   Building the memory and the lists of the threads, the turns of a thread
   at rest, the table of threads and the choice of the next thread are not
   counted; the log is never packed.  The hash-map reducer is linear (`HNet.runC_cost`);

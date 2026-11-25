@@ -48,7 +48,7 @@ theorem Expr.wrun_by (e : Expr) {nt : Nat} (hnt : 0 < nt) (s : Nat)
 
 /-- `(2 + 3) + (1 + 4)` run by three threads taking turns: after 700
 actions they are at rest and the result read is `10`. -/
-theorem Checks.Arith.WorkRun.c1
+theorem _root_.INet.Checks.Arith.WorkRun.c1
     : (Expr.add (.add (.lit 2) (.lit 3)) (.add (.lit 1) (.lit 4))).wrun 3 700 = some 10 := by
   decide +kernel
 

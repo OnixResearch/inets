@@ -145,9 +145,21 @@ the actions of `JMach.bfRun` and to return the time of `IJMach` over them,
      4,096       64   651,269 1,507,357 3,795
 
 The time per action falls with more threads (turns of the scan are cheap),
-but the milliseconds grow faster than the time: the pick of the next thread
-reads the list of threads, with a lookup by position for each, at every
-action, and that is not counted.  A measuring loop must not compute the lists the
+but the milliseconds grow faster than the time, most likely from the pick
+of the next thread, which reads the list of threads, with a lookup by
+position for each, at every action, and is not counted (it was not timed
+alone).
+
+Where long names come from.  Measured, with one thread: on `joinChain` and
+the chain of combinators every name has one cell throughout.  On nested
+sums the names are long from the start, the depth of the expression
+(1,025 cells for 1,024 additions), and grow by about ten in the run; with
+the input renamed to one-cell names before the run, the time for a
+counted operation stays near 200 ns up to 1,024 additions (287 ns, 191 ms
+in all), against 13,747 ns (9.1 s) with the names of the input.  In Peano
+multiplication the names start at two cells and grow with the run, to 258
+for `256 * 3`, and the time for a counted operation rises only from 203 ns
+to 296 ns between `128 * 3` and `1024 * 3`.  A measuring loop must not compute the lists the
 maps stand for (`IMem.toX`) at each action: that is a pass over the log. -/
 
 namespace INet

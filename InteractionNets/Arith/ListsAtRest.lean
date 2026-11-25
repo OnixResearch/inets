@@ -468,7 +468,7 @@ theorem sums_exact (l : List (Nat × Nat)) {nt : Nat} (hnt : 0 < nt) (σ : Nat �
 /-- `0 + 7`, `3 + 0` and `2 + 2` side by side, with any number of threads
 and any schedule: a memory at rest holds no adder, the fourteen
 successors of `7`, `3` and `4`, and seventeen agents in all. -/
-theorem Checks.Arith.ListsAtRest.c1 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+theorem _root_.INet.Checks.Arith.ListsAtRest.c1 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (sums [(0, 7), (3, 0), (2, 2)]) nt).trace xsys σ i).1.resting = true) :
     adders ((XMach.init (sums [(0, 7), (3, 0), (2, 2)]) nt).trace xsys σ i).1.mem.agents = 0 ∧
       succs ((XMach.init (sums [(0, 7), (3, 0), (2, 2)]) nt).trace xsys σ i).1.mem.agents = 14 ∧

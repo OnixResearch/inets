@@ -350,7 +350,7 @@ theorem two_sums_fair (m n m' n' : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → 
 
 /-- `6 + 32` twice, with any number of threads and any schedule: a memory
 at rest has `38` on each of the two free ports. -/
-theorem Checks.Arith.AtRest.c1 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+theorem _root_.INet.Checks.Arith.AtRest.c1 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (twoSums 6 32 6 32) nt).trace xsys σ i).1.resting = true) :
     IsNum ((XMach.init (twoSums 6 32 6 32) nt).trace xsys σ i).1.mem.toNet ([0, 0], 0) 38 ∧
       IsNum ((XMach.init (twoSums 6 32 6 32) nt).trace xsys σ i).1.mem.toNet ([0, 1], 0) 38 :=
@@ -709,7 +709,7 @@ theorem two_sums_fair_all (m n m' n' : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat 
 /-- `0 + 7` beside `3 + 0`, with any number of threads and any schedule:
 a memory at rest has `7` on the first free port and `3` on the second,
 after five claims. -/
-theorem Checks.Arith.AtRest.c2 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+theorem _root_.INet.Checks.Arith.AtRest.c2 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (twoSums 0 7 3 0) nt).trace xsys σ i).1.resting = true) :
     ((XMach.init (twoSums 0 7 3 0) nt).trace xsys σ i).2 = 5 ∧
       IsNum ((XMach.init (twoSums 0 7 3 0) nt).trace xsys σ i).1.mem.toNet ([0, 0], 0) 7 ∧
@@ -889,7 +889,7 @@ theorem two_sums_census (m n m' n' : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat �
 /-- `0 + 7` beside `3 + 0`, with any number of threads and any schedule:
 a memory at rest holds ten successors, three of them in the second net,
 and two zeros, twelve agents in all. -/
-theorem Checks.Arith.AtRest.c3 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+theorem _root_.INet.Checks.Arith.AtRest.c3 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (twoSums 0 7 3 0) nt).trace xsys σ i).1.resting = true) :
     succs ((XMach.init (twoSums 0 7 3 0) nt).trace xsys σ i).1.mem.agents = 10 ∧
       succs1 ((XMach.init (twoSums 0 7 3 0) nt).trace xsys σ i).1.mem.agents = 3 ∧
@@ -1110,7 +1110,7 @@ theorem two_sums_exact (m n m' n' : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat →
 /-- `0 + 7` beside `3 + 0`, with any number of threads and any schedule:
 at rest every agent in memory is one of the eight of the first numeral
 or one of the four of the second. -/
-theorem Checks.Arith.AtRest.c4 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+theorem _root_.INet.Checks.Arith.AtRest.c4 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (twoSums 0 7 3 0) nt).trace xsys σ i).1.resting = true) :
     ∃ l₀ l₁ : List Id, l₀.length = 8 ∧ l₁.length = 4 ∧
       ∀ e, e ∈ ((XMach.init (twoSums 0 7 3 0) nt).trace xsys σ i).1.mem.agents →

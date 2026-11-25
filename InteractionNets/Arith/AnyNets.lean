@@ -707,7 +707,7 @@ theorem besides_rest_num {L : List (Nat × XNet Arith)} (hnd : (L.map Prod.fst).
 any schedule: a run that ends at rest has made the three claims of
 `2 + 3`, the memory has `5` on the free port of the addition, and the
 numeral is as it was. -/
-theorem Checks.Arith.AnyNets.c1 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+theorem _root_.INet.Checks.Arith.AnyNets.c1 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (besides [(0, sum 2 3), (1, two)]) nt).trace xsys σ i).1.resting = true) :
     ((XMach.init (besides [(0, sum 2 3), (1, two)]) nt).trace xsys σ i).2 = 3 ∧
       IsNum ((XMach.init (besides [(0, sum 2 3), (1, two)]) nt).trace xsys σ i).1.mem.toNet

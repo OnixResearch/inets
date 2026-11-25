@@ -177,7 +177,7 @@ theorem PExpr.run_complete (e : PExpr) {nt : Nat} (hnt : 0 < nt) :
 /-! ### Examples -/
 
 /-- `(2 + 1) * (3 * 2)` has the value 18 and costs 81 interactions. -/
-theorem Checks.Peano.Expr.c1
+theorem _root_.INet.Checks.Peano.Expr.c1
     : (PExpr.mul (.add (.lit 2) (.lit 1)) (.mul (.lit 3) (.lit 2))).eval = 18 ∧
     (PExpr.mul (.add (.lit 2) (.lit 1)) (.mul (.lit 3) (.lit 2))).cost = 81 := by
   decide
@@ -186,7 +186,7 @@ set_option maxRecDepth 100000 in
 /-- `(2 * 2) + 1` on the machine, two threads taking turns: after 1000
 actions both are at rest and they have made 23 interactions, the cost of
 the expression. -/
-theorem Checks.Peano.Expr.c2 :
+theorem _root_.INet.Checks.Peano.Expr.c2 :
     ((XMach.init (PExpr.add (.mul (.lit 2) (.lit 2)) (.lit 1)).net 2).trace xsys
       (fun j => j % 2) 1000).1.resting = true ∧
     ((XMach.init (PExpr.add (.mul (.lit 2) (.lit 2)) (.lit 1)).net 2).trace xsys
@@ -197,21 +197,21 @@ theorem Checks.Peano.Expr.c2 :
 set_option maxRecDepth 100000 in
 /-- `(2 * 2) + 1` run by two threads taking turns: after 1000 actions
 they are at rest and the result read is `5`. -/
-theorem Checks.Peano.Expr.c3
+theorem _root_.INet.Checks.Peano.Expr.c3
     : (PExpr.add (.mul (.lit 2) (.lit 2)) (.lit 1)).run 2 1000 = some 5 := by
   decide +kernel
 
 set_option maxRecDepth 100000 in
 /-- `2 * (1 + 2)` run by three threads taking turns: after 1500 actions
 they are at rest and the result read is `6`. -/
-theorem Checks.Peano.Expr.c4
+theorem _root_.INet.Checks.Peano.Expr.c4
     : (PExpr.mul (.lit 2) (.add (.lit 1) (.lit 2))).run 3 1500 = some 6 := by
   decide +kernel
 
 set_option maxRecDepth 100000 in
 /-- `2 ^ (1 + 1)` run by two threads taking turns: after 2500 actions
 they are at rest and the result read is `4`. -/
-theorem Checks.Peano.Expr.c5
+theorem _root_.INet.Checks.Peano.Expr.c5
     : (PExpr.pow (.lit 2) (.add (.lit 1) (.lit 1))).run 2 2500 = some 4 := by
   decide +kernel
 
