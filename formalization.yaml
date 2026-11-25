@@ -1,0 +1,142 @@
+# Schema: formalization.yaml v0.4 (github.com/mathlib-initiative/formalization.yaml).
+# What is formalized here, from what, how, and how far it has been checked.
+# The overview in InteractionNets.lean is the full account; this file is the
+# catalogue. Every declaration named below is checked to exist by the local
+# checks before each commit.
+version: "v0.4"
+
+project:
+  name: "inets"
+  description: >-
+    Lafont's interaction nets in Lean 4 without Mathlib: nets with wires as
+    chains of segments, firing, strong confluence and its consequences
+    (confluence, unique normal forms, every reduction to a normal form of
+    the same length), observational equivalence, renaming, and Lafont's
+    symmetry condition. Then reducers proved to compute normal forms: a list
+    reducer, a hash-map reducer linear in the steps, and machines with
+    threads that claim active pairs, with bounds on their actions and their
+    running time under stated cost models, including a program that walks
+    the wires a rule joins, in O(n + K log K) on an indexed memory.
+  authors: ["Claude (Anthropic models, through Claude Code)"]
+  responsible_maintainers: ["OnixResearch"]
+  license: "MPL-2.0"
+
+sources:
+  - title: "Interaction Nets"
+    authors: ["Yves Lafont"]
+    id: "doi:10.1145/96709.96718"
+    type: "article"
+    location: "POPL 1990, pages 95-108"
+    relationship: "formalizes"
+    note: >-
+      The model and its strong confluence. Rules are given for ordered pairs
+      of symbols as mirror images; Lafont's symmetry condition is shown to
+      come to the same (Rhs.Lafont.presented).
+    author_endorsement: "not-contacted"
+  - title: "Interaction Combinators"
+    authors: ["Yves Lafont"]
+    id: "doi:10.1006/inco.1997.2643"
+    type: "article"
+    location: "Information and Computation 137(1), 1997, pages 69-101"
+    relationship: "background"
+    note: "The combinators are one of the example systems (Comb)."
+    author_endorsement: "not-contacted"
+  - title: "Reducers and machines with threads, and their bounds"
+    type: "original-proof"
+    relationship: "other"
+    note: >-
+      The machines with threads, the wire-walking program and its bounds
+      are not taken from a source.
+
+related_formalizations: []
+
+classification:
+  arxiv: ["cs.LO", "cs.DC"]
+  msc2020: ["68Q42", "68Q85", "03B70"]
+
+status:
+  scope: >-
+    Complete for what it states: no sorry. Each bound on actions or time
+    holds in a stated model; what a model leaves uncounted is listed in the
+    overview (sections Scope and Corrections).
+  sorry_count: 0
+  sorry_in_definitions: 0
+  axioms: ["propext", "Quot.sound", "Classical.choice"]
+  main_results:
+    - declaration: "INet.Step.diamond"
+      file: "InteractionNets/Confluence.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound"]
+    - declaration: "INet.confluence"
+      file: "InteractionNets/Confluence.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.normal_form_unique"
+      file: "InteractionNets/Confluence.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.reduction_bounded"
+      file: "InteractionNets/Confluence.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.HNet.runC_cost"
+      file: "InteractionNets/HashMap.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.XMach.fair_complete"
+      file: "InteractionNets/Fair.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.JMach.exec_rest_steps"
+      file: "InteractionNets/JoinRun.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.JMach.walked_log"
+      file: "InteractionNets/JoinPay.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.JMach.rests_multi"
+      file: "InteractionNets/JoinMulti.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.JMach.rests_bfSched"
+      file: "InteractionNets/JoinCritWork.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.IJMach.time_bfSched"
+      file: "InteractionNets/IndexedJoin.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.Arith.Expr.itime_bfSched"
+      file: "InteractionNets/IndexedJoin.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
+
+automation:
+  methods:
+    - method: "agent"
+      models: ["claude-opus-5-5"]
+      framework: "Claude Code"
+      tool_setup: >-
+        Local checks before every commit: lake build with warnings as
+        errors, an axiom sweep, leanchecker --fresh, a search for sorry,
+        native_decide and axiom, a line-length check, and this catalogue's
+        names; lake check --paranoid at milestones. CI is switched off.
+  notes: >-
+    Earlier sessions were run by Claude models as well; the commit history
+    records each session.
+
+fidelity:
+  divergences: >-
+    Fired ports stay behind as junctions of wires, and observational
+    equivalence and compaction forget them. Rules are given for ordered
+    pairs of symbols. Nets need not be finite.
+
+review:
+  status: "agent-reviewed"
+  notes: >-
+    Reviewed by Claude agents, a separate reviewer model at milestones,
+    and audited by an agent once; not reviewed by a person. Claims once made and corrected
+    are listed in the overview, section Corrections.
+
+acknowledgements: "Lean 4 and its standard library, Lake, and the kernels of lake check."

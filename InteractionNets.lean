@@ -3939,6 +3939,10 @@ The runs of the program (`Comb.xgg2_exec` and the examples after
 `Arith.sum_exec`) are longer and use `decide +kernel`, which leaves the
 whole evaluation to the kernel; it adds no axiom.
 No line of the development is longer than 100 characters.
+`formalization.yaml`, at the root, catalogues the main results with their
+files and what each depends on, the sources and how the work was done, in
+the format of the mathlib-initiative; its names and their dependencies are
+checked against the library before each commit.
 The theorems depend only on Lean's three standard axioms `propext`,
 `Quot.sound` and `Classical.choice`; `Step.diamond` does not use the last.
 -/
