@@ -3938,6 +3938,14 @@ is, by evaluating the reducer and the validators inside the kernel.
 The runs of the program (`Comb.xgg2_exec` and the examples after
 `Arith.sum_exec`) are longer and use `decide +kernel`, which leaves the
 whole evaluation to the kernel; it adds no axiom.
+Most of the evaluated checks are named theorems, in namespaces `Checks`
+after their modules (`INet.Checks.Arith.Late.c1` and so on), so that they
+are in the library and are checked again by `leanchecker` and the external
+kernels of `lake check`.  Those of six modules whose evaluation is the
+heaviest (`Arith.Correct`, `Arith.Readers`, `Arith.SideBySide`,
+`Peano.WorkList`, `Peano.JoinWalk`, `Peano.JoinBound`) are left as
+`example`s: the kernel checks them when the module is built, and they are
+not in the library.
 No line of the development is longer than 100 characters.
 `formalization.yaml`, at the root, catalogues the main results with their
 files and what each depends on, the sources and how the work was done, in

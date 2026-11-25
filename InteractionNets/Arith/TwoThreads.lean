@@ -2088,7 +2088,8 @@ theorem round_robin_beats_turns (m n : Nat) (hm : 9 ≤ m) (hn : n ≤ m) (i : N
   have hmm := Nat.mul_le_mul_right m hm
   omega
 
-example (i : Nat) : (XMach.init (sum 101 100) 2).work xsys (fun i => i % 2) i ≤ 3250 :=
+theorem Checks.Arith.TwoThreads.c1
+    (i : Nat) : (XMach.init (sum 101 100) 2).work xsys (fun i => i % 2) i ≤ 3250 :=
   two_threads_linear 100 100 (by decide) (by decide) i
 
 /-- Two threads, whatever the second argument: at most
@@ -2137,14 +2138,16 @@ theorem three_threads_linear_any (m n : Nat) (hm : 6 ≤ m) (i : Nat) :
 
 /-- Ten threads add `400` and `100` in turn in at most 26,312 actions that
 are not rests; one thread needs 9,113. -/
-example (i : Nat) : (XMach.init (sum 400 100) 10).work xsys (fun i => i % 10) i ≤ 26312 :=
+theorem Checks.Arith.TwoThreads.c2
+    (i : Nat) : (XMach.init (sum 400 100) 10).work xsys (fun i => i % 10) i ≤ 26312 :=
   Nat.le_trans ((threads_round_robin 399 100 9 (by decide) (by decide) (.inl (by decide))).1 i)
     (by decide)
 
 /-- With a long second argument few successors are needed: ten threads add
 `13` and `44` in turn in at most 2,186 actions that are not rests; one
 thread needs 431. -/
-example (i : Nat) : (XMach.init (sum 13 44) 10).work xsys (fun i => i % 10) i ≤ 2186 :=
+theorem Checks.Arith.TwoThreads.c3
+    (i : Nat) : (XMach.init (sum 13 44) 10).work xsys (fun i => i % 10) i ≤ 2186 :=
   Nat.le_trans ((threads_round_robin 12 44 9 (by decide) (by decide) (.inl (by decide))).1 i)
     (by decide)
 
@@ -2174,22 +2177,26 @@ theorem two_threads_narrow (m n : Nat) (hm : 4 ≤ m)
 
 /-- With a long second argument: three threads add `23` and `120` in turn
 in at most 1,805 actions that are not rests; one thread needs 879. -/
-example (i : Nat) : (XMach.init (sum 23 120) 3).work xsys (fun i => i % 3) i ≤ 1805 :=
+theorem Checks.Arith.TwoThreads.c4
+    (i : Nat) : (XMach.init (sum 23 120) 3).work xsys (fun i => i % 3) i ≤ 1805 :=
   Nat.le_trans ((threads_round_robin 22 120 2 (by decide) (by decide) (.inr (by decide))).1 i)
     (by decide)
 
 /-- At the edge of the short case: ten threads add `13` and `56` in turn
 in at most 2,546 actions that are not rests; one thread needs 467. -/
-example (i : Nat) : (XMach.init (sum 13 56) 10).work xsys (fun i => i % 10) i ≤ 2546 :=
+theorem Checks.Arith.TwoThreads.c5
+    (i : Nat) : (XMach.init (sum 13 56) 10).work xsys (fun i => i % 10) i ≤ 2546 :=
   Nat.le_trans ((threads_round_robin 12 56 9 (by decide) (by decide) (.inl (by decide))).1 i)
     (by decide)
 
 /-- Two threads on `21 + 93` and on `21 + 98`, on either side of the four
 second arguments left out. -/
-example (i : Nat) : (XMach.init (sum 21 93) 2).work xsys (fun i => i % 2) i ≤ 1128 :=
+theorem Checks.Arith.TwoThreads.c6
+    (i : Nat) : (XMach.init (sum 21 93) 2).work xsys (fun i => i % 2) i ≤ 1128 :=
   Nat.le_trans (two_threads_narrow 20 93 (by decide) (.inl (by decide)) i) (by decide)
 
-example (i : Nat) : (XMach.init (sum 21 98) 2).work xsys (fun i => i % 2) i ≤ 1158 :=
+theorem Checks.Arith.TwoThreads.c7
+    (i : Nat) : (XMach.init (sum 21 98) 2).work xsys (fun i => i % 2) i ≤ 1158 :=
   Nat.le_trans (two_threads_narrow 20 98 (by decide) (.inr (by decide)) i) (by decide)
 
 /-- **Two threads in turn: the second only reads, or gets ready to take the
@@ -3555,10 +3562,12 @@ theorem two_threads_race (m n : Nat) (hm : 4 ≤ m) (i : Nat) :
     have h2 := raceWork_le m n d
     omega
 
-example (i : Nat) : (XMach.init (sum 21 94) 2).work xsys (fun i => i % 2) i ≤ 1512 :=
+theorem Checks.Arith.TwoThreads.c8
+    (i : Nat) : (XMach.init (sum 21 94) 2).work xsys (fun i => i % 2) i ≤ 1512 :=
   two_threads_race 20 94 (by decide) i
 
-example (i : Nat) : (XMach.init (sum 21 97) 2).work xsys (fun i => i % 2) i ≤ 1530 :=
+theorem Checks.Arith.TwoThreads.c9
+    (i : Nat) : (XMach.init (sum 21 97) 2).work xsys (fun i => i % 2) i ≤ 1530 :=
   two_threads_race 20 97 (by decide) i
 
 end Arith

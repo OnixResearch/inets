@@ -629,7 +629,7 @@ theorem ones_saving (n n' : Nat) (hn : 7 ≤ n) :
   omega
 
 /-- `1 + 12` beside `1 + 3`: 161 rounds for one thread, 131 for two. -/
-example : Rounds 1 (XMach.init (twoSums 1 12 1 3) 1) 161 ∧
+theorem Checks.Arith.Apart.c1 : Rounds 1 (XMach.init (twoSums 1 12 1 3) 1) 161 ∧
     Rounds 2 (XMach.init (twoSums 1 12 1 3) 2) 131 :=
   ⟨(ones_saving 12 3 (by decide)).1.cast (by decide), ones_two_threads 12 3 (by decide)⟩
 
@@ -1256,21 +1256,21 @@ theorem twice_family (m n : Nat) (hn : 5 * m + 7 ≤ n) :
   exact ⟨h1.cast (by omega), h2.cast (by omega)⟩
 
 /-- `6 + 31` beside `1 + 2`: 407 rounds for one thread, 283 for two. -/
-example : Rounds 1 (XMach.init (twoSums 6 31 1 2) 1) 407 ∧
+theorem Checks.Arith.Apart.c2 : Rounds 1 (XMach.init (twoSums 6 31 1 2) 1) 407 ∧
     Rounds 2 (XMach.init (twoSums 6 31 1 2) 2) 283 :=
   ⟨(apart_saving 5 31 0 2 (by decide) (by decide) (by decide)).1.cast (by decide),
     (apart_two_threads 5 31 0 2 (by decide) (by decide) (by decide)).cast (by decide)⟩
 
 /-- `6 + 32` twice: 613 rounds for one thread, 489 for two. -/
-example : Rounds 1 (XMach.init (twoSums 6 32 6 32) 1) 613 ∧
+theorem Checks.Arith.Apart.c3 : Rounds 1 (XMach.init (twoSums 6 32 6 32) 1) 613 ∧
     Rounds 2 (XMach.init (twoSums 6 32 6 32) 2) 489 := twice_family 5 32 (by decide)
 
 /-- `2 + 12` twice: 237 rounds for one thread, 188 for two. -/
-example : Rounds 1 (XMach.init (twoSums 2 12 2 12) 1) 237 ∧
+theorem Checks.Arith.Apart.c4 : Rounds 1 (XMach.init (twoSums 2 12 2 12) 1) 237 ∧
     Rounds 2 (XMach.init (twoSums 2 12 2 12) 2) 188 := twice_family 1 12 (by decide)
 
 /-- `1 + 7` twice: 143 rounds for one thread, 113 for two. -/
-example : Rounds 1 (XMach.init (twoSums 1 7 1 7) 1) 143 ∧
+theorem Checks.Arith.Apart.c5 : Rounds 1 (XMach.init (twoSums 1 7 1 7) 1) 143 ∧
     Rounds 2 (XMach.init (twoSums 1 7 1 7) 2) 113 := twice_family 0 7 (by decide)
 
 end Arith

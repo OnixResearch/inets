@@ -1355,16 +1355,18 @@ theorem two_sums_rounds_late (m n m' n' : Nat) {c R : Nat} (hc : 0 < c) (hcm : c
 
 /-- `6 + 32` twice: two threads take 489 rounds and cannot take fewer
 than 300. -/
-example {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 32 6 32) 2) R) : 300 ≤ R := by
+theorem Checks.Arith.Late.c1
+    {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 32 6 32) 2) R) : 300 ≤ R := by
   have h' := two_sums_rounds_late 5 32 5 32 (by decide) (by decide) h
   omega
 
 /-- `6 + 200` twice: two threads take 2,001 rounds, and cannot take fewer
 than 1,812. -/
-example : Rounds 2 (XMach.init (twoSums 6 200 6 200) 2) 2001 :=
+theorem Checks.Arith.Late.c2 : Rounds 2 (XMach.init (twoSums 6 200 6 200) 2) 2001 :=
   (twice_family 5 200 (by decide)).2.cast (by decide)
 
-example {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 200 6 200) 2) R) : 1812 ≤ R := by
+theorem Checks.Arith.Late.c3
+    {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 200 6 200) 2) R) : 1812 ≤ R := by
   have h' := two_sums_rounds_late 5 200 5 200 (by decide) (by decide) h
   omega
 
@@ -1765,13 +1767,15 @@ theorem two_threads_late2 (m n m' n' : Nat) {R : Nat}
 
 /-- `6 + 32` twice: two threads take 489 rounds and cannot take fewer
 than 332. -/
-example {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 32 6 32) 2) R) : 332 ≤ R := by
+theorem Checks.Arith.Late.c4
+    {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 32 6 32) 2) R) : 332 ≤ R := by
   have h' := two_threads_late2 5 32 5 32 h
   omega
 
 /-- `6 + 200` twice: two threads take 2,001 rounds and cannot take fewer
 than 1,844. -/
-example {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 200 6 200) 2) R) : 1844 ≤ R := by
+theorem Checks.Arith.Late.c5
+    {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 200 6 200) 2) R) : 1844 ≤ R := by
   have h' := two_threads_late2 5 200 5 200 h
   omega
 
@@ -1919,13 +1923,15 @@ theorem two_sums_rounds_late3 (m n m' n' : Nat) {c R : Nat} (hc : 0 < c) (hcn : 
 
 /-- `6 + 32` twice with eight threads in turn: they take 458 rounds in
 the run computed, and cannot take fewer than 287. -/
-example {R : Nat} (h : Rounds 8 (XMach.init (twoSums 6 32 6 32) 8) R) : 287 ≤ R := by
+theorem Checks.Arith.Late.c6
+    {R : Nat} (h : Rounds 8 (XMach.init (twoSums 6 32 6 32) 8) R) : 287 ≤ R := by
   have h' := two_sums_rounds_late3 5 32 5 32 (by decide) (by decide) h
   omega
 
 /-- With sixteen: 399 rounds in the run computed, and not fewer than
 249. -/
-example {R : Nat} (h : Rounds 16 (XMach.init (twoSums 6 32 6 32) 16) R) : 249 ≤ R := by
+theorem Checks.Arith.Late.c7
+    {R : Nat} (h : Rounds 16 (XMach.init (twoSums 6 32 6 32) 16) R) : 249 ≤ R := by
   have h' := two_sums_rounds_late3 5 32 5 32 (by decide) (by decide) h
   omega
 

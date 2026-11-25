@@ -206,10 +206,10 @@ theorem two_threads_rounds_ge (m n R : Nat) (hm : 4 ≤ m)
   · omega
   · omega
 
-example : Rounds 3 (XMach.init (sum 8 28) 3) 273 :=
+theorem Checks.Arith.Rounds.c1 : Rounds 3 (XMach.init (sum 8 28) 3) 273 :=
   (threads_rounds_none 7 28 2 (by decide) (by decide) (by decide)).cast (by decide)
 
-example : Rounds 5 (XMach.init (sum 9 34) 5) 313 :=
+theorem Checks.Arith.Rounds.c2 : Rounds 5 (XMach.init (sum 9 34) 5) 313 :=
   (threads_rounds_none 8 34 4 (by decide) (by decide) (by decide)).cast (by decide)
 
 /-- **The rounds of threads that only read.**  If each thread of `Ts` only
@@ -500,19 +500,19 @@ theorem two_threads_rounds_bounds (m n : Nat) (hm : 4 ≤ m) :
     · rw [ite_neg' hW]
       omega
 
-example : Rounds 2 (XMach.init (sum 6 25) 2) 211 :=
+theorem Checks.Arith.Rounds.c3 : Rounds 2 (XMach.init (sum 6 25) 2) 211 :=
   (two_threads_rounds 5 25 (by decide)).cast (by decide)
 
-example : Rounds 2 (XMach.init (sum 6 26) 2) 217 :=
+theorem Checks.Arith.Rounds.c4 : Rounds 2 (XMach.init (sum 6 26) 2) 217 :=
   (two_threads_rounds 5 26 (by decide)).cast (by decide)
 
-example : Rounds 2 (XMach.init (sum 6 28) 2) 229 :=
+theorem Checks.Arith.Rounds.c5 : Rounds 2 (XMach.init (sum 6 28) 2) 229 :=
   (two_threads_rounds 5 28 (by decide)).cast (by decide)
 
-example : Rounds 2 (XMach.init (sum 10 46) 2) 371 :=
+theorem Checks.Arith.Rounds.c6 : Rounds 2 (XMach.init (sum 10 46) 2) 371 :=
   (two_threads_rounds 9 46 (by decide)).cast (by decide)
 
-example : soloWork 6 25 = 220 := by decide
+theorem Checks.Arith.Rounds.c7 : soloWork 6 25 = 220 := by decide
 
 /-- **One more thread at the end that only reads and is at rest in time
 leaves the rounds of the run as they are.** -/
@@ -1211,13 +1211,13 @@ theorem threads_rounds_bounds (m n k : Nat) (hm4 : 4 ≤ m) (hm : k + 1 ≤ m)
         soloWork (m + 1) n - raceSave (turnAt m n r - (17 * m + 7)) + 9
       omega
 
-example : Rounds 3 (XMach.init (sum 8 36) 3) 290 :=
+theorem Checks.Arith.Rounds.c8 : Rounds 3 (XMach.init (sum 8 36) 3) 290 :=
   (threads_rounds_exact 7 36 2 (by decide) (by decide) (by decide)).cast (by decide)
 
-example : Rounds 5 (XMach.init (sum 9 41) 5) 325 :=
+theorem Checks.Arith.Rounds.c9 : Rounds 5 (XMach.init (sum 9 41) 5) 325 :=
   (threads_rounds_exact 8 41 4 (by decide) (by decide) (by decide)).cast (by decide)
 
-example : Rounds 6 (XMach.init (sum 11 52) 6) 405 :=
+theorem Checks.Arith.Rounds.c10 : Rounds 6 (XMach.init (sum 11 52) 6) 405 :=
   (threads_rounds_exact 10 52 5 (by decide) (by decide) (by decide)).cast (by decide)
 
 end Arith

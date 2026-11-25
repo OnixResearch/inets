@@ -1494,16 +1494,17 @@ theorem three_threads_race_third (m n : Nat) (hm : 4 ≤ m)
         rw [eR, ite_neg' (by omega)]
         omega)
 
-example : (XMach.init (sum 7 33) 3).Total xsys (fun i => i % 3) 653 :=
+theorem Checks.Arith.ThreeThreads.c1 : (XMach.init (sum 7 33) 3).Total xsys (fun i => i % 3) 653 :=
   (three_threads_race_third 6 33 (by decide) (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 8 38) 3).Total xsys (fun i => i % 3) 594 :=
+theorem Checks.Arith.ThreeThreads.c2 : (XMach.init (sum 8 38) 3).Total xsys (fun i => i % 3) 594 :=
   (three_threads_race_third 7 38 (by decide) (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 5 24) 3).Total xsys (fun i => i % 3) 383 :=
+theorem Checks.Arith.ThreeThreads.c3 : (XMach.init (sum 5 24) 3).Total xsys (fun i => i % 3) 383 :=
   (three_threads_race_third 4 24 (by decide) (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 14 66) 3).Total xsys (fun i => i % 3) 1285 :=
+theorem Checks.Arith.ThreeThreads.c4
+    : (XMach.init (sum 14 66) 3).Total xsys (fun i => i % 3) 1285 :=
   (three_threads_race_third 13 66 (by decide) (by decide) (by decide)).cast (by decide)
 
 /-- A search that finds no segment finds none among fewer segments. -/
@@ -3091,22 +3092,22 @@ theorem three_threads_total (m n : Nat) (hm : 4 ≤ m) (hn : 19 ≤ 3 * m + 3 * 
         · omega
         · omega)
 
-example : (XMach.init (sum 7 31) 3).Total xsys (fun i => i % 3) 624 :=
+theorem Checks.Arith.ThreeThreads.c5 : (XMach.init (sum 7 31) 3).Total xsys (fun i => i % 3) 624 :=
   (three_threads_total 6 31 (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 7 32) 3).Total xsys (fun i => i % 3) 641 :=
+theorem Checks.Arith.ThreeThreads.c6 : (XMach.init (sum 7 32) 3).Total xsys (fun i => i % 3) 641 :=
   (three_threads_total 6 32 (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 8 36) 3).Total xsys (fun i => i % 3) 718 :=
+theorem Checks.Arith.ThreeThreads.c7 : (XMach.init (sum 8 36) 3).Total xsys (fun i => i % 3) 718 :=
   (three_threads_total 7 36 (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 7 33) 3).Total xsys (fun i => i % 3) 653 :=
+theorem Checks.Arith.ThreeThreads.c8 : (XMach.init (sum 7 33) 3).Total xsys (fun i => i % 3) 653 :=
   (three_threads_total 6 33 (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 7 30) 3).Total xsys (fun i => i % 3) 612 :=
+theorem Checks.Arith.ThreeThreads.c9 : (XMach.init (sum 7 30) 3).Total xsys (fun i => i % 3) 612 :=
   (three_threads_total 6 30 (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 7 9) 3).Total xsys (fun i => i % 3) 300 :=
+theorem Checks.Arith.ThreeThreads.c10 : (XMach.init (sum 7 9) 3).Total xsys (fun i => i % 3) 300 :=
   (three_threads_total 6 9 (by decide) (by decide)).cast (by decide)
 
 end Arith

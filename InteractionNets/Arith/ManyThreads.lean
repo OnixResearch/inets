@@ -1008,19 +1008,19 @@ theorem threads_exact (m n k : Nat) (hm4 : 4 ≤ m) (hm : k + 1 ≤ m)
       rw [show j + 2 + (k - (j + 2)) + 1 = k + 1 by omega] at res
       exact res
 
-example : (XMach.init (sum 8 38) 5).Total xsys (fun i => i % 5) 1014 :=
+theorem Checks.Arith.ManyThreads.c1 : (XMach.init (sum 8 38) 5).Total xsys (fun i => i % 5) 1014 :=
   (threads_exact 7 38 4 (by decide) (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 8 40) 5).Total xsys (fun i => i % 5) 898 :=
+theorem Checks.Arith.ManyThreads.c2 : (XMach.init (sum 8 40) 5).Total xsys (fun i => i % 5) 898 :=
   (threads_exact 7 40 4 (by decide) (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 14 66) 6).Total xsys (fun i => i % 6) 1992 :=
+theorem Checks.Arith.ManyThreads.c3 : (XMach.init (sum 14 66) 6).Total xsys (fun i => i % 6) 1992 :=
   (threads_exact 13 66 5 (by decide) (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 8 38) 7).Total xsys (fun i => i % 7) 1284 :=
+theorem Checks.Arith.ManyThreads.c4 : (XMach.init (sum 8 38) 7).Total xsys (fun i => i % 7) 1284 :=
   (threads_exact 7 38 6 (by decide) (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 13 60) 8).Total xsys (fun i => i % 8) 2258 :=
+theorem Checks.Arith.ManyThreads.c5 : (XMach.init (sum 13 60) 8).Total xsys (fun i => i % 8) 2258 :=
   (threads_exact 12 60 7 (by decide) (by decide) (by decide)).cast (by decide)
 
 /-- Each thread comes to the zero of the first argument three or four
@@ -1371,18 +1371,19 @@ theorem threads_bounds (m n k : Nat) (hm4 : 4 ≤ m) (hm : k + 1 ≤ m)
     sumTo_ge k (fun t ht => turnAt_ge m n t (by omega))
   omega
 
-example : allWork 7 38 5 = allWork 7 38 4 + 136 := by decide
+theorem Checks.Arith.ManyThreads.c6 : allWork 7 38 5 = allWork 7 38 4 + 136 := by decide
 
-example : allWork 7 38 6 = allWork 7 38 5 + 134 := by decide
+theorem Checks.Arith.ManyThreads.c7 : allWork 7 38 6 = allWork 7 38 5 + 134 := by decide
 
-example : soloWork 8 38 = 303 := by decide
+theorem Checks.Arith.ManyThreads.c8 : soloWork 8 38 = 303 := by decide
 
 /-- The second bound is reached: two threads on `6 + 28` make 456 actions
 that are not rests, one thread 229. -/
-example : (XMach.init (sum 6 28) 2).Total xsys (fun i => i % 2) (2 * soloWork 6 28 - 2) :=
+theorem Checks.Arith.ManyThreads.c9
+    : (XMach.init (sum 6 28) 2).Total xsys (fun i => i % 2) (2 * soloWork 6 28 - 2) :=
   (threads_exact 5 28 1 (by decide) (by decide) (by decide)).cast (by decide)
 
-example : 2 * soloWork 6 28 - 2 = 456 := by decide
+theorem Checks.Arith.ManyThreads.c10 : 2 * soloWork 6 28 - 2 = 456 := by decide
 
 end Arith
 

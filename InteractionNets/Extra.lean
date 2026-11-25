@@ -162,7 +162,7 @@ theorem cater_rest (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : N
 
 /-- The reducer on the net for `c 3` stops after `caterCost 3 = 20` steps
 on seven successors and a zero. -/
-example : ((Core.unaryNet zero succ cater 3).normalize xsys 100).map
+theorem Checks.Extra.c1 : ((Core.unaryNet zero succ cater 3).normalize xsys 100).map
     (fun r => (r.2, (r.1.agents.filter (·.2 = succ)).length,
       (r.1.agents.filter (·.2 = zero)).length, r.1.agents.length)) =
     some (caterCost 3, 7, 1, 8) := by
@@ -228,7 +228,7 @@ theorem tri_rest (n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat
 
 /-- The reducer on the net for `t 4` stops after `triCost 4` steps on ten
 successors and a zero. -/
-example : ((Core.unaryNet zero succ tri 4).normalize xsys 200).map
+theorem Checks.Extra.c2 : ((Core.unaryNet zero succ tri 4).normalize xsys 200).map
     (fun r => (r.2, (r.1.agents.filter (·.2 = succ)).length,
       (r.1.agents.filter (·.2 = zero)).length, r.1.agents.length)) =
     some (triCost 4, 10, 1, 11) := by
@@ -284,7 +284,7 @@ theorem mul_rest (m n : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : N
 
 /-- The reducer on the net for `2 * 3` stops after `prodCost 2 3 = 23`
 steps on six successors and a zero. -/
-example : ((Core.binaryNet zero succ mul 2 3).normalize xsys 100).map
+theorem Checks.Extra.c3 : ((Core.binaryNet zero succ mul 2 3).normalize xsys 100).map
     (fun r => (r.2, (r.1.agents.filter (·.2 = succ)).length,
       (r.1.agents.filter (·.2 = zero)).length, r.1.agents.length)) =
     some (Core.prodCost 2 3, 6, 1, 7) := by
@@ -313,7 +313,7 @@ def triOp : Core.Op1 xsys := Core.Op1.ofComputes tri_computes rfl (by decide) (b
 
 /-- `c 2 + t 2`, an expression over the operators of this system: the
 value `7`, in `25` interactions. -/
-example : (Core.GExpr.app2 addOp (.app1 caterOp (.lit 2)) (.app1 triOp (.lit 2)) :
+theorem Checks.Extra.c4 : (Core.GExpr.app2 addOp (.app1 caterOp (.lit 2)) (.app1 triOp (.lit 2)) :
       Core.GExpr xsys).eval = 7 ∧
     (Core.GExpr.app2 addOp (.app1 caterOp (.lit 2)) (.app1 triOp (.lit 2)) :
       Core.GExpr xsys).cost = 25 := by
@@ -321,14 +321,14 @@ example : (Core.GExpr.app2 addOp (.app1 caterOp (.lit 2)) (.app1 triOp (.lit 2))
 
 /-- `c 2 * t 3`, with the multiplier, an operator of two arguments by
 recursion on a parameter: `4 * 6 = 24`. -/
-example : (Core.GExpr.app2 mulOp (.app1 caterOp (.lit 2)) (.app1 triOp (.lit 3)) :
+theorem Checks.Extra.c5 : (Core.GExpr.app2 mulOp (.app1 caterOp (.lit 2)) (.app1 triOp (.lit 3)) :
     Core.GExpr xsys).eval = 24 := by
   decide
 
 set_option maxRecDepth 100000 in
 /-- `c 2 + t 2` run by two threads taking turns: after 1500 actions they
 are at rest and the result read is `7`. -/
-example : (Core.GExpr.app2 addOp (.app1 caterOp (.lit 2)) (.app1 triOp (.lit 2)) :
+theorem Checks.Extra.c6 : (Core.GExpr.app2 addOp (.app1 caterOp (.lit 2)) (.app1 triOp (.lit 2)) :
     Core.GExpr xsys).run 2 1500 = some 7 := by
   decide +kernel
 

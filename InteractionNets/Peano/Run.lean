@@ -88,26 +88,26 @@ theorem power_fair (e b : Nat) {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat)
   exact binary_fair pow_computes rfl (by decide) (by decide) e b hnt σ hfair
 
 /-- The count for `2 * 3` is the 23 steps that the reducer takes. -/
-example : prodCost 2 3 = 23 := by decide
+theorem Checks.Peano.Run.c1 : prodCost 2 3 = 23 := by decide
 
 /-- The reducer on the net for `2 * 3` stops after 23 steps on a net whose
 agents are six successors and a zero. -/
-example : ((prod 2 3).normalize xsys 100).map
+theorem Checks.Peano.Run.c2 : ((prod 2 3).normalize xsys 100).map
     (fun r => (r.2, (r.1.agents.filter (·.2 = succ)).length,
       (r.1.agents.filter (·.2 = zero)).length)) = some (23, 6, 1) := by
   decide +kernel
 
 /-- The reducer on the net for `2 ^ 3` stops after `powCost 3 2 = 75`
 steps on eight successors and a zero. -/
-example : ((power 3 2).normalize xsys 200).map
+theorem Checks.Peano.Run.c3 : ((power 3 2).normalize xsys 200).map
     (fun r => (r.2, (r.1.agents.filter (·.2 = succ)).length,
       (r.1.agents.filter (·.2 = zero)).length, r.1.agents.length)) = some (75, 8, 1, 9) := by
   decide +kernel
 
 /-- `3! = 6`, in 52 interactions, and the reducer agrees. -/
-example : fact 3 = 6 ∧ facCost 3 = 52 := by decide
+theorem Checks.Peano.Run.c4 : fact 3 = 6 ∧ facCost 3 = 52 := by decide
 
-example : ((facNet 3).normalize xsys 200).map
+theorem Checks.Peano.Run.c5 : ((facNet 3).normalize xsys 200).map
     (fun r => (r.2, (r.1.agents.filter (·.2 = succ)).length,
       (r.1.agents.filter (·.2 = zero)).length, r.1.agents.length)) = some (52, 6, 1, 7) := by
   decide +kernel

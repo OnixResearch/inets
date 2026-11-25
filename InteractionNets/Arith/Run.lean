@@ -63,12 +63,13 @@ theorem Expr.run_complete (e : Expr) {nt : Nat} (hnt : 0 < nt) :
 
 /-- `1 + 1` run by two threads taking turns: after 200 actions they are
 at rest and the result read is `2`. -/
-example : (Expr.add (.lit 1) (.lit 1)).run 2 200 = some 2 := by
+theorem Checks.Arith.Run.c1 : (Expr.add (.lit 1) (.lit 1)).run 2 200 = some 2 := by
   decide +kernel
 
 /-- `(2 + 3) + (1 + 4)` run by three threads taking turns: after 700
 actions they are at rest and the result read is `10`. -/
-example : (Expr.add (.add (.lit 2) (.lit 3)) (.add (.lit 1) (.lit 4))).run 3 700 = some 10 := by
+theorem Checks.Arith.Run.c2
+    : (Expr.add (.add (.lit 2) (.lit 3)) (.add (.lit 1) (.lit 4))).run 3 700 = some 10 := by
   decide +kernel
 
 end Arith

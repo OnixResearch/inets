@@ -1353,7 +1353,7 @@ theorem two_sums_rest_census (m n m' n' : Nat) {nt : Nat} (hnt : 0 < nt) (σ : N
 /-- `6 + 32` twice, with any number of threads and any schedule: a memory
 at rest holds the two results, thirty-eight successors each, and two
 zeros, seventy-eight agents in all. -/
-example {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+theorem Checks.Arith.Census.c1 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (twoSums 6 32 6 32) nt).trace xsys σ i).1.resting = true) :
     succs ((XMach.init (twoSums 6 32 6 32) nt).trace xsys σ i).1.mem.agents = 76 ∧
       succs1 ((XMach.init (twoSums 6 32 6 32) nt).trace xsys σ i).1.mem.agents = 38 ∧

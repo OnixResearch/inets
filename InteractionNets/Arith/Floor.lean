@@ -721,15 +721,18 @@ theorem sum_rounds_read (m n : Nat) {c R : Nat} (hc : 0 < c)
 /-- `6 + 32` twice: two threads take 489 rounds and cannot take fewer
 than 171; four threads cannot take fewer than 121, and sixteen not fewer
 than 73. -/
-example {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 32 6 32) 2) R) : 171 ≤ R := by
+theorem Checks.Arith.Floor.c1
+    {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 32 6 32) 2) R) : 171 ≤ R := by
   have h' := two_threads_read_ge 5 32 5 32 h
   omega
 
-example {R : Nat} (h : Rounds 4 (XMach.init (twoSums 6 32 6 32) 4) R) : 121 ≤ R := by
+theorem Checks.Arith.Floor.c2
+    {R : Nat} (h : Rounds 4 (XMach.init (twoSums 6 32 6 32) 4) R) : 121 ≤ R := by
   have h' := two_sums_rounds_read 5 32 5 32 (by decide) h
   omega
 
-example {R : Nat} (h : Rounds 16 (XMach.init (twoSums 6 32 6 32) 16) R) : 73 ≤ R := by
+theorem Checks.Arith.Floor.c3
+    {R : Nat} (h : Rounds 16 (XMach.init (twoSums 6 32 6 32) 16) R) : 73 ≤ R := by
   have h' := two_sums_rounds_read 5 32 5 32 (by decide) h
   omega
 
@@ -1941,15 +1944,18 @@ theorem two_threads_read3_ge (m n m' n' : Nat) {R : Nat}
 /-- `6 + 32` twice: two threads take 489 rounds and cannot take fewer
 than 299; four threads cannot take fewer than 249, and sixteen not fewer
 than 201. -/
-example {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 32 6 32) 2) R) : 299 ≤ R := by
+theorem Checks.Arith.Floor.c4
+    {R : Nat} (h : Rounds 2 (XMach.init (twoSums 6 32 6 32) 2) R) : 299 ≤ R := by
   have h' := two_threads_read3_ge 5 32 5 32 h
   omega
 
-example {R : Nat} (h : Rounds 4 (XMach.init (twoSums 6 32 6 32) 4) R) : 249 ≤ R := by
+theorem Checks.Arith.Floor.c5
+    {R : Nat} (h : Rounds 4 (XMach.init (twoSums 6 32 6 32) 4) R) : 249 ≤ R := by
   have h' := two_sums_rounds_read3 5 32 5 32 (by decide) h
   omega
 
-example {R : Nat} (h : Rounds 16 (XMach.init (twoSums 6 32 6 32) 16) R) : 201 ≤ R := by
+theorem Checks.Arith.Floor.c6
+    {R : Nat} (h : Rounds 16 (XMach.init (twoSums 6 32 6 32) 16) R) : 201 ≤ R := by
   have h' := two_sums_rounds_read3 5 32 5 32 (by decide) h
   omega
 

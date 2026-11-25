@@ -593,7 +593,7 @@ theorem sums_fair (l : List (Nat × Nat)) {nt : Nat} (hnt : 0 < nt) (σ : Nat �
 /-- `0 + 7`, `3 + 0` and `2 + 2` side by side, with any number of threads
 and any schedule: a run that ends at rest has made eight claims, and the
 memory has `7`, `3` and `4` on the three free ports. -/
-example {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+theorem Checks.Arith.Lists.c1 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init (sums [(0, 7), (3, 0), (2, 2)]) nt).trace xsys σ i).1.resting = true) :
     ((XMach.init (sums [(0, 7), (3, 0), (2, 2)]) nt).trace xsys σ i).2 = 8 ∧
       IsNum ((XMach.init (sums [(0, 7), (3, 0), (2, 2)]) nt).trace xsys σ i).1.mem.toNet

@@ -463,16 +463,16 @@ theorem four_threads_race_last (m n : Nat) (hm : 4 ≤ m)
       rw [eR, ite_neg' (by omega), e2]
       omega)
 
-example : (XMach.init (sum 7 32) 4).Total xsys (fun i => i % 4) 752 :=
+theorem Checks.Arith.FourThreads.c1 : (XMach.init (sum 7 32) 4).Total xsys (fun i => i % 4) 752 :=
   (four_threads_race_last 6 32 (by decide) (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 7 33) 4).Total xsys (fun i => i % 4) 772 :=
+theorem Checks.Arith.FourThreads.c2 : (XMach.init (sum 7 33) 4).Total xsys (fun i => i % 4) 772 :=
   (four_threads_race_last 6 33 (by decide) (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 7 34) 4).Total xsys (fun i => i % 4) 787 :=
+theorem Checks.Arith.FourThreads.c3 : (XMach.init (sum 7 34) 4).Total xsys (fun i => i % 4) 787 :=
   (four_threads_race_last 6 34 (by decide) (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 8 39) 4).Total xsys (fun i => i % 4) 744 :=
+theorem Checks.Arith.FourThreads.c4 : (XMach.init (sum 8 39) 4).Total xsys (fun i => i % 4) 744 :=
   (four_threads_race_last 7 39 (by decide) (by decide) (by decide)).cast (by decide)
 
 /-- A step of one of the first threads of a list does not look at the
@@ -1419,19 +1419,19 @@ theorem four_threads_total (m n : Nat) (hm : 4 ≤ m) (hn : 39 ≤ 3 * m + 3 * n
         unfold turnAt at h3 ⊢
         rcases ht' with rfl | rfl | rfl <;> omega))
 
-example : (XMach.init (sum 7 28) 4).Total xsys (fun i => i % 4) 578 :=
+theorem Checks.Arith.FourThreads.c5 : (XMach.init (sum 7 28) 4).Total xsys (fun i => i % 4) 578 :=
   (four_threads_total 6 28 (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 7 30) 4).Total xsys (fun i => i % 4) 725 :=
+theorem Checks.Arith.FourThreads.c6 : (XMach.init (sum 7 30) 4).Total xsys (fun i => i % 4) 725 :=
   (four_threads_total 6 30 (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 7 31) 4).Total xsys (fun i => i % 4) 740 :=
+theorem Checks.Arith.FourThreads.c7 : (XMach.init (sum 7 31) 4).Total xsys (fun i => i % 4) 740 :=
   (four_threads_total 6 31 (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 7 32) 4).Total xsys (fun i => i % 4) 752 :=
+theorem Checks.Arith.FourThreads.c8 : (XMach.init (sum 7 32) 4).Total xsys (fun i => i % 4) 752 :=
   (four_threads_total 6 32 (by decide) (by decide)).cast (by decide)
 
-example : (XMach.init (sum 7 35) 4).Total xsys (fun i => i % 4) 662 :=
+theorem Checks.Arith.FourThreads.c9 : (XMach.init (sum 7 35) 4).Total xsys (fun i => i % 4) 662 :=
   (four_threads_total 6 35 (by decide) (by decide)).cast (by decide)
 
 /-- The actions before they rest of the `k` threads from the one numbered
@@ -1474,11 +1474,12 @@ theorem threads_beyond_four (m n' k : Nat) (hm : 4 ≤ m) (hn : 39 ≤ 3 * m + 3
   threads_early_many m n' 3 (fourWork m (n' + 1)) hA (four_threads_total m (n' + 1) hm hn) k hk
     hk2
 
-example : (XMach.init (sum 8 36) 5).Total xsys (fun i => i % 5) 984 :=
+theorem Checks.Arith.FourThreads.c10 : (XMach.init (sum 8 36) 5).Total xsys (fun i => i % 5) 984 :=
   (threads_beyond_four 7 35 1 (by decide) (by decide) (by decide) (by decide) (by decide)).cast
     (by decide)
 
-example : (XMach.init (sum 14 64) 6).Total xsys (fun i => i % 6) 1956 :=
+theorem Checks.Arith.FourThreads.c11
+    : (XMach.init (sum 14 64) 6).Total xsys (fun i => i % 6) 1956 :=
   (threads_beyond_four 13 63 2 (by decide) (by decide) (by decide) (by decide) (by decide)).cast
     (by decide)
 

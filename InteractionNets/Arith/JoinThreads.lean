@@ -21,31 +21,33 @@ set_option maxRecDepth 100000
 
 /-- Sixteen adders, sixteen threads, claims first: 296 actions of walks,
 more than `16 * 16`. -/
-example :
+theorem Arith.chain16_adversary :
     jAdversary Arith.xsys (JMach.init (joinChain 4 id) 16) 16 100000 false = (999, 296) := by
   decide +kernel
 
 /-- One thread on the same net: 79 actions of walks. -/
-example : jStats Arith.xsys 1 (JMach.init (joinChain 4 id) 1) 100000 = (223, 16, 0, 79) := by
+theorem Arith.chain16_one :
+    jStats Arith.xsys 1 (JMach.init (joinChain 4 id) 1) 100000 = (223, 16, 0, 79) := by
   decide +kernel
 
 /-- The same net and threads, when a thread in a claim keeps the turn
 (`jCritical`, the schedules of `JMach.walked_cs`): 79 actions of walks,
 as with one thread. -/
-example : jCritical Arith.xsys (JMach.init (joinChain 4 id) 16) 16 100000 = (1087, 79) := by
+theorem Arith.chain16_critical :
+    jCritical Arith.xsys (JMach.init (joinChain 4 id) 16) 16 100000 = (1087, 79) := by
   decide +kernel
 
 /-- The busy-first measuring run (`JMach.bfRun`, proved to follow the
 schedule of `JMach.rests_bfSched`) on the same net and threads: at rest
 after 703 actions, 79 of them walks. -/
-example : JMach.bfRun Arith.xsys (joinChain 4 id) 16 100000 = (703, 79) := by
+theorem Arith.chain16_bfRun : JMach.bfRun Arith.xsys (joinChain 4 id) 16 100000 = (703, 79) := by
   decide +kernel
 
 /-- The measuring run where turns go round (`JMach.csRun`, proved to follow
 `JMach.csSched`): at rest after 1008 actions, 91 of them walks.  More walks
 than one thread here; `JMach.csRun_walked` bounds them for any net with a
 normal form. -/
-example : JMach.csRun Arith.xsys (joinChain 4 id) 16 100000 = (1008, 91) := by
+theorem Arith.chain16_csRun : JMach.csRun Arith.xsys (joinChain 4 id) 16 100000 = (1008, 91) := by
   decide +kernel
 
 end INet

@@ -39,7 +39,7 @@ end Bridge
 namespace Solo
 
 /-- The rule of `Solo` makes an agent that belongs to neither side. -/
-example : ¬ Solo.system.Sided := by
+theorem Checks.UnionExamples.c1 : ¬ Solo.system.Sided := by
   intro h
   have h0 := h A A _ rfl 0
   cases h0
@@ -49,7 +49,7 @@ with any number of threads and any schedule: a run that ends at rest has
 made two claims, one for each copy, and the memory holds two nets side by
 side, each a renaming of a normal form of `aa` whose compact form is the
 single `B` wired to itself. -/
-example {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
+theorem Checks.UnionExamples.c2 {nt : Nat} (hnt : 0 < nt) (σ : Nat → Nat) {i : Nat}
     (hr : ((XMach.init ((xaa.tag 0).union (xaa.tag 1)) nt).trace xsystem σ i).1.resting = true) :
     ((XMach.init ((xaa.tag 0).union (xaa.tag 1)) nt).trace xsystem σ i).2 = 2 ∧
       ∃ (g g' : Id → Id) (A' B' : Net Solo),

@@ -217,7 +217,8 @@ def twoTimesThree : XNet Peano :=
 /-- The reducer validates the net for `2 * 3` and stops after 23 steps on
 a net whose agents are six successors and a zero.  This is one product,
 evaluated; the proof for all products is `Peano.mul_computes`. -/
-example : (twoTimesThree.normalize xsys 100).map (fun r => (r.2, r.1.agents.map (·.2))) =
+theorem Checks.Peano.c1
+    : (twoTimesThree.normalize xsys 100).map (fun r => (r.2, r.1.agents.map (·.2))) =
     some (23, [zero, succ, succ, succ, succ, succ, succ]) := by
   decide +kernel
 

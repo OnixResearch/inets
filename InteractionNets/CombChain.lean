@@ -43,17 +43,17 @@ def combChain (b : Nat) (order : Nat → Nat) : XNet Comb :=
      (([0], 2), ([2 * (n - 1) + 2], 1)), (([2 * (n - 1) + 2], 1), ([0], 2)),
      (([0], 3), ([2 * (n - 1) + 2], 2)), (([2 * (n - 1) + 2], 2), ([0], 3))]⟩
 set_option maxRecDepth 100000
-example : (combChain 3 (bitRev 3)).Ok Comb.dsystem.sys.ar := by decide +kernel
+theorem Checks.CombChain.c1 : (combChain 3 (bitRev 3)).Ok Comb.dsystem.sys.ar := by decide +kernel
 /-- Eight pairs, bits reversed: at rest after 193 actions, not before, 105
 of them in walks. -/
-example :
+theorem Checks.CombChain.c2 :
     JMach.walked Comb.dsystem (fun _ => 0) (JMach.init (combChain 3 (bitRev 3)) 1) 193 = 105 := by
   decide +kernel
-example :
+theorem Checks.CombChain.c3 :
     ((JMach.init (combChain 3 (bitRev 3)) 1).trace Comb.dsystem (fun _ => 0) 193).1.resting =
       true := by
   decide +kernel
-example :
+theorem Checks.CombChain.c4 :
     ((JMach.init (combChain 3 (bitRev 3)) 1).trace Comb.dsystem (fun _ => 0) 192).1.resting =
       false := by
   decide +kernel

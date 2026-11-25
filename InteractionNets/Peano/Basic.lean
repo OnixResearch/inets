@@ -80,7 +80,7 @@ def eraseTwo : XNet Peano :=
     [(([1], 0), ([2], 0)), (([2], 1), ([3], 0)), (([3], 1), ([4], 0))]
 
 /-- The reducer stops after three steps with no agent and no wire. -/
-example : (eraseTwo.normalize xsys 20).map
+theorem Checks.Peano.Basic.c1 : (eraseTwo.normalize xsys 20).map
     (fun r => (r.2, r.1.agents.length, r.1.wires.length)) = some (3, 0, 0) := by
   decide +kernel
 
@@ -92,7 +92,8 @@ def copyTwo : XNet Peano :=
 
 /-- The reducer stops after three steps with four successors and two
 zeros. -/
-example : (copyTwo.normalize xsys 20).map (fun r => (r.2, r.1.agents.map (·.2))) =
+theorem Checks.Peano.Basic.c2
+    : (copyTwo.normalize xsys 20).map (fun r => (r.2, r.1.agents.map (·.2))) =
     some (3, [succ, succ, succ, succ, zero, zero]) := by
   decide +kernel
 

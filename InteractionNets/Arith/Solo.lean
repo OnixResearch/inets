@@ -1723,7 +1723,7 @@ theorem solo_btime_ops (m n : Nat) (i : Nat) :
 operations on the maps of agents and 25,010 on the map of segments; so at
 least 25,013 counted once it rests, and at most 14,809,557, and at most
 1,421,717,472 bits. -/
-example : (XMach.init (sum 1000 1000) 1).work xsys (fun _ => 0) 25013 = 25013 ∧
+theorem Checks.Arith.Solo.c1 : (XMach.init (sum 1000 1000) 1).work xsys (fun _ => 0) 25013 = 25013 ∧
     (XMach.init (sum 1000 1000) 1).tally XThread.opsA xsys (fun _ => 0) 25013 = 28018 ∧
     (XMach.init (sum 1000 1000) 1).tally XThread.opsW xsys (fun _ => 0) 25013 = 25010 ∧
     ∀ i, (25013 ≤ i → 25013 ≤ (ZMach.init (sum 1000 1000) 1).ftime xsys (fun _ => 0) i) ∧
@@ -1761,7 +1761,7 @@ of at most 53 agents and 310 on a tree of at most 206 segments, so at most
 107,889 counted and 6,473,340 bits, where four operations for every action
 on trees of 379 entries gave 267,615 and 16,056,900.  The run takes 10,999
 and 28,984. -/
-example : ∀ i, (ZMach.init (sum 12 12) 1).ftime xsys (fun _ => 0) i ≤ 107889 ∧
+theorem Checks.Arith.Solo.c2 : ∀ i, (ZMach.init (sum 12 12) 1).ftime xsys (fun _ => 0) i ≤ 107889 ∧
     (ZMach.init (sum 12 12) 1).btime xsys (fun _ => 0) i ≤ 6473340 := by
   intro i
   have h1 := solo_ztime_ops 12 12 i
@@ -2288,7 +2288,7 @@ theorem two_threads_factor (c m n : Nat) (hc : 13 * c ≤ m) (hn : n ≤ m) :
 /-- `100 + 0` with two more successors: one thread takes 2,257 actions in
 all; two threads taking turns have taken 22,133 before the successors of
 the first argument are gone. -/
-example : (XMach.init (sum 102 0) 1).work xsys (fun _ => 0) 2257 = 2257 ∧
+theorem Checks.Arith.Solo.c3 : (XMach.init (sum 102 0) 1).work xsys (fun _ => 0) 2257 = 2257 ∧
     (∀ i, (XMach.init (sum 102 0) 1).work xsys (fun _ => 0) i ≤ 2257) ∧
     ∀ i, 22133 ≤ i → 22133 ≤ (XMach.init (sum 102 0) 2).work xsys (altSched 100) i := by
   have e : soloWork 102 0 = 2257 := by decide
