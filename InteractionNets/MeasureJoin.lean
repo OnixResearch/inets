@@ -238,7 +238,14 @@ the run stops having fired `W` pairs.  For the balanced sum of 32 ones
 (`W = 111`, `D = 21`) the rounds are 111, 39 and 22 for `p` = 1, 4 and 16,
 against bounds 132, 48 and 27; the largest number in a name is 95 against
 a bound of 476.  On Peano `8 * 3` the largest number moves with `p`, from
-32 to 35, as the order of firing changes the nets held. -/
+32 to 35, as the order of firing changes the nets held.  The final nets
+are not the same lists for every `p`: on two sums side by side with
+`p = 1` the short form of the final net differs from that of
+`XNet.parRun`, as it may, since only a renaming of the normal form is
+claimed.  What is read at the short names of the free ports is the
+normal form's (`XNet.reuseRunP_read`): on the NetI64 net `fanout_overflow`
+of `noble-lang`, run outside this repository, `p` = 1, 4 and 16 all read
+0, 0 and 0, the outputs of the Rust runtime. -/
 
 namespace INet
 
