@@ -101,6 +101,7 @@ import InteractionNets.JoinCrit
 import InteractionNets.JoinCritWork
 import InteractionNets.SchedRun
 import InteractionNets.IndexedJoin
+import InteractionNets.ShortNames
 import InteractionNets.Arith.JoinIndexed
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
@@ -3641,8 +3642,16 @@ holds up to equality rather than up to renaming.
   operation grows with the size, where on `joinChain` it stays flat.
   Measured, renaming the input to one-cell names first keeps it flat
   there too, and the growth of names during a run (to 258 cells in
-  Peano's `256 * 3`) costs little; renaming the input is not yet part of
-  the program.
+  Peano's `256 * 3`) costs little.  `XNet.short` (`ShortNames`) renames
+  every name of the input to one cell, its place among the names of the
+  net; that is a renaming (`XNet.short_renaming`), so the short form is
+  well formed, lists no name twice, has the same agents and segments by
+  count, reduces in the same number of steps to the renamed normal form
+  (`XNet.short_steps`), and has the same bounds (`IJMach.time_short`;
+  every expression of additions, `Arith.Expr.itime_short`).  Measured on
+  `((5 + 0) + 0) + …` with 1,024 additions it takes 142 ms against 10.0 s,
+  at about 210 ns a counted operation for every size; the renaming itself
+  searches a list for each name and is not counted.
   Building the memory and the lists of the threads, the turns of a thread
   at rest, the table of threads and the choice of the next thread are not
   counted; the log is never packed.  The hash-map reducer is linear (`HNet.runC_cost`);

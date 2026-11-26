@@ -159,7 +159,11 @@ counted operation stays near 200 ns up to 1,024 additions (287 ns, 191 ms
 in all), against 13,747 ns (9.1 s) with the names of the input.  In Peano
 multiplication the names start at two cells and grow with the run, to 258
 for `256 * 3`, and the time for a counted operation rises only from 203 ns
-to 296 ns between `128 * 3` and `1024 * 3`.  A measuring loop must not compute the lists the
+to 296 ns between `128 * 3` and `1024 * 3`.  With `XNet.short`, the proved
+renaming of the input to one-cell names (`ShortNames`), `((5 + 0) + 0) + …`
+takes 15, 31, 69 and 142 ms for 128, 256, 512 and 1,024 additions, against
+54, 325, 1,950 and 10,008 ms, at 180 to 214 ns a counted operation; the
+renaming is done before the clock starts.  A measuring loop must not compute the lists the
 maps stand for (`IMem.toX`) at each action: that is a pass over the log. -/
 
 namespace INet
