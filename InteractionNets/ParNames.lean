@@ -159,7 +159,7 @@ and on a renamed copy fire as many pairs and reach copies. -/
 theorem XNet.parStep_map {f : Id → Id} (hX : X.Ok xs.sys.ar) (hY : Y.Ok xs.sys.ar)
     (hf : Renaming f X.toNet) (e : Y.toNet = X.toNet.map f) :
     (Y.parStep xs).2 = (X.parStep xs).2 ∧
-      ∃ g, Renaming g (X.parStep xs).1.toNet ∧
+      ∃ g, Renaming g (X.parStep xs).1.toNet ∧ (∀ i, X.toNet.Used i → g i = f i) ∧
         (Y.parStep xs).1.toNet = (X.parStep xs).1.toNet.map g := by
   have hC := hX.1
   have hI := (XNet.redexes_indep xs X).abs
@@ -181,9 +181,9 @@ theorem XNet.parStep_map {f : Id → Id} (hX : X.Ok xs.sys.ar) (hY : Y.Ok xs.sys
     · exact .inr ⟨e₂.symm, e₁.symm⟩
   refine ⟨?_, ?_⟩
   · rw [XNet.parStep_snd, XNet.parStep_snd, hJ.length_same hM m₁ m₂', List.length_map]
-  · obtain ⟨g, hg, -, eg⟩ := hI.fireSeq_map hC hf
+  · obtain ⟨g, hg, agree, eg⟩ := hI.fireSeq_map hC hf
     have hW : (X.toNet.fireSeq (X.parSel xs)).WF xs.sys.ar := Steps.wf hC (hI.steps hC)
-    refine ⟨g, ?_, ?_⟩
+    refine ⟨g, ?_, agree, ?_⟩
     · rw [XNet.parStep_toNet hX, ← hI.fireSeq_eq hC]
       exact hg.compact
     · rw [XNet.parStep_toNet hY, XNet.parStep_toNet hX, e, ← hJ.fireSeq_eq hCf,
@@ -210,7 +210,7 @@ theorem XNet.parStep_copy (hX : X.Ok xs.sys.ar) (hY : Y.Ok xs.sys.ar)
       (X.parStep xs).1.toNet.Copy xs.sys.ar (Y.parStep xs).1.toNet := by
   obtain ⟨f, hi⟩ := h
   obtain ⟨hf, e⟩ := (XNet.copy_iff hX hY).1 hi
-  obtain ⟨hn, g, hg, eg⟩ := XNet.parStep_map hX hY hf e
+  obtain ⟨hn, g, hg, -, eg⟩ := XNet.parStep_map hX hY hf e
   obtain ⟨-, hX'⟩ := XNet.parStep_spec (xs := xs) hX
   obtain ⟨-, hY'⟩ := XNet.parStep_spec (xs := xs) hY
   exact ⟨hn, g, (XNet.copy_iff hX' hY').2 ⟨hg, eg⟩⟩

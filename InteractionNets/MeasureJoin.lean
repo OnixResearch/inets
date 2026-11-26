@@ -218,7 +218,18 @@ short forms of the two final nets are equal on every family measured.  The
 longest list of identifiers held, which bounds the numbers in the names
 (`XNet.packRun_short`), is that of the input on the sums (2,591 for 256
 nested additions, 21,504 for 64 sums side by side), which only shrink, and
-grows from 191 to 547 on Peano `32 * 3`. -/
+grows from 191 to 547 on Peano `32 * 3`.
+
+With the allocator instead (`XNet.reuseRun`, `reuse`), which keeps the
+names of one cell held before a round and gives the new ones spare
+numbers, the run fires the pairs of `XNet.parRun` in the same rounds, the
+free ports keep their names, and the short forms of the final nets agree
+with those of `XNet.parRun`.  The largest number in a name stays near a
+fifth of the bound proved, which counts every end of every segment: 134
+against 671 for 64 nested additions, 271 against 1,344 for four sums side
+by side, 59 against 307 for Peano `16 * 3`.  The allocator as written
+scans the list of identifiers for each name, so a round takes time in the
+square of the size; only small nets are measured. -/
 
 namespace INet
 
