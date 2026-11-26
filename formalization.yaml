@@ -119,6 +119,10 @@ status:
       file: "InteractionNets/EndToEnd.lean"
       sorry_count: 0
       axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.IJMach.runReadAgents_eq"
+      file: "InteractionNets/ReadAgents.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
 
 automation:
   methods:

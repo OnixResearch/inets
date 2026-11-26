@@ -11,6 +11,8 @@
   build of `inets-measure`;
 * the foundations of every constant of the library (`Tools/Axioms.lean`):
   only `propext`, `Quot.sound` and `Classical.choice`;
+* every name of the library that `OnixResearch/noble-lang` refers to still
+  exists (`Tools/Consumers.lean`);
 * `leanchecker --fresh` on the library;
 * `lake comparator --paranoid` accepting each statement file;
 * every declaration named in `formalization.yaml` exists, lies in the file
@@ -148,6 +150,8 @@ def checks : IO Unit := do
   for a in lst.splitOn "," do
     unless ["propext", "Quot.sound", "Classical.choice"].contains (trim a) do
       throw <| IO.userError s!"foundation not allowed: {trim a}"
+  IO.println "== names that noble-lang uses"
+  discard <| capture "lake" #["env", "lean", "Tools/Consumers.lean"]
   IO.println "== leanchecker"
   run "lake" #["env", "leanchecker", "--fresh", "InteractionNets"]
   IO.println "== Comparator"

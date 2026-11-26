@@ -103,6 +103,7 @@ import InteractionNets.SchedRun
 import InteractionNets.IndexedJoin
 import InteractionNets.ShortNames
 import InteractionNets.EndToEnd
+import InteractionNets.ReadAgents
 import InteractionNets.Arith.JoinIndexed
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
@@ -3672,6 +3673,16 @@ holds up to equality rather than up to renaming.
   `Addition.IsNum.map`).  Whatever it returns, for any fuel, is the value
   (`IJMach.runRead_sound`, `Arith.Expr.shortRun_sound`).  Not in the count:
   the renaming, building the maps, and the reading.
+  For a system whose values are agents of their own (an agent carrying a
+  number, say), `IJMach.runReadAgents` reads, at rest, the symbol of the
+  agent wired to each port of a list, from the maps (`IMem.readAgent`,
+  proved to read what the lists say, `IMem.readAgent_eq`;
+  `XNet.readAgent_sound`, `XNet.readAgent_complete`).  Whatever it returns
+  names, for each port, the agent wired to it in the normal form
+  (`IJMach.runReadAgents_sound`), and with enough fuel it returns them at a
+  time within `2 C + 3 D + 6` times the work bound
+  (`IJMach.runReadAgents_eq`), for any system whose rules write at most
+  `C` agents and `D` segments and join at most `J`.
   Building the memory and the lists of the threads, the turns of a thread
   at rest, the table of threads and the choice of the next thread are not
   counted; the log is never packed.  The hash-map reducer is linear (`HNet.runC_cost`);
