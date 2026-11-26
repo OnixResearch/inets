@@ -65,18 +65,22 @@ status:
   main_results:
     - declaration: "INet.Step.diamond"
       file: "InteractionNets/Confluence.lean"
+      comparator_config: "Challenges/Confluence.json"
       sorry_count: 0
       axioms: ["propext", "Quot.sound"]
     - declaration: "INet.confluence"
       file: "InteractionNets/Confluence.lean"
+      comparator_config: "Challenges/Confluence.json"
       sorry_count: 0
       axioms: ["propext", "Quot.sound", "Classical.choice"]
     - declaration: "INet.normal_form_unique"
       file: "InteractionNets/Confluence.lean"
+      comparator_config: "Challenges/Confluence.json"
       sorry_count: 0
       axioms: ["propext", "Quot.sound", "Classical.choice"]
     - declaration: "INet.reduction_bounded"
       file: "InteractionNets/Confluence.lean"
+      comparator_config: "Challenges/Confluence.json"
       sorry_count: 0
       axioms: ["propext", "Quot.sound", "Classical.choice"]
     - declaration: "INet.HNet.runC_cost"

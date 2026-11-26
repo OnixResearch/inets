@@ -3957,6 +3957,20 @@ heaviest (`Arith.Correct`, `Arith.Readers`, `Arith.SideBySide`,
 `example`s: the kernel checks them when the module is built, and they are
 not in the library.
 No line of the development is longer than 100 characters.
+`Challenges/Confluence.lean`, outside the library and imported by nothing,
+restates word for word the definitions that the statements of
+`Step.wf`, `Step.free`, `Step.diamond`, `confluence`, `normal_form_unique`
+and `reduction_bounded` depend on (nets, wires, rules, firing, steps), some
+230 lines, and states those six theorems with their proofs left open.
+`lake comparator --config Challenges/Confluence.json` checks that the
+library proves exactly those statements, from exactly those definitions,
+with no other foundation than the three named at the end of this text,
+and runs all six kernels of `lake check --paranoid` on the result; it is
+run before each commit.
+So a reader who accepts those 230 lines as interaction nets need not read
+the rest to trust the main theorems.  The bounds on the machines are not
+restated: their statements reach the programs, their memories and the
+schedules, which would not make a short file.
 `formalization.yaml`, at the root, catalogues the main results with their
 files and what each depends on, the sources and how the work was done, in
 the format of the mathlib-initiative; its names and their dependencies are

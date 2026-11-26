@@ -4,3 +4,6 @@ defaultTargets = ["InteractionNets"]
 [[lean_lib]]
 name = "InteractionNets"
 moreLeanArgs = ["-DwarningAsError=true"]
+
+[[lean_lib]]
+name = "Challenges"

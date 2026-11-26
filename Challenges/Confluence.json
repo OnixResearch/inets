@@ -1,0 +1,14 @@
+{
+  "challenge_module": "Challenges.Confluence",
+  "solution_module": "InteractionNets.Confluence",
+  "theorem_names": [
+    "INet.Step.wf",
+    "INet.Step.free",
+    "INet.Step.diamond",
+    "INet.confluence",
+    "INet.normal_form_unique",
+    "INet.reduction_bounded"
+  ],
+  "definition_names": [],
+  "permitted_axioms": ["propext", "Quot.sound", "Classical.choice"]
+}
