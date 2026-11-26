@@ -123,6 +123,10 @@ status:
       file: "InteractionNets/ReadAgents.lean"
       sorry_count: 0
       axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.XNet.parRun_optimal_iff"
+      file: "InteractionNets/ParOptimal.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
 
 automation:
   methods:

@@ -104,6 +104,7 @@ import InteractionNets.IndexedJoin
 import InteractionNets.ShortNames
 import InteractionNets.EndToEnd
 import InteractionNets.ReadAgents
+import InteractionNets.ParOptimal
 import InteractionNets.Arith.JoinIndexed
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
@@ -1957,6 +1958,13 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              net after firing the same number of pairs, and
                              the parallel one stops whenever a normal form
                              exists and it is given enough rounds
+* `INet.XNet.parRun_optimal_iff`, `INet.XNet.parRun_ahead`
+                             firing every active pair in each round is
+                             optimal: a schedule of `r` rounds, each firing
+                             any active pairs that share no agent, reaches a
+                             normal form exactly when `r` rounds of
+                             `XNet.parStep` do; a net some pairs ahead never
+                             needs more rounds (`ParOptimal`)
 * `INet.XNet.run_map`        the reducer does not depend on names: on a
                              renamed input it stops after the same number of
                              steps, on a renaming of its output
@@ -2235,8 +2243,10 @@ holds up to equality rather than up to renaming.
   they stand for is well formed and compact).  Its rounds are measured
   against the steps in `MeasureJoin` (`inets-measure rounds`): sums side
   by side take the rounds of one, and on unary numbers the rounds follow
-  the size of the numbers.  Nothing is proved yet about the number of
-  rounds.
+  the size of the numbers.  `XNet.parRun_optimal_iff` proves its rounds
+  the fewest any schedule of rounds can take; it counts rounds, not the
+  work of finding the pairs of a round, and says nothing of how many rounds
+  a given net takes.
   `XNet.check` decides that invariant and steps preserve it, so
   `XNet.normalize` needs no hypothesis.  The check is quadratic.
 * The hash-map reducer does a number of map operations per step that
