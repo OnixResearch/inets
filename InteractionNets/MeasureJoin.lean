@@ -205,8 +205,9 @@ bound `W / p + D` proved in `XNet.parRunP_bound`:
     balanced sum of 64 ones      255   38     255      84       47       38
     joinChain 64                  64    1      64      16        4        1
 
-The rounds come out near the larger of `W / p` and `D`, below the bound
-throughout.  On the NetI64 nets of `noble-lang`, run outside this
+The rounds come out between the larger of `W / p` and `D` and their sum,
+the bound; by `XNet.parRunP_twice` they are at most twice the rounds of
+any schedule of rounds of at most `p` pairs.  On the NetI64 nets of `noble-lang`, run outside this
 repository, a balanced sum of 128 constants (`W = 254`, `D = 14`) takes
 254, 74, 26 and 14 rounds for `p` = 1, 4, 16 and 64. -/
 

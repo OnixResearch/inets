@@ -9,7 +9,8 @@ rounds reaches a normal form in fewer rounds than `XNet.parRun`
 no more rounds than it (`XNet.parRun_ahead`): firing a pair early never
 costs a round.  With room for at most `p` pairs a round, `W / p + D`
 rounds are enough, `W` the steps and `D` the rounds of `XNet.parRun`
-(`XNet.parRunP_bound`).
+(`XNet.parRunP_bound`), at most twice the rounds of any schedule of at
+most `p` pairs a round (`XNet.parRunP_twice`).
 
 The key fact is `par_absorb`: fire any independent pairs `rs` of a net, and the
 net reached by firing all its active pairs is one round further on, by the
@@ -464,5 +465,45 @@ theorem XNet.parRunP_bound {p : Nat} (hp : 0 < p) :
           omega
         · obtain ⟨e, -⟩ := XNet.fireList_toNet hX hT
           exact ⟨_, hT.abs, e⟩
+
+/-- A schedule of `r` rounds, each firing at most `p` independent active
+pairs. -/
+inductive XNet.SchedP (xs : XSys S) (p : Nat) : Nat → XNet S → XNet S → Prop
+  | refl (X : XNet S) : XNet.SchedP xs p 0 X X
+  | round {X Y : XNet S} {r : Nat} (rs : List (XRedex S)) (h : X.Indep xs rs)
+      (hp : rs.length ≤ p) (rest : XNet.SchedP xs p r (X.fireList xs.sys.ar rs) Y) :
+      XNet.SchedP xs p (r + 1) X Y
+
+theorem XNet.SchedP.sched {p r : Nat} {X Y : XNet S} (h : XNet.SchedP xs p r X Y) :
+    XNet.Sched xs r X Y := by
+  induction h with
+  | refl X => exact .refl X
+  | round rs hI _ _ ih => exact .round rs hI ih
+
+/-- A schedule of `r` rounds of at most `p` pairs is a reduction of at most
+`p * r` steps. -/
+theorem XNet.SchedP.steps {p r : Nat} {X Y : XNet S} (h : XNet.SchedP xs p r X Y)
+    (hX : X.Ok xs.sys.ar) :
+    ∃ W, W ≤ p * r ∧ Steps (CStep xs.sys) W X.toNet Y.toNet ∧ Y.Ok xs.sys.ar := by
+  induction h with
+  | refl X => exact ⟨0, Nat.zero_le _, .refl _, hX⟩
+  | @round X Y r rs hI hp _ ih =>
+    obtain ⟨st, hX₁⟩ := XNet.fireList_steps hX hI
+    obtain ⟨W, hW, sts, hY⟩ := ih hX₁
+    refine ⟨rs.length + W, ?_, st.trans sts, hY⟩
+    rw [Nat.mul_succ]
+    omega
+
+/-- **Within twice the best**: if some schedule of `r` rounds of at most
+`p` pairs each brings the net to a normal form, then `2 * r` rounds of
+`XNet.parStepP` do. -/
+theorem XNet.parRunP_twice {p r : Nat} {X Y : XNet S} (hp : 0 < p) (hX : X.Ok xs.sys.ar)
+    (h : XNet.SchedP xs p r X Y) (hn : Y.step xs = none) :
+    (X.parRunP xs p (2 * r)).1.step xs = none := by
+  obtain ⟨W, hW, sts, hY⟩ := h.steps hX
+  have hD := XNet.parRun_optimal hX h.sched hn
+  refine XNet.parRunP_bound hp (2 * r) hX sts (XNet.step_complete hY hn) hD ?_
+  have : W / p ≤ r := Nat.div_le_of_le_mul hW
+  omega
 
 end INet
