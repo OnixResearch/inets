@@ -115,6 +115,10 @@ status:
       file: "InteractionNets/IndexedJoin.lean"
       sorry_count: 0
       axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.Arith.Expr.shortRun_eq"
+      file: "InteractionNets/EndToEnd.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
 
 automation:
   methods:

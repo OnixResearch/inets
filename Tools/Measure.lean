@@ -2,6 +2,7 @@ import InteractionNets.MeasureJoin
 import InteractionNets.ShortNames
 import InteractionNets.Peano.Expr
 import InteractionNets.CombChain
+import InteractionNets.EndToEnd
 
 /-! # The measurements of `MeasureJoin`, run again
 
@@ -20,7 +21,9 @@ hand.  The tables:
 * `indexed-threads`: `IJMach.bfRun` with several threads;
 * `names`: the longest names at the start, written and at the end;
 * `name-time`: nanoseconds for a counted operation, with long names;
-* `short`: `XNet.short` against the names of the input. -/
+* `short`: `XNet.short` against the names of the input;
+* `end-to-end`: `IJMach.runRead` on expressions, renamed short, against
+  the value and the bound of `Arith.Expr.shortRun_eq`. -/
 
 open INet
 
@@ -171,10 +174,30 @@ def short : IO Unit := do
     shortTimed s!"lnest {k}" Arith.xsys (Arith.lnest k).net
     shortTimed s!"rnest {k}" Arith.xsys (Arith.rnest k).net
 
+def endToEnd : IO Unit := do
+  let go (nm : String) (e : Arith.Expr) (nt : Nat) : IO Unit := do
+    let B := e.net.workBound nt 2 8 1 e.cost
+    let s := B + 2 + e.net.wires.length + 8 * e.cost + e.eval + 1
+    let X := e.net.short
+    let p := mapPort e.net.shortName e.res
+    let t₀ ← IO.monoMsNow
+    let r := IJMach.runRead Arith.xsys Arith.zero Arith.succ X p nt s
+    let t₁ ← IO.monoMsNow
+    let shown := match r with
+      | some (v, t) => s!"value={v} (expected {e.eval}) time={t} bound={34 * B}"
+      | none => "none"
+    row s!"{nm} threads={nt}: {shown} ms={t₁ - t₀}"
+  for k in [64, 256, 1024] do
+    for nt in [1, 4] do
+      go s!"lnest {k}" (Arith.lnest k) nt
+      go s!"rnest {k}" (Arith.rnest k) nt
+      go s!"lit {k} + lit {k}" (Arith.Expr.add (.lit k) (.lit k)) nt
+
 def tables : List (String × IO Unit) :=
   [("programs", programs), ("threads", threads), ("chain", chain), ("adversary", adversary),
     ("schedules", schedules), ("indexed", indexed), ("indexed-threads", indexedThreads),
-    ("names", names), ("name-time", nameTime), ("short", short)]
+    ("names", names), ("name-time", nameTime), ("short", short),
+    ("end-to-end", endToEnd)]
 
 def main (args : List String) : IO UInt32 := do
   match args with

@@ -102,6 +102,7 @@ import InteractionNets.JoinCritWork
 import InteractionNets.SchedRun
 import InteractionNets.IndexedJoin
 import InteractionNets.ShortNames
+import InteractionNets.EndToEnd
 import InteractionNets.Arith.JoinIndexed
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
@@ -3655,6 +3656,19 @@ holds up to equality rather than up to renaming.
   places, `idxMap_get`) and hashes every name of the input, so it takes
   time with the total length of the names; it is not counted (2.7 s for
   the 14,355 cells of that net, whose names are as long as its depth).
+  The pieces come together in one program (`EndToEnd`): `IJMach.runRead`
+  runs the indexed program busy-first within a fuel and, if every thread
+  is at rest, reads the numeral on a port from the maps (`IMem.readNum`,
+  proved to read what the lists say, `IMem.readNum_eq`), returning it with
+  the time of the run.  With enough fuel it returns the numeral of the
+  normal form, at a time within `2 C + 3 D + 6` times the work bound
+  (`IJMach.runRead_eq`).  For **every expression of additions**, renamed
+  short, run by any number of threads and read at the renamed result
+  port, it returns the value of the expression, in at most
+  `34 (nt (7 |agents| + K) + 34 c + K + 4 K log₂ (K + 1) + 6 K)`
+  operations, `c` the steps and `K = wires + 8 c`, with no hypothesis
+  (`Arith.Expr.shortRun_eq`; a numeral is carried along a renaming,
+  `Addition.IsNum.map`).  The reading itself is not in that count.
   Building the memory and the lists of the threads, the turns of a thread
   at rest, the table of threads and the choice of the next thread are not
   counted; the log is never packed.  The hash-map reducer is linear (`HNet.runC_cost`);
