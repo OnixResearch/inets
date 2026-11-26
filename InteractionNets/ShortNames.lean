@@ -1,4 +1,5 @@
 import InteractionNets.IndexedJoin
+import Std.Data.HashMap
 
 /-! # Short names at the start
 
@@ -73,8 +74,52 @@ def XNet.shortName (X : XNet S) (i : Id) : Id :=
   | some k => [k]
   | none => i
 
-/-- **The net with short names.** -/
-def XNet.short (X : XNet S) : XNet S := X.map X.shortName
+/-- The first places of the identifiers of a list, counted from `k`, in a
+hash map: built once, so that renaming a net takes one lookup a name. -/
+def idxMap : List Id → Nat → Std.HashMap Id Nat
+  | [], _ => ∅
+  | x :: xs, k => (idxMap xs (k + 1)).insert x k
+
+theorem idxMap_get : ∀ (l : List Id) (k : Nat) (i : Id),
+    (idxMap l k)[i]? = (firstIdx l i).map (· + k)
+  | [], _, _ => Std.HashMap.getElem?_empty
+  | x :: xs, k, i => by
+    show ((idxMap xs (k + 1)).insert x k)[i]? = _
+    rw [Std.HashMap.getElem?_insert, idxMap_get xs (k + 1) i]
+    have e : firstIdx (x :: xs) i = if x = i then some 0 else (firstIdx xs i).map (· + 1) := rfl
+    rw [e]
+    by_cases hx : x = i
+    · rw [ite_pos' hx, hx]
+      simp
+    · rw [ite_neg' hx]
+      have : (x == i) = false := by simpa using hx
+      rw [this]
+      cases firstIdx xs i with
+      | none => rfl
+      | some j =>
+        show some (j + (k + 1)) = some (j + 1 + k)
+        rw [Nat.add_comm k 1, Nat.add_assoc]
+
+/-- **The net with short names**, renamed through the map of first places,
+built once. -/
+def XNet.short (X : XNet S) : XNet S :=
+  let m := idxMap X.allIds 0
+  X.map fun i =>
+    match m[i]? with
+    | some k => [k]
+    | none => i
+
+/-- The short form is the net renamed by `XNet.shortName`. -/
+theorem XNet.short_eq (X : XNet S) : X.short = X.map X.shortName := by
+  unfold XNet.short
+  dsimp only
+  congr 1
+  funext i
+  unfold XNet.shortName
+  rw [idxMap_get]
+  cases firstIdx X.allIds i with
+  | none => rfl
+  | some k => rfl
 
 theorem XNet.used_ids {X : XNet S} {i : Id} (h : X.toNet.Used i) : i ∈ X.allIds := by
   unfold XNet.allIds
@@ -113,19 +158,22 @@ theorem XNet.short_renaming (X : XNet S) : Renaming X.shortName X.toNet where
     simp only [List.length_cons, List.length_nil, List.length_append] at this
     exact List.eq_nil_of_length_eq_zero (by omega)
 
-theorem XNet.short_toNet (X : XNet S) : X.short.toNet = X.toNet.map X.shortName :=
-  XNet.map_toNet _ _
+theorem XNet.short_toNet (X : XNet S) : X.short.toNet = X.toNet.map X.shortName := by
+  rw [XNet.short_eq]
+  exact XNet.map_toNet _ _
 
 /-- The short form of a well-formed net is well formed. -/
 theorem XNet.short_wf {ar : S → Nat} {X : XNet S} (hX : X.toNet.WF ar) : X.short.toNet.WF ar := by
   rw [XNet.short_toNet]
   exact (XNet.short_renaming X).wf_map hX
 
-theorem XNet.short_agents_length (X : XNet S) : X.short.agents.length = X.agents.length :=
-  List.length_map _
+theorem XNet.short_agents_length (X : XNet S) : X.short.agents.length = X.agents.length := by
+  rw [XNet.short_eq]
+  exact List.length_map _
 
-theorem XNet.short_wires_length (X : XNet S) : X.short.wires.length = X.wires.length :=
-  List.length_map _
+theorem XNet.short_wires_length (X : XNet S) : X.short.wires.length = X.wires.length := by
+  rw [XNet.short_eq]
+  exact List.length_map _
 
 theorem XNet.allIds_map (f : Id → Id) (X : XNet S) :
     (X.map f).allIds = X.allIds.map f := by
@@ -137,7 +185,7 @@ theorem XNet.allIds_map (f : Id → Id) (X : XNet S) :
 ports and the ends of the segments. -/
 theorem XNet.short_names (X : XNet S) : ∀ i ∈ X.short.allIds, i.length = 1 := by
   intro i hi
-  rw [XNet.short, XNet.allIds_map] at hi
+  rw [XNet.short_eq, XNet.allIds_map] at hi
   obtain ⟨j, hj, rfl⟩ := List.mem_map.1 hi
   obtain ⟨k, ek, -⟩ := XNet.shortName_of_mem hj
   rw [ek]
@@ -146,6 +194,7 @@ theorem XNet.short_names (X : XNet S) : ∀ i ∈ X.short.allIds, i.length = 1 :
 /-- The short form lists no name twice if the net does not. -/
 theorem XNet.short_nodup {X : XNet S} (hnd : (X.agents.map Prod.fst).Nodup) :
     (X.short.agents.map Prod.fst).Nodup := by
+  rw [XNet.short_eq]
   show ((X.agents.map fun e => (X.shortName e.1, e.2)).map Prod.fst).Nodup
   rw [List.map_map]
   have hm : ∀ e ∈ X.agents, e.1 ∈ X.allIds := fun e he =>

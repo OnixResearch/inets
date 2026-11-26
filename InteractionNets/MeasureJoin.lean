@@ -5,13 +5,15 @@ import InteractionNets.Peano.WorkList
 /-! ## Measuring the three programs at sizes the kernel does not reach
 
 Nothing here is proved, and nothing above depends on it.  These are the
-functions that were compiled (with `lake`, into an executable whose `main`
-is `INet.joinTable`) and run, to count the actions of `XMach`, `WMach` and
-`JMach` until rest, threads taking turns.  The counts are of the programs
+functions that are compiled and run to count the actions of `XMach`,
+`WMach` and `JMach` until rest.  Every table below is printed again by
+`lake exe inets-measure <table>` (`Tools/Measure.lean`), with the name of
+the table given at it; counts come out the same on every machine, times
+are of one run on the machine at hand.  The counts are of the programs
 as defined; the kernel checks such counts only on small nets
 (`Peano.inertThenJoins_bounds` and the examples of `Peano/JoinWalk.lean`).
 
-One thread:
+One thread (`programs`):
 
     net                      claims   JMach     WMach     XMach
     inertThenJoins 80            80    1,283    20,323    20,323
@@ -34,7 +36,7 @@ Several threads, `JMach`.  Turns go to the threads in order whether or
 not they are at rest, and a turn of a thread at rest changes nothing; the
 counts of actions until rest include those turns, so they jump with where
 the threads happen to be when the work runs out.  The work, the actions of
-threads that are not at rest, is linear (`jStats`):
+threads that are not at rest, is linear (`jStats`; `threads`):
 
     net                      threads  claims   actions    work    walk
     ((5 + 0) + 0) + …, 40          2     240     9,677   5,983     512
@@ -56,14 +58,15 @@ a zero, with the result of each wired to the second argument of the next
 (`joinChain`), every claim joins two wires.  Listed in order, each walk
 takes five actions.  Listed in the order of the reversed bits of their
 positions, the walks join wires of equal length, both sides go to the end,
-and the walks take 133, 773, 4,101, 20,485, 45,061 and 98,309 actions for
+and the walks take (`chain`) 133, 773, 4,101, 20,485, 45,061 and 98,309 actions for
 `n` = 16, 64, 256, 1,024, 2,048 and 4,096: almost exactly `2 * n * lg n`.
 So the best bound to hope for on walks is of the order `n * lg n`.
 
 With several threads it is not reached in general.  A schedule that gives
 the turn to a thread that is not walking whenever there is one
 (`jAdversary`), so that claims run ahead of walks and wires grow under the
-walks, makes the walks cost about `n` for each thread, up to `n` threads:
+walks, makes the walks cost about `n` for each thread, up to `n` threads
+(`adversary`):
 
     chain (order)        n   threads   walks, claims first   walks first
     bit-reversed        64        16                 1,320           773
@@ -95,7 +98,8 @@ runs out) and to count the walks of `JMach.walked`.  On the runs below
 proved), and the same at 64 and 256 adders.  `jCritical` gives turns
 round from the last thread that acted, so it
 is not `JMach.csSched`, whose turns go by the number of actions; on the
-bit-reversed chain of 1,024 adders the two differ by under 10 percent:
+bit-reversed chain of 1,024 adders the two differ by under 10 percent
+(`schedules`):
 
     threads   jBusyFirst = bfRun   bound of bfRun   jCritical   csRun     bound of csRun
           1               29,701          786,553      29,701   29,701           786,553
@@ -115,7 +119,7 @@ On the indexed memory (`IJMach`, `IndexedJoin`), run as programs with the
 hash maps compiled, one thread on the bit-reversed chain rests after the
 same actions as on lists, and its time in operations on the maps and cells
 (`IJMach.time`) is about 3.5 for each action.  The milliseconds are of one
-run on one machine, and the program on lists is `JMach` itself:
+run on one machine, and the program on lists is `JMach` itself (`indexed`):
 
     adders   actions   time (IJMach.time)   ms indexed   ms on lists
         64     1,349                4,759            1            10
@@ -134,7 +138,7 @@ for 1,024, whose longest name has 1,035 cells; on `lit k + lit k + lit k`
 names stay at seven cells and it stays near 180 ns.  With several threads
 under the busy-first schedule, run by `IJMach.bfRun` (proved to stop after
 the actions of `JMach.bfRun` and to return the time of `IJMach` over them,
-`IJMach.bfRun_eq`):
+`IJMach.bfRun_eq`; `indexed-threads`):
 
     adders  threads   actions      time   ms
      1,024        1    29,701   104,475   16
@@ -150,7 +154,8 @@ of the next thread, which reads the list of threads, with a lookup by
 position for each, at every action, and is not counted (it was not timed
 alone).
 
-Where long names come from.  Measured, with one thread: on `joinChain` and
+Where long names come from (`names`, `name-time`, `short`).  Measured,
+with one thread: on `joinChain` and
 the chain of combinators every name has one cell throughout.  On nested
 sums the names are long from the start, the depth of the expression
 (1,025 cells for 1,024 additions), and grow by about ten in the run; with
@@ -163,7 +168,8 @@ to 296 ns between `128 * 3` and `1024 * 3`.  With `XNet.short`, the proved
 renaming of the input to one-cell names (`ShortNames`), `((5 + 0) + 0) + …`
 takes 15, 31, 69 and 142 ms for 128, 256, 512 and 1,024 additions, against
 54, 325, 1,950 and 10,008 ms, at 180 to 214 ns a counted operation; the
-renaming is done before the clock starts.  A measuring loop must not compute the lists the
+renaming is timed on its own: 2.7 s for the 1,024 additions, whose
+names add up to the square of the depth.  A measuring loop must not compute the lists the
 maps stand for (`IMem.toX`) at each action: that is a pass over the log. -/
 
 namespace INet

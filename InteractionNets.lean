@@ -3650,8 +3650,11 @@ holds up to equality rather than up to renaming.
   (`XNet.short_steps`), and has the same bounds (`IJMach.time_short`;
   every expression of additions, `Arith.Expr.itime_short`).  Measured on
   `((5 + 0) + 0) + …` with 1,024 additions it takes 142 ms against 10.0 s,
-  at about 210 ns a counted operation for every size; the renaming itself
-  searches a list for each name and is not counted.
+  at about 210 ns a counted operation for every size.  The renaming
+  builds a hash map of the names once (`idxMap`, proved to give the first
+  places, `idxMap_get`) and hashes every name of the input, so it takes
+  time with the total length of the names; it is not counted (2.7 s for
+  the 14,355 cells of that net, whose names are as long as its depth).
   Building the memory and the lists of the threads, the turns of a thread
   at rest, the table of threads and the choice of the next thread are not
   counted; the log is never packed.  The hash-map reducer is linear (`HNet.runC_cost`);
@@ -3966,6 +3969,14 @@ heaviest (`Arith.Correct`, `Arith.Readers`, `Arith.SideBySide`,
 `example`s: the kernel checks them when the module is built, and they are
 not in the library.
 No line of the development is longer than 100 characters.
+The checks every commit passes are run by `lake exe inets-check`
+(`Tools/Check.lean`): the build with warnings as errors, the foundations of
+every constant (`Tools/Axioms.lean`), `leanchecker --fresh`, the length of
+lines and the words the library must not contain, Comparator on every
+statement file, and the catalogue.  `lake exe inets-check commit` makes
+the commit only once they pass, and pushes only while the workflow of the
+repository is switched off.  The measured tables of `MeasureJoin` are
+printed again by `lake exe inets-measure` (`Tools/Measure.lean`).
 `Challenges/Confluence.lean`, outside the library and imported by nothing,
 restates word for word the definitions that the statements of
 `Step.wf`, `Step.free`, `Step.diamond`, `confluence`, `normal_form_unique`

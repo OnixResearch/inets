@@ -7,3 +7,11 @@ moreLeanArgs = ["-DwarningAsError=true"]
 
 [[lean_lib]]
 name = "Challenges"
+
+[[lean_exe]]
+name = "inets-check"
+root = "Tools.Check"
+
+[[lean_exe]]
+name = "inets-measure"
+root = "Tools.Measure"
