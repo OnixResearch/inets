@@ -195,7 +195,20 @@ one agent (`NetI64`, run outside this repository against this library), a
 balanced sum of `2 ^ d` constants takes `2 * d` rounds for `2 ^ (d + 1) - 2`
 steps (20 rounds for 1,024 constants), a chain of `n` operations takes
 `2 * n + 1` rounds, and repeated squaring, which copies each result, takes a
-round per step. -/
+round per step.
+
+With room for `p` pairs a round (`XNet.parRunP`, `rounds-p`), against the
+bound `W / p + D` proved in `XNet.parRunP_bound`:
+
+    net                          W     D   p = 1   p = 4   p = 16   p = 64
+    16 sums 32 + 32 side by side 528   33     528     132       33       33
+    balanced sum of 64 ones      255   38     255      84       47       38
+    joinChain 64                  64    1      64      16        4        1
+
+The rounds come out near the larger of `W / p` and `D`, below the bound
+throughout.  On the NetI64 nets of `noble-lang`, run outside this
+repository, a balanced sum of 128 constants (`W = 254`, `D = 14`) takes
+254, 74, 26 and 14 rounds for `p` = 1, 4, 16 and 64. -/
 
 namespace INet
 

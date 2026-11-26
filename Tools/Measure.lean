@@ -4,6 +4,7 @@ import InteractionNets.Peano.Expr
 import InteractionNets.CombChain
 import InteractionNets.EndToEnd
 import InteractionNets.Arith.SideBySide
+import InteractionNets.ParOptimal
 
 /-! # The measurements of `MeasureJoin`, run again
 
@@ -26,7 +27,9 @@ hand.  The tables:
 * `end-to-end`: `IJMach.runRead` on expressions, renamed short, against
   the value and the bound of `Arith.Expr.shortRun_eq`;
 * `rounds`: the steps to the normal form against the rounds of
-  `XNet.parStep`, which fires every active pair at once. -/
+  `XNet.parStep`, which fires every active pair at once;
+* `rounds-p`: rounds of `XNet.parRunP`, at most `p` pairs a round,
+  against the bound `W / p + D` of `XNet.parRunP_bound`. -/
 
 open INet
 
@@ -271,11 +274,33 @@ def rounds : IO Unit := do
     let e : Peano.PExpr := .mul (.lit k) (.lit 3)
     go s!"Peano {k} * 3" Peano.xsys (compactX Peano.xsys.sys.ar e.net)
 
+def roundsP : IO Unit := do
+  let go {S : Type} [DecidableEq S] (nm : String) (xs : XSys S) (X : XNet S) : IO Unit := do
+    let (D, W) := roundRun xs X
+    let mut line := s!"{nm}: W={W} D={D}"
+    for p in [1, 2, 4, 16, 64] do
+      let mut cur := X
+      let mut r := 0
+      let mut w := 0
+      for _ in [0:W + 1] do
+        let (Y, k) := cur.parStepP xs p
+        if k == 0 then break
+        cur := Y
+        r := r + 1
+        w := w + k
+      line := line ++ s!" | p={p}: {r} (bound {W / p + D}){if w == W then "" else " ?"}"
+    row line
+  for k in [4, 16] do
+    go s!"{k} sums 32 + 32 side by side" Arith.xsys (sumsBeside k 32 32)
+  go "sum 32 + 32" Arith.xsys (Arith.sum 32 32)
+  go "balanced sum of 64 ones" Arith.xsys (compactX Arith.xsys.sys.ar (balanced 6).net)
+  go "joinChain 64" Arith.xsys (joinChain 6 id)
+
 def tables : List (String × IO Unit) :=
   [("programs", programs), ("threads", threads), ("chain", chain), ("adversary", adversary),
     ("schedules", schedules), ("indexed", indexed), ("indexed-threads", indexedThreads),
     ("names", names), ("name-time", nameTime), ("short", short),
-    ("end-to-end", endToEnd), ("rounds", rounds)]
+    ("end-to-end", endToEnd), ("rounds", rounds), ("rounds-p", roundsP)]
 
 def main (args : List String) : IO UInt32 := do
   match args with

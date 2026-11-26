@@ -1965,6 +1965,11 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              normal form exactly when `r` rounds of
                              `XNet.parStep` do; a net some pairs ahead never
                              needs more rounds (`ParOptimal`)
+* `INet.XNet.parRunP_bound`  with room for `p` pairs a round, firing the
+                             first `p` that `XNet.parStep` would fire, a net
+                             reaching its normal form in `W` steps and in
+                             `D` rounds of `XNet.parStep` reaches it within
+                             `W / p + D` rounds (Brent's bound)
 * `INet.XNet.run_map`        the reducer does not depend on names: on a
                              renamed input it stops after the same number of
                              steps, on a renaming of its output

@@ -7,7 +7,9 @@ A parallel round fires some active pairs that share no agent, all at once.
 rounds reaches a normal form in fewer rounds than `XNet.parRun`
 (`XNet.parRun_optimal`), and that a net some pairs ahead of another needs
 no more rounds than it (`XNet.parRun_ahead`): firing a pair early never
-costs a round.
+costs a round.  With room for at most `p` pairs a round, `W / p + D`
+rounds are enough, `W` the steps and `D` the rounds of `XNet.parRun`
+(`XNet.parRunP_bound`).
 
 The key fact is `par_absorb`: fire any independent pairs `rs` of a net, and the
 net reached by firing all its active pairs is one round further on, by the
@@ -358,5 +360,109 @@ theorem XNet.parRun_optimal_iff {r : Nat} (hX : X.Ok xs.sys.ar) :
     (X.parRun xs r).1.step xs = none ↔ ∃ Y, XNet.Sched xs r X Y ∧ Y.step xs = none :=
   ⟨fun h => ⟨_, XNet.parRun_sched xs r X, h⟩,
     fun ⟨_, hs, hn⟩ => XNet.parRun_optimal hX hs hn⟩
+
+/-! ### A bounded number of firing units
+
+With room for at most `p` pairs in a round, the rounds needed are at most
+the pairs fired divided by `p`, plus the rounds of `XNet.parStep` (Brent's
+bound).  The policy is the plainest one: fire the first `p` pairs that
+`XNet.parStep` would fire. -/
+
+/-- A round that fires at most `p` active pairs: the first `p` of those
+that `XNet.parStep` fires.  Returns the net reached and the pairs fired. -/
+def XNet.parStepP (xs : XSys S) (p : Nat) (X : XNet S) : XNet S × Nat :=
+  (X.fireList xs.sys.ar ((selectIndep [] (X.redexes xs)).take p),
+    ((selectIndep [] (X.redexes xs)).take p).length)
+
+/-- Repeat `XNet.parStepP` for at most `n` rounds.  Returns the net reached
+and the total number of pairs fired. -/
+def XNet.parRunP (xs : XSys S) (p : Nat) : Nat → XNet S → XNet S × Nat
+  | 0, X => (X, 0)
+  | n + 1, X =>
+    if (X.parStepP xs p).2 = 0 then (X, 0)
+    else ((XNet.parRunP xs p n (X.parStepP xs p).1).1,
+      (X.parStepP xs p).2 + (XNet.parRunP xs p n (X.parStepP xs p).1).2)
+
+theorem XNet.Indep.sublist {rs rs' : List (XRedex S)} (h : X.Indep xs rs) (hs : rs'.Sublist rs) :
+    X.Indep xs rs' :=
+  ⟨fun r hr => h.redex r (hs.subset hr), h.disjoint.sublist hs⟩
+
+/-- Firing a list of independent pairs is a reduction with one step per
+pair, and preserves the invariant. -/
+theorem XNet.fireList_steps {rs : List (XRedex S)} (hX : X.Ok xs.sys.ar) (h : X.Indep xs rs) :
+    Steps (CStep xs.sys) rs.length X.toNet (X.fireList xs.sys.ar rs).toNet ∧
+      (X.fireList xs.sys.ar rs).Ok xs.sys.ar := by
+  obtain ⟨e, hok⟩ := XNet.fireList_toNet hX h
+  refine ⟨?_, hok⟩
+  have sts := Steps.cstep hX.1 (h.abs.fireAll_steps hX.1)
+  rw [hX.2, List.length_map] at sts
+  rw [e]
+  exact sts
+
+/-- **Brent's bound for interaction nets.**  If the net reaches a normal
+form in `W` steps, and `D` rounds of `XNet.parStep` bring it to a normal
+form, then rounds of at most `p` pairs bring it to a normal form within
+`W / p + D` rounds. -/
+theorem XNet.parRunP_bound {p : Nat} (hp : 0 < p) :
+    ∀ (n : Nat) {X : XNet S} {W D : Nat} {C : Net S}, X.Ok xs.sys.ar →
+      Steps (CStep xs.sys) W X.toNet C → Normal (CStep xs.sys) C →
+      (X.parRun xs D).1.step xs = none → W / p + D ≤ n →
+      (X.parRunP xs p n).1.step xs = none := by
+  intro n
+  induction n with
+  | zero =>
+    intro X W D C hX _ _ hD hn
+    obtain rfl : D = 0 := by have := Nat.zero_le (W / p); omega
+    exact hD
+  | succ n ih =>
+    intro X W D C hX hW hC hD hn
+    have hI := XNet.redexes_indep xs X
+    have hT : X.Indep xs ((selectIndep [] (X.redexes xs)).take p) :=
+      hI.sublist (List.take_sublist _ _)
+    unfold XNet.parRunP
+    split
+    · rename_i h0
+      have h0' : ((selectIndep [] (X.redexes xs)).take p).length = 0 := h0
+      rw [List.length_take] at h0'
+      have hl : (selectIndep [] (X.redexes xs)).length = 0 := by omega
+      exact XNet.parStep_zero_iff.1 hl
+    · rename_i h0
+      obtain ⟨sts, hY⟩ := XNet.fireList_steps hX hT
+      obtain ⟨hle, rest⟩ := (cstrongConfluent xs.sys).bounded hX.1 hW hC sts
+      by_cases hsel : (selectIndep [] (X.redexes xs)).length ≤ p
+      · -- the round fires every active pair: it is a round of `parStep`
+        have et : (selectIndep [] (X.redexes xs)).take p = selectIndep [] (X.redexes xs) :=
+          List.take_of_length_le hsel
+        have hz : ¬ (X.parStep xs).2 = 0 := by
+          intro hz
+          exact h0 (by
+            show ((selectIndep [] (X.redexes xs)).take p).length = 0
+            rw [et]
+            exact hz)
+        cases D with
+        | zero => exact absurd (XNet.parStep_zero_iff.2 hD) hz
+        | succ d =>
+          unfold XNet.parRun at hD
+          split at hD
+          · exact absurd (by assumption) hz
+          rw [et] at hY rest hle
+          show (XNet.parRunP xs p n
+            (X.fireList xs.sys.ar ((selectIndep [] (X.redexes xs)).take p))).1.step xs = none
+          rw [et]
+          refine ih hY rest hC hD ?_
+          have := Nat.div_le_div_right (c := p) (Nat.sub_le W
+            (selectIndep [] (X.redexes xs)).length)
+          omega
+      · -- the round fires `p` pairs: it is ahead of `X`
+        have hlen : ((selectIndep [] (X.redexes xs)).take p).length = p := by
+          rw [List.length_take]
+          omega
+        have hD' := XNet.parRun_ahead hX hY ?_ D hD
+        · refine ih (W := W - _) hY rest hC hD' ?_
+          rw [hlen] at hle ⊢
+          have := Nat.div_eq_sub_div hp hle
+          omega
+        · obtain ⟨e, -⟩ := XNet.fireList_toNet hX hT
+          exact ⟨_, hT.abs, e⟩
 
 end INet
