@@ -3998,10 +3998,12 @@ heaviest (`Arith.Correct`, `Arith.Readers`, `Arith.SideBySide`,
 not in the library.
 No line of the development is longer than 100 characters.
 The checks every commit passes are run by `lake exe inets-check`
-(`Tools/Check.lean`): the build with warnings as errors, the foundations of
-every constant (`Tools/Axioms.lean`), `leanchecker --fresh`, the length of
-lines and the words the library must not contain, Comparator on every
-statement file, and the catalogue.  `lake exe inets-check commit` makes
+(`Tools/Check.lean`): first the length of lines and the words the library
+must not contain, then the build with warnings as errors and the build of
+`inets-measure`, the foundations of every constant (`Tools/Axioms.lean`),
+every name that `OnixResearch/noble-lang` refers to (`Tools/Consumers.lean`),
+`leanchecker --fresh`, Comparator on every statement file, and the
+catalogue.  `lake exe inets-check commit` makes
 the commit only once they pass, and pushes only while the workflow of the
 repository is switched off.  The measured tables of `MeasureJoin` are
 printed again by `lake exe inets-measure` (`Tools/Measure.lean`).
