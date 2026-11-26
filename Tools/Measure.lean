@@ -3,6 +3,7 @@ import InteractionNets.ShortNames
 import InteractionNets.Peano.Expr
 import InteractionNets.CombChain
 import InteractionNets.EndToEnd
+import InteractionNets.Arith.SideBySide
 
 /-! # The measurements of `MeasureJoin`, run again
 
@@ -23,7 +24,9 @@ hand.  The tables:
 * `name-time`: nanoseconds for a counted operation, with long names;
 * `short`: `XNet.short` against the names of the input;
 * `end-to-end`: `IJMach.runRead` on expressions, renamed short, against
-  the value and the bound of `Arith.Expr.shortRun_eq`. -/
+  the value and the bound of `Arith.Expr.shortRun_eq`;
+* `rounds`: the steps to the normal form against the rounds of
+  `XNet.parStep`, which fires every active pair at once. -/
 
 open INet
 
@@ -194,11 +197,85 @@ def endToEnd : IO Unit := do
       go s!"rnest {k}" (Arith.rnest k) nt
       go s!"lit {k} + lit {k}" (Arith.Expr.add (.lit k) (.lit k)) nt
 
+/-- The net with every wire one segment: for each end (a free port, or a
+port of an agent within its arity), the end the wire from it reaches.  For
+measuring only; the nets of expressions have wires of several segments,
+and `XNet.parStep` reads a wire as one segment. -/
+def compactX {S : Type} [DecidableEq S] (ar : S → Nat) (X : XNet S) : XNet S := Id.run do
+  let mut adj : Std.HashMap Port (List Port) := {}
+  for (p, q) in X.wires do adj := adj.insert p (q :: adj.getD p [])
+  let mut syms : Std.HashMap Id S := {}
+  for (i, γ) in X.agents do syms := syms.insert i γ
+  let isEnd := fun (p : Port) =>
+    X.free.contains p || (match syms[p.1]? with | some γ => p.2 ≤ ar γ | none => false)
+  let ends := X.free ++ X.agents.flatMap fun (i, γ) => (List.range (ar γ + 1)).map (i, ·)
+  let mut ws : List (Port × Port) := []
+  for p in ends do
+    match adj.getD p [] with
+    | c :: _ =>
+      let mut prev := p
+      let mut cur := c
+      let mut guard := 0
+      while !isEnd cur && guard < 1000000 do
+        guard := guard + 1
+        match (adj.getD cur []).find? (· ≠ prev) with
+        | some nx => prev := cur; cur := nx
+        | none => guard := 1000000
+      if isEnd cur then ws := (p, cur) :: ws
+    | [] => pure ()
+  return ⟨X.agents, X.free, ws.reverse⟩
+
+/-- Rounds of `XNet.parStep` until no pair is active, and the pairs fired. -/
+def roundRun {S : Type} [DecidableEq S] (xs : XSys S) (X : XNet S) : Nat × Nat := Id.run do
+  let mut cur := X
+  let mut r := 0
+  let mut n := 0
+  for _ in [0:1000000] do
+    let (Y, k) := cur.parStep xs
+    if k == 0 then break
+    cur := Y
+    r := r + 1
+    n := n + k
+  return (r, n)
+
+/-- A balanced sum of `2 ^ d` ones. -/
+def balanced : Nat → Arith.Expr
+  | 0 => .lit 1
+  | d + 1 => .add (balanced d) (balanced d)
+
+/-- `k` additions `m + n` side by side, each tagged apart. -/
+def sumsBeside (k m n : Nat) : XNet Arith :=
+  (List.range k).foldl (fun X i => Arith.beside X (Arith.tagNet i (Arith.sum m n)))
+    ⟨[], [], []⟩
+
+def rounds : IO Unit := do
+  let go {S : Type} [DecidableEq S] (nm : String) (xs : XSys S) (X : XNet S) : IO Unit := do
+    let (r, n) := roundRun xs X
+    let seq := match X.normalize xs 100000 with | some (_, k) => toString k | none => "-"
+    row s!"{nm}: ok={X.check xs.sys.ar} steps={seq} fired={n} rounds={r} \
+      steps per round={if r = 0 then 0 else n / r}"
+  let ar := Arith.xsys.sys.ar
+  for k in [16, 64, 256] do
+    go s!"lnest {k}" Arith.xsys (compactX ar (Arith.lnest k).net)
+    go s!"rnest {k}" Arith.xsys (compactX ar (Arith.rnest k).net)
+  for d in [4, 6, 8] do
+    go s!"balanced sum of {2 ^ d} ones" Arith.xsys (compactX ar (balanced d).net)
+  for m in [16, 64, 256] do
+    go s!"sum {m} + {m}" Arith.xsys (Arith.sum m m)
+  for k in [4, 16, 64] do
+    go s!"{k} sums 32 + 32 side by side" Arith.xsys (sumsBeside k 32 32)
+  for b in [4, 6, 8] do
+    go s!"joinChain {2 ^ b} in order" Arith.xsys (joinChain b id)
+    go s!"combChain {2 ^ b}" Comb.dsystem (INet.combChain b (bitRev b))
+  for k in [8, 32] do
+    let e : Peano.PExpr := .mul (.lit k) (.lit 3)
+    go s!"Peano {k} * 3" Peano.xsys (compactX Peano.xsys.sys.ar e.net)
+
 def tables : List (String × IO Unit) :=
   [("programs", programs), ("threads", threads), ("chain", chain), ("adversary", adversary),
     ("schedules", schedules), ("indexed", indexed), ("indexed-threads", indexedThreads),
     ("names", names), ("name-time", nameTime), ("short", short),
-    ("end-to-end", endToEnd)]
+    ("end-to-end", endToEnd), ("rounds", rounds)]
 
 def main (args : List String) : IO UInt32 := do
   match args with

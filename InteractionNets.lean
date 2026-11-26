@@ -2232,7 +2232,11 @@ holds up to equality rather than up to renaming.
   step.  `XNet.parStep` fires all the active pairs of a round, but by
   folding over a list: it is a strategy, proved to agree with the sequential
   one.  Correctness is stated for inputs that satisfy `XNet.Ok` (the net
-  they stand for is well formed and compact).
+  they stand for is well formed and compact).  Its rounds are measured
+  against the steps in `MeasureJoin` (`inets-measure rounds`): sums side
+  by side take the rounds of one, and on unary numbers the rounds follow
+  the size of the numbers.  Nothing is proved yet about the number of
+  rounds.
   `XNet.check` decides that invariant and steps preserve it, so
   `XNet.normalize` needs no hypothesis.  The check is quadratic.
 * The hash-map reducer does a number of map operations per step that

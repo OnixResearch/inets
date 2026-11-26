@@ -170,7 +170,32 @@ takes 15, 31, 69 and 142 ms for 128, 256, 512 and 1,024 additions, against
 54, 325, 1,950 and 10,008 ms, at 180 to 214 ns a counted operation; the
 renaming is timed on its own: 2.7 s for the 1,024 additions, whose
 names add up to the square of the depth.  A measuring loop must not compute the lists the
-maps stand for (`IMem.toX`) at each action: that is a pass over the log. -/
+maps stand for (`IMem.toX`) at each action: that is a pass over the log.
+
+Rounds of `XNet.parStep`, which fires every active pair of the net at
+once, against the steps of the sequential reducer (`rounds`).  The nets
+of expressions are first made compact by `compactX` of `Tools/Measure.lean`,
+which is not proved; the steps of the compacted nets agree with the
+pairs fired, as `XNet.parRun_eq_run` says they must:
+
+    net                                 steps   rounds
+    ((5 + 0) + 0) + …, 256              1,536      261
+    0 + (0 + (… + 5)), 256                256        1
+    balanced sum of 256 ones            1,279      136
+    256 + 256                             257      257
+    64 sums 32 + 32 side by side        2,112       33
+    joinChain 256, combChain 256          256        1
+    Peano 32 * 3                          293       37
+
+Numbers here are unary, so one addition is a chain of `m + 1` rounds and
+the rounds follow the size of the numbers: `k + 5` for the left-nested
+sums, `2 ^ (d - 1) + d` for the balanced one.  Sums side by side take the
+rounds of one.  On the nets of `OnixResearch/noble-lang`, where a number is
+one agent (`NetI64`, run outside this repository against this library), a
+balanced sum of `2 ^ d` constants takes `2 * d` rounds for `2 ^ (d + 1) - 2`
+steps (20 rounds for 1,024 constants), a chain of `n` operations takes
+`2 * n + 1` rounds, and repeated squaring, which copies each result, takes a
+round per step. -/
 
 namespace INet
 
