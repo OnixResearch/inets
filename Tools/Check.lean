@@ -2,15 +2,17 @@
 
 `lake exe inets-check` runs every check that a commit must pass:
 
-* `lake build`, with warnings as errors (set in `lakefile.toml`);
+* first, as they take seconds: no line of a Lean file, or of
+  `formalization.yaml`, over 100 characters; none of the three forbidden
+  words in the library or its overview, but for the two sentences of the
+  overview that name what is excluded; in `Challenges/`, exactly one open
+  proof for each theorem a configuration lists;
+* `lake build`, with warnings as errors (set in `lakefile.toml`), and the
+  build of `inets-measure`;
 * the foundations of every constant of the library (`Tools/Axioms.lean`):
   only `propext`, `Quot.sound` and `Classical.choice`;
 * `leanchecker --fresh` on the library;
-* no line of a Lean file, or of `formalization.yaml`, over 100 characters;
-* none of the three forbidden words in the library or its overview, but
-  for the two sentences of the overview that name what is excluded;
-* in `Challenges/`, exactly one open proof for each theorem a
-  configuration lists, and `lake comparator --paranoid` accepting each;
+* `lake comparator --paranoid` accepting each statement file;
 * every declaration named in `formalization.yaml` exists, lies in the file
   given, rests on exactly the foundations listed, and, when a Comparator
   configuration is given, is one of its theorems.
@@ -114,18 +116,6 @@ def entries (yaml : String) : List Entry := Id.run do
   return acc.reverse
 
 def checks : IO Unit := do
-  IO.println "== build"
-  run "lake" #["build"]
-  IO.println "== foundations of every constant"
-  let ax ← capture "lake" #["env", "lean", "Tools/Axioms.lean"]
-  IO.println (trim ax)
-  let some lst := (ax.splitOn ("axi" ++ "oms: [")).getLast?.map (fun s => (s.splitOn "]")[0]!)
-    | throw <| IO.userError "no list of foundations"
-  for a in lst.splitOn "," do
-    unless ["propext", "Quot.sound", "Classical.choice"].contains (trim a) do
-      throw <| IO.userError s!"foundation not allowed: {trim a}"
-  IO.println "== leanchecker"
-  run "lake" #["env", "leanchecker", "--fresh", "InteractionNets"]
   IO.println "== lines and words"
   let lean := (← filesUnder "InteractionNets" "lean") ++ #[("InteractionNets.lean" : FilePath)]
   let others := (← filesUnder "Challenges" "lean") ++ (← filesUnder "Tools" "lean")
@@ -138,16 +128,31 @@ def checks : IO Unit := do
     for (l, i) in lines.zip (List.range lines.length) do
       if forbidden.any (occurs · l) && !allowed.any (occurs · l) then
         throw <| IO.userError s!"{f}:{i + 1}: {l}"
-  IO.println "== challenges"
+  IO.println "== open proofs in Challenges/"
   let mut listed := 0
   for c in ← filesUnder "Challenges" "json" do
     listed := listed + (theoremNames (← IO.FS.readFile c)).length
-    run "lake" #["comparator", "--config", c.toString, "--paranoid"]
   let mut open_ := 0
   for f in ← filesUnder "Challenges" "lean" do
     open_ := open_ + wordCount ("sor" ++ "ry") (← IO.FS.readFile f)
   IO.println s!"listed theorems {listed}, open proofs {open_}"
   unless listed == open_ do throw <| IO.userError "open proofs and listed theorems differ"
+  IO.println "== build"
+  run "lake" #["build"]
+  run "lake" #["build", "inets-measure"]
+  IO.println "== foundations of every constant"
+  let ax ← capture "lake" #["env", "lean", "Tools/Axioms.lean"]
+  IO.println (trim ax)
+  let some lst := (ax.splitOn ("axi" ++ "oms: [")).getLast?.map (fun s => (s.splitOn "]")[0]!)
+    | throw <| IO.userError "no list of foundations"
+  for a in lst.splitOn "," do
+    unless ["propext", "Quot.sound", "Classical.choice"].contains (trim a) do
+      throw <| IO.userError s!"foundation not allowed: {trim a}"
+  IO.println "== leanchecker"
+  run "lake" #["env", "leanchecker", "--fresh", "InteractionNets"]
+  IO.println "== Comparator"
+  for c in ← filesUnder "Challenges" "json" do
+    run "lake" #["comparator", "--config", c.toString, "--paranoid"]
   IO.println "== catalogue"
   let yaml ← IO.FS.readFile "formalization.yaml"
   let es := entries yaml

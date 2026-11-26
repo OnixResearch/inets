@@ -260,6 +260,56 @@ theorem IJMach.runRead_eq {zero succ : S} (hzs : zero ≠ succ) {J : Nat}
     rfl
   · exact IJMach.time_bfSched hJ hX hnd hnt hb hs hn _
 
+/-- **Whatever the program returns is the numeral of the normal form**,
+for any fuel. -/
+theorem IJMach.runRead_sound {zero succ : S} (hzs : zero ≠ succ) (hsucc : 1 ≤ xs.sys.ar succ)
+    {X : XNet S} (hX : X.toNet.WF xs.sys.ar) (hnd : (X.agents.map Prod.fst).Nodup) {nt : Nat}
+    (hnt : 0 < nt) {n : Nat} {N' : Net S} (hs : Steps (Step xs.sys) n X.toNet N')
+    (hn : Normal (Step xs.sys) N') {p : Port} {v₀ : Nat}
+    (hnum : Addition.IsNum xs.sys.ar zero succ N' p v₀) {s v t : Nat}
+    (h : IJMach.runRead xs zero succ X p nt s = some (v, t)) : v = v₀ := by
+  unfold IJMach.runRead at h
+  rw [IJMach.bfLoopS_eq hX hnd hnt s] at h
+  dsimp only at h
+  obtain ⟨a, -, ok⟩ := IJMach.init_sim hX hnd hnt (JMach.bfSched xs (JMach.init X nt) nt)
+    (JMach.bfRun xs X nt s).1
+  by_cases hr : ((IJMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt)
+      (JMach.bfRun xs X nt s).1).1.ths.all (fun T => T.todo.isEmpty && T.st.isIdle) = true
+  · rw [ite_pos' hr, IMem.readNum_eq ok] at h
+    have hrest : ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt)
+        (JMach.bfRun xs X nt s).1).1.resting = true := by
+      rw [← a]
+      exact hr
+    obtain ⟨hs', hn'⟩ := JMach.rest_steps hX hnt hrest
+    have e : ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt)
+        (JMach.bfRun xs X nt s).1).1.mem.toNet = N' :=
+      (normal_form_unique hX hs' hs hn' hn).1
+    have em : ((IJMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt)
+        (JMach.bfRun xs X nt s).1).1.mem.toX = ((JMach.init X nt).trace xs
+          (JMach.bfSched xs (JMach.init X nt) nt) (JMach.bfRun xs X nt s).1).1.mem :=
+      congrArg JMach.mem a
+    rw [em] at h
+    cases hv : ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt)
+        (JMach.bfRun xs X nt s).1).1.mem.readNum zero succ s s p with
+    | none => rw [hv] at h; cases h
+    | some v' =>
+      rw [hv] at h
+      cases h
+      have hW : ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt)
+          (JMach.bfRun xs X nt s).1).1.mem.toNet.WF xs.sys.ar := by
+        rw [e]
+        exact Steps.wf hX hs
+      have hnum' : Addition.IsNum xs.sys.ar zero succ
+          ((JMach.init X nt).trace xs (JMach.bfSched xs (JMach.init X nt) nt)
+            (JMach.bfRun xs X nt s).1).1.mem.toNet p v₀ := by
+        rw [e]
+        exact hnum
+      obtain ⟨i, hpi, -⟩ := hnum'
+      exact Addition.IsNum.unique hzs hW (XNet.readNum_sound hsucc hW _ _ _ _ hpi.1 hv)
+        (by rw [e]; exact hnum)
+  · rw [ite_neg' hr] at h
+    cases h
+
 /-! ## A numeral along a renaming -/
 
 omit [DecidableEq S] in
@@ -298,7 +348,7 @@ the busy-first schedule, and read at the renamed result port, the program
 returns the value of the expression, with a time within
 `34 (nt (7 |agents| + K) + 20 c + 14 c + K + 4 K log₂ (K + 1) + 6 K)`,
 `c` the steps of the expression and `K = wires + 8 c`, given that many
-actions and two, `K` and the value and one.  No hypothesis. -/
+actions and two, `K` and the value and one.  No hypothesis on the expression. -/
 theorem Arith.Expr.shortRun_eq (e : Arith.Expr) {nt : Nat} (hnt : 0 < nt) (s : Nat)
     (h₁ : e.net.workBound nt 2 8 1 e.cost + 2 ≤ s) (h₂ : e.net.wires.length + 8 * e.cost ≤ s)
     (h₃ : e.eval + 1 ≤ s) :
@@ -321,5 +371,21 @@ theorem Arith.Expr.shortRun_eq (e : Arith.Expr) {nt : Nat} (hnt : 0 < nt) (s : N
     (by rw [XNet.short_wires_length]; exact h₂) h₃
   rw [XNet.short_workBound] at k
   exact k
+
+/-- **Whatever the program returns on an expression is its value**, for
+any fuel and any number of threads. -/
+theorem Arith.Expr.shortRun_sound (e : Arith.Expr) {nt : Nat} (hnt : 0 < nt) {s v t : Nat}
+    (h : IJMach.runRead Arith.xsys Arith.zero Arith.succ e.net.short
+      (mapPort e.net.shortName e.res) nt s = some (v, t)) : v = e.eval := by
+  obtain ⟨hX, hfree, N', hs, hA, hno⟩ := Arith.Expr.good e
+  have hn := Arith.normal_of_no_add hno
+  obtain ⟨g, hg, eg, hs', hn'⟩ := XNet.short_steps hX hs hn
+  have hA' := Addition.IsNum.map hg (Steps.wf hX hs) hA
+  have ep : mapPort g e.res = mapPort e.net.shortName e.res := by
+    unfold mapPort
+    rw [eg e.res.1 (.inr (.inr ⟨e.res.2, hfree⟩))]
+  rw [ep] at hA'
+  exact IJMach.runRead_sound (by decide) (by decide) (XNet.short_wf hX)
+    (XNet.short_nodup (Arith.Expr.net_nodup e)) hnt hs' hn' hA' h
 
 end INet

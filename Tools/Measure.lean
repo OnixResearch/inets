@@ -101,9 +101,10 @@ def indexed : IO Unit := do
     let (a, tm) := IJMach.bfRun Arith.xsys X 1 1000000000
     let t₁ ← IO.monoMsNow
     let lists ← if b ≤ 11 then do
-        let (a', c) := listRun Arith.xsys X
+        let (a', _) := jCount Arith.xsys 1 (JMach.init X 1) 1000000000
         let t₂ ← IO.monoMsNow
-        pure s!"lists: actions={a'} walk-cells={c} ms={t₂ - t₁}"
+        let (_, c) := listRun Arith.xsys X
+        pure s!"lists: actions={a'} ms={t₂ - t₁} walk-cells={c}"
       else pure "lists: not run"
     row s!"n={2 ^ b} indexed: actions={a} time={tm} ms={t₁ - t₀}; {lists}"
 

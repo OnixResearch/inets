@@ -3666,9 +3666,12 @@ holds up to equality rather than up to renaming.
   short, run by any number of threads and read at the renamed result
   port, it returns the value of the expression, in at most
   `34 (nt (7 |agents| + K) + 34 c + K + 4 K log₂ (K + 1) + 6 K)`
-  operations, `c` the steps and `K = wires + 8 c`, with no hypothesis
+  operations, `c` the steps and `K = wires + 8 c`, with no hypothesis on
+  the expression, only enough fuel and one thread at least
   (`Arith.Expr.shortRun_eq`; a numeral is carried along a renaming,
-  `Addition.IsNum.map`).  The reading itself is not in that count.
+  `Addition.IsNum.map`).  Whatever it returns, for any fuel, is the value
+  (`IJMach.runRead_sound`, `Arith.Expr.shortRun_sound`).  Not in the count:
+  the renaming, building the maps, and the reading.
   Building the memory and the lists of the threads, the turns of a thread
   at rest, the table of threads and the choice of the next thread are not
   counted; the log is never packed.  The hash-map reducer is linear (`HNet.runC_cost`);
