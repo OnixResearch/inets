@@ -107,6 +107,7 @@ import InteractionNets.ReadAgents
 import InteractionNets.ParOptimal
 import InteractionNets.ParNames
 import InteractionNets.ParAlloc
+import InteractionNets.ParUnits
 import InteractionNets.Arith.JoinIndexed
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
@@ -1996,6 +1997,14 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              holds only names `[k]` with `k` below the
                              longest list of identifiers held
                              (`XNet.reusePeak`; `ParAlloc`)
+* `INet.XNet.reuseRunP_short`  both limits at once: from the short form,
+                             rounds of at most `p` pairs each followed by
+                             the allocator (`XNet.reuseRunP`) stop within
+                             `W / p + D` rounds on the normal form renamed
+                             by `XNet.shortName` on the free ports, keep
+                             the names of the free ports, and hold only
+                             names `[k]` with `k` below the longest list
+                             of identifiers held (`ParUnits`)
 * `INet.XNet.run_map`        the reducer does not depend on names: on a
                              renamed input it stops after the same number of
                              steps, on a renaming of its output

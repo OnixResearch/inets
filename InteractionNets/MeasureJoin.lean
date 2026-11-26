@@ -229,7 +229,16 @@ fifth of the bound proved, which counts every end of every segment: 134
 against 671 for 64 nested additions, 271 against 1,344 for four sums side
 by side, 59 against 307 for Peano `16 * 3`.  The allocator as written
 scans the list of identifiers for each name, so a round takes time in the
-square of the size; only small nets are measured. -/
+square of the size; only small nets are measured.
+
+Both limits at once (`XNet.reuseRunP`, `units`): at most `p` pairs a
+round and the allocator, from the short form.  The rounds stay within
+`W / p + D` (`XNet.reuseRunP_short`), the free ports keep their names, and
+the run stops having fired `W` pairs.  For the balanced sum of 32 ones
+(`W = 111`, `D = 21`) the rounds are 111, 39 and 22 for `p` = 1, 4 and 16,
+against bounds 132, 48 and 27; the largest number in a name is 95 against
+a bound of 476.  On Peano `8 * 3` the largest number moves with `p`, from
+32 to 35, as the order of firing changes the nets held. -/
 
 namespace INet
 

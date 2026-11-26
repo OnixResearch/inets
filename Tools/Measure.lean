@@ -4,7 +4,7 @@ import InteractionNets.Peano.Expr
 import InteractionNets.CombChain
 import InteractionNets.EndToEnd
 import InteractionNets.Arith.SideBySide
-import InteractionNets.ParAlloc
+import InteractionNets.ParUnits
 
 /-! # The measurements of `MeasureJoin`, run again
 
@@ -35,7 +35,11 @@ hand.  The tables:
   the numbers in the names (`XNet.packRun_short`);
 * `reuse`: `XNet.reuseRun` from the short form, against `XNet.parRun`: the
   pairs and rounds, the free ports, the largest number in a name against
-  the bound `XNet.reusePeak` of `XNet.reuseRun_short`. -/
+  the bound `XNet.reusePeak` of `XNet.reuseRun_short`;
+* `units`: `XNet.reuseRunP`, at most `p` pairs a round and the allocator,
+  from the short form: rounds against `W / p + D`
+  (`XNet.reuseRunP_short`), the free ports, the largest number in a name
+  against the longest list of identifiers held. -/
 
 open INet
 
@@ -358,12 +362,43 @@ def reuse : IO Unit := do
   go "Peano 16 * 3" Peano.xsys (compactX Peano.xsys.sys.ar (Peano.PExpr.mul (.lit 16) (.lit 3)).net)
   go "combChain 64" Comb.dsystem (INet.combChain 6 (bitRev 6))
 
+def units : IO Unit := do
+  let go {S : Type} [DecidableEq S] (nm : String) (xs : XSys S) (X0 : XNet S) : IO Unit := do
+    let (D, W) := roundRun xs X0
+    let mut line := s!"{nm}: W={W} D={D}"
+    for p in [1, 4, 16] do
+      let mut X := X0.short
+      let fr := X.free
+      let mut r := 0
+      let mut w := 0
+      let mut peak := X.allIds.length
+      let mut top := 0
+      let mut freeSame := true
+      for _ in [0:W + 1] do
+        let (Y, k) := X.parStepP xs p
+        if k == 0 then break
+        X := Y.map (X.reuseName Y)
+        peak := max peak X.allIds.length
+        top := max top (X.allIds.foldl (fun m i => max m (i.headD 0)) 0)
+        r := r + 1
+        w := w + k
+        freeSame := freeSame && X.free == fr
+      let ok := w == W && freeSame && (X.step xs).isNone
+      line := line ++ s!" | p={p}: {r} (bound {W / p + D}) largest {top} \
+        (bound {peak}){if ok then "" else " ?"}"
+    row line
+  let ar := Arith.xsys.sys.ar
+  go "balanced sum of 32 ones" Arith.xsys (compactX ar (balanced 5).net)
+  go "4 sums 32 + 32 side by side" Arith.xsys (sumsBeside 4 32 32)
+  go "Peano 8 * 3" Peano.xsys (compactX Peano.xsys.sys.ar (Peano.PExpr.mul (.lit 8) (.lit 3)).net)
+  go "joinChain 64" Arith.xsys (joinChain 6 id)
+
 def tables : List (String × IO Unit) :=
   [("programs", programs), ("threads", threads), ("chain", chain), ("adversary", adversary),
     ("schedules", schedules), ("indexed", indexed), ("indexed-threads", indexedThreads),
     ("names", names), ("name-time", nameTime), ("short", short),
     ("end-to-end", endToEnd), ("rounds", rounds), ("rounds-p", roundsP), ("packed", packed),
-    ("reuse", reuse)]
+    ("reuse", reuse), ("units", units)]
 
 def main (args : List String) : IO UInt32 := do
   match args with

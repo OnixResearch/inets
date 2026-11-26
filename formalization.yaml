@@ -139,6 +139,10 @@ status:
       file: "InteractionNets/ParAlloc.lean"
       sorry_count: 0
       axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.XNet.reuseRunP_short"
+      file: "InteractionNets/ParUnits.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
 
 automation:
   methods:
