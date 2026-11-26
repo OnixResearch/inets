@@ -4,7 +4,7 @@ import InteractionNets.Peano.Expr
 import InteractionNets.CombChain
 import InteractionNets.EndToEnd
 import InteractionNets.Arith.SideBySide
-import InteractionNets.ParOptimal
+import InteractionNets.ParNames
 
 /-! # The measurements of `MeasureJoin`, run again
 
@@ -29,7 +29,10 @@ hand.  The tables:
 * `rounds`: the steps to the normal form against the rounds of
   `XNet.parStep`, which fires every active pair at once;
 * `rounds-p`: rounds of `XNet.parRunP`, at most `p` pairs a round,
-  against the bound `W / p + D` of `XNet.parRunP_bound`. -/
+  against the bound `W / p + D` of `XNet.parRunP_bound`;
+* `packed`: `XNet.packRun` from the short form, against `XNet.parRun`: the
+  pairs and rounds, and the largest list of identifiers held, which bounds
+  the numbers in the names (`XNet.packRun_short`). -/
 
 open INet
 
@@ -296,11 +299,38 @@ def roundsP : IO Unit := do
   go "balanced sum of 64 ones" Arith.xsys (compactX Arith.xsys.sys.ar (balanced 6).net)
   go "joinChain 64" Arith.xsys (joinChain 6 id)
 
+def packed : IO Unit := do
+  let go {S : Type} [DecidableEq S] (nm : String) (xs : XSys S) (X0 : XNet S) : IO Unit := do
+    let mut X := X0.short
+    let mut r := 0
+    let mut n := 0
+    let mut peak := X.allIds.length
+    let mut wide := 0
+    for _ in [0:1000000] do
+      let (Y, k) := X.parStep xs
+      if k == 0 then break
+      X := Y.short
+      r := r + 1
+      n := n + k
+      peak := max peak X.allIds.length
+      wide := max wide (X.allIds.foldl (fun m i => max m i.length) 0)
+    let (Z, m) := X0.parRun xs 1000000
+    let same := X.short == Z.short && m == n
+    row s!"{nm}: pairs={n} rounds={r} peak ids={peak} longest name={wide} \
+      input ids={X0.allIds.length} same as parRun={same}"
+  let ar := Arith.xsys.sys.ar
+  for k in [64, 256] do
+    go s!"lnest {k}" Arith.xsys (compactX ar (Arith.lnest k).net)
+  go "balanced sum of 256 ones" Arith.xsys (compactX ar (balanced 8).net)
+  go "64 sums 32 + 32 side by side" Arith.xsys (sumsBeside 64 32 32)
+  go "Peano 32 * 3" Peano.xsys (compactX Peano.xsys.sys.ar (Peano.PExpr.mul (.lit 32) (.lit 3)).net)
+  go "combChain 256" Comb.dsystem (INet.combChain 8 (bitRev 8))
+
 def tables : List (String × IO Unit) :=
   [("programs", programs), ("threads", threads), ("chain", chain), ("adversary", adversary),
     ("schedules", schedules), ("indexed", indexed), ("indexed-threads", indexedThreads),
     ("names", names), ("name-time", nameTime), ("short", short),
-    ("end-to-end", endToEnd), ("rounds", rounds), ("rounds-p", roundsP)]
+    ("end-to-end", endToEnd), ("rounds", rounds), ("rounds-p", roundsP), ("packed", packed)]
 
 def main (args : List String) : IO UInt32 := do
   match args with

@@ -131,6 +131,10 @@ status:
       file: "InteractionNets/ParOptimal.lean"
       sorry_count: 0
       axioms: ["propext", "Quot.sound", "Classical.choice"]
+    - declaration: "INet.XNet.packRun_short"
+      file: "InteractionNets/ParNames.lean"
+      sorry_count: 0
+      axioms: ["propext", "Quot.sound", "Classical.choice"]
 
 automation:
   methods:

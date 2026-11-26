@@ -209,7 +209,16 @@ The rounds come out between the larger of `W / p` and `D` and their sum,
 the bound; by `XNet.parRunP_twice` they are at most twice the rounds of
 any schedule of rounds of at most `p` pairs.  On the NetI64 nets of `noble-lang`, run outside this
 repository, a balanced sum of 128 constants (`W = 254`, `D = 14`) takes
-254, 74, 26 and 14 rounds for `p` = 1, 4, 16 and 64. -/
+254, 74, 26 and 14 rounds for `p` = 1, 4, 16 and 64.
+
+Rounds on names of one cell (`XNet.packRun`, `packed`): from the short
+form, with every identifier renamed to one cell after each round, the
+packed run fires the pairs of `XNet.parRun` in the same rounds, and the
+short forms of the two final nets are equal on every family measured.  The
+longest list of identifiers held, which bounds the numbers in the names
+(`XNet.packRun_short`), is that of the input on the sums (2,591 for 256
+nested additions, 21,504 for 64 sums side by side), which only shrink, and
+grows from 191 to 547 on Peano `32 * 3`. -/
 
 namespace INet
 

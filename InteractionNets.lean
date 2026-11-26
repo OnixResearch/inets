@@ -105,6 +105,7 @@ import InteractionNets.ShortNames
 import InteractionNets.EndToEnd
 import InteractionNets.ReadAgents
 import InteractionNets.ParOptimal
+import InteractionNets.ParNames
 import InteractionNets.Arith.JoinIndexed
 import InteractionNets.Core.JoinBound
 import InteractionNets.Peano.JoinBound
@@ -1972,6 +1973,15 @@ An executable reducer.  `XNet` is a finite net without history, as data;
                              `W / p + D` rounds (Brent's bound), so within
                              twice the rounds of any schedule of at most `p`
                              pairs a round (`INet.XNet.parRunP_twice`)
+* `INet.XNet.packRun_short`  rounds of `XNet.parStep`, each followed by
+                             renaming every identifier to one cell
+                             (`XNet.packRun`), fire the pairs of
+                             `XNet.parRun`, stop when it does on a copy of
+                             its result, and hold only names `[k]` with `k`
+                             below the length of the list of identifiers
+                             of the net held; a round commutes with
+                             renaming (`INet.XNet.parStep_copy`;
+                             `ParNames`)
 * `INet.XNet.run_map`        the reducer does not depend on names: on a
                              renamed input it stops after the same number of
                              steps, on a renaming of its output
